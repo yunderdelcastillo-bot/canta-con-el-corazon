@@ -30,7 +30,7 @@ app.get("/api/audio",async(req,res)=>{
   }
   const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,300);
   if(signError||!data?.signedUrl)return res.status(500).json({error:"No se pudo crear el enlace temporal."});
-  res.set("Cache-Control","no-store").json({url:data.signedUrl,expiresIn:300});
+  res.set("Cache-Control","no-store").redirect(302,data.signedUrl);
  }catch(e){res.status(500).json({error:"Error interno al preparar el audio."});}
 });
 app.get("/api/verify-grant",async(req,res)=>{
