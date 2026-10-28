@@ -21,6 +21,18 @@ h1{font-family:Georgia,serif;text-align:center;font-weight:500;font-size:clamp(2
 label{display:block;font-size:.92rem;color:#ffe9f0;margin:14px 0 7px}input,select,textarea{width:100%;border:1px solid #d9a5ba;border-radius:12px;background:#fff9f7;color:#341827;padding:13px;font:inherit}textarea{min-height:100px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 .player{border:1px solid #d9a5ba55;border-radius:16px;padding:16px;margin-top:18px;background:#220d1d66}.player audio{width:100%;margin-top:10px}
 footer{text-align:center;color:#d6b2c2;font-size:.8rem;margin:22px 0 0}
+/* Diseños automáticos para cada ocasión */
+body[data-theme="cumpleanos"]{background:radial-gradient(circle at top,#8154a5 0,#3c174d 48%,#160b22 100%)}
+body[data-theme="aniversario"]{background:radial-gradient(circle at top,#b17a38 0,#572b27 48%,#1e1018 100%)}
+body[data-theme="serenata"]{background:radial-gradient(circle at top,#a94e42 0,#551c2b 48%,#1b0a15 100%)}
+body[data-theme="homenaje"]{background:radial-gradient(circle at top,#3e6b82 0,#173746 48%,#08151d 100%)}
+body[data-theme="amistad"]{background:radial-gradient(circle at top,#3b887e 0,#17463f 48%,#081b1b 100%)}
+body[data-theme="romantico"]{background:radial-gradient(circle at top,#7a3158 0,#3b1028 45%,#180b19 100%)}
+body[data-theme="cumpleanos"] .art{background:radial-gradient(circle,#c7a4ff,#59378b 70%)}
+body[data-theme="aniversario"] .art{background:radial-gradient(circle,#f3c06a,#7b3c35 70%)}
+body[data-theme="serenata"] .art{background:radial-gradient(circle,#e58a79,#742a3d 70%)}
+body[data-theme="homenaje"] .art{background:radial-gradient(circle,#8fc9dd,#285a70 70%)}
+body[data-theme="amistad"] .art{background:radial-gradient(circle,#8ad9c2,#28665c 70%)}
 @media(max-width:520px){.grid{grid-template-columns:1fr}.card{padding:22px 18px}.art{width:125px;height:125px}}
 </style></head>
 <body><main class="wrap">
@@ -60,6 +72,9 @@ footer{text-align:center;color:#d6b2c2;font-size:.8rem;margin:22px 0 0}
 const params=new URLSearchParams(location.search);
 const name=params.get('para');const message=params.get('mensaje');const audio=params.get('audio');
 const lyricText=params.get('letra');
+const theme=params.get('tema')||'romantico';
+const allowedThemes=['romantico','cumpleanos','aniversario','serenata','homenaje','amistad'];
+document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
