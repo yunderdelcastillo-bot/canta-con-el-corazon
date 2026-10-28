@@ -18,7 +18,7 @@ app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
   const path=String(req.query.path||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path))return res.status(400).json({error:"Ruta de audio no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({error:"Ruta de audio no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,published,audio_path,owner_id").eq("audio_path",path).maybeSingle();
   if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
@@ -38,7 +38,7 @@ app.get("/api/verify-grant",async(req,res)=>{
   if(!ready())return res.status(503).json({valid:false,error:"Storage privado aún no está configurado."});
   const token=String(req.query.token||"");
   const path=String(req.query.path||"");
-  if(!token||!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path))return res.status(400).json({valid:false});
+  if(!token||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({valid:false});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",path).maybeSingle();
   if(!song)return res.status(404).json({valid:false});
