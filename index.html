@@ -37,7 +37,7 @@ footer{text-align:center;color:#d6b2c2;font-size:.8rem;margin:22px 0 0}
 <div class="art">♫</div>
 <h1 id="giftTitle">Una canción para ti</h1>
 <p class="subtitle" id="giftMessage">Porque tu historia merece convertirse en música.</p>
-<div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls class="hidden"></audio></div>
+<div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls class="hidden"></audio><div id="lyricsBox" class="hidden" style="margin-top:18px;padding:16px 10px;border-top:1px solid #d9a5ba55;text-align:center"><div style="font-size:.75rem;letter-spacing:.16em;color:#f6d78c;text-transform:uppercase;margin-bottom:10px">La letra de tu canción</div><p id="lyricsCurrent" style="font-family:Georgia,serif;font-size:1.35rem;line-height:1.5;color:#fff0e8;min-height:3em;margin:0">♪</p><p id="lyricsHint" class="note">La letra irá avanzando mientras suena la canción.</p></div></div>
 <button class="btn secondary" id="shareGift">Compartir este regalo</button>
 </div>
 </section>
@@ -59,10 +59,13 @@ footer{text-align:center;color:#d6b2c2;font-size:.8rem;margin:22px 0 0}
 <script>
 const params=new URLSearchParams(location.search);
 const name=params.get('para');const message=params.get('mensaje');const audio=params.get('audio');
+const lyricText=params.get('letra');
+let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
-if(audio && /^https:\/\//i.test(audio)){const p=document.getElementById('audioPlayer');p.src=audio;p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden')}
+if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
+if(audio && /^https:\/\//i.test(audio)){const p=document.getElementById('audioPlayer');p.src=audio;p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden');if(lyricLines.length){p.addEventListener('timeupdate',()=>{const duration=p.duration;if(!Number.isFinite(duration)||duration<=0)return;const idx=Math.min(lyricLines.length-1,Math.floor((p.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'});p.addEventListener('ended',()=>{document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥'})}}
 document.getElementById('openGift').addEventListener('click',()=>{document.getElementById('intro').classList.add('hidden');document.getElementById('revealed').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})});
 document.getElementById('shareGift').addEventListener('click',async()=>{try{await navigator.share({title:'Canta con el corazón',text:'Te comparto este regalo musical',url:location.href})}catch(e){try{await navigator.clipboard.writeText(location.href);alert('Enlace copiado. Ya puedes compartirlo.')}catch(_){prompt('Copia este enlace:',location.href)}}});
-document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim();const phone=v('contact').replace(/\D/g,'');const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+v('buyer')+'\nMi WhatsApp: '+v('contact')+'\nPara: '+v('recipient')+'\nOcasión: '+v('occasion')+'\nHistoria/dedicatoria: '+v('story')+'\nEstilo: '+v('style')+'\nVoz: '+v('voice')+'\nFecha deseada: '+(v('date')||'Por coordinar');const owner=prompt('Escribe el número de WhatsApp de Canta con el corazón, con código de país y solo números. Ejemplo Perú: 519XXXXXXXX');if(!owner)return;const clean=owner.replace(/\D/g,'');if(clean.length<10){alert('Revisa el número de WhatsApp del negocio e inténtalo de nuevo.');return}window.open('https://wa.me/'+clean+'?text='+encodeURIComponent(text),'_blank')});
+document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim();const phone=v('contact').replace(/\D/g,'');const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+v('buyer')+'\nMi WhatsApp: '+v('contact')+'\nPara: '+v('recipient')+'\nOcasión: '+v('occasion')+'\nHistoria/dedicatoria: '+v('story')+'\nEstilo: '+v('style')+'\nVoz: '+v('voice')+'\nFecha deseada: '+(v('date')||'Por coordinar');const owner='51977974730';window.open('https://wa.me/'+owner+'?text='+encodeURIComponent(text),'_blank')});
 </script></body></html>
