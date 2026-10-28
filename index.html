@@ -80,7 +80,7 @@ if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
 const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;
-if(audio && /^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audio)){
+if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
  const p=document.getElementById('audioPlayer');p.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio);p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden');resolvedAudioUrl=p.src;
  if(lyricLines.length){p.addEventListener('timeupdate',()=>{const duration=p.duration;if(!Number.isFinite(duration)||duration<=0)return;const idx=Math.min(lyricLines.length-1,Math.floor((p.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'});p.addEventListener('ended',()=>{document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥'})}
 }
