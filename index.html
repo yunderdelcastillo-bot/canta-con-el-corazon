@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#3b1028">
+<title>Canta con el corazón | Regalos musicales</title>
+<style>
+:root{--wine:#3b1028;--wine2:#681b43;--rose:#e9a5bd;--gold:#f6d78c;--cream:#fff7f2;--ink:#351b2b}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:radial-gradient(circle at top,#7a3158 0,#3b1028 45%,#180b19 100%);color:var(--cream);min-height:100vh}
+.wrap{width:min(100% - 28px,760px);margin:auto;padding:24px 0 50px}.brand{text-align:center;font-size:.88rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin:10px 0 22px}
+.card{background:linear-gradient(160deg,rgba(255,247,242,.12),rgba(255,247,242,.05));border:1px solid rgba(246,215,140,.38);border-radius:26px;padding:clamp(20px,5vw,38px);box-shadow:0 24px 70px #10050d80;backdrop-filter:blur(8px)}
+h1{font-family:Georgia,serif;text-align:center;font-weight:500;font-size:clamp(2.1rem,8vw,4rem);line-height:1.05;margin:0 0 12px;color:#fff0e8}
+.subtitle{text-align:center;color:#f4dce6;line-height:1.65;margin:0 auto 25px;max-width:520px}
+.art{width:150px;height:150px;border:1px solid var(--gold);border-radius:50%;margin:18px auto 22px;display:grid;place-items:center;background:radial-gradient(circle,#a94c73,#4b1634 70%);box-shadow:0 0 0 10px #f6d78c10,0 0 50px #e9a5bd38;font-size:4rem}
+.envelope{display:block;margin:0 auto 20px;border:0;background:transparent;color:inherit;cursor:pointer;text-align:center}
+.env{font-size:5.5rem;filter:drop-shadow(0 12px 15px #10050d80);transition:transform .3s}.envelope:hover .env{transform:translateY(-5px) rotate(-3deg)}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;width:100%;border:0;border-radius:999px;padding:15px 20px;background:linear-gradient(90deg,#f6d78c,#f2b7c9);color:#351426;font-weight:800;font-size:1rem;text-decoration:none;cursor:pointer;box-shadow:0 9px 24px #12040c50}
+.btn.secondary{background:transparent;border:1px solid #f6d78c;color:#fff4e9;box-shadow:none;margin-top:10px}
+.hidden{display:none!important}.note{text-align:center;color:#eac9d7;font-size:.88rem;margin-top:14px}
+.section{margin-top:18px}.section h2{font-family:Georgia,serif;font-weight:500;color:var(--gold);font-size:1.7rem;margin:0 0 12px}
+label{display:block;font-size:.92rem;color:#ffe9f0;margin:14px 0 7px}input,select,textarea{width:100%;border:1px solid #d9a5ba;border-radius:12px;background:#fff9f7;color:#341827;padding:13px;font:inherit}textarea{min-height:100px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.player{border:1px solid #d9a5ba55;border-radius:16px;padding:16px;margin-top:18px;background:#220d1d66}.player audio{width:100%;margin-top:10px}
+footer{text-align:center;color:#d6b2c2;font-size:.8rem;margin:22px 0 0}
+@media(max-width:520px){.grid{grid-template-columns:1fr}.card{padding:22px 18px}.art{width:125px;height:125px}}
+</style></head>
+<body><main class="wrap">
+<div class="brand">✦ Un regalo que se siente ✦</div>
+<section class="card" id="gift">
+<div id="intro">
+<h1>Canta con<br>el corazón</h1>
+<p class="subtitle">Hay sentimientos que merecen su propia canción. Descubre un regalo hecho para emocionar.</p>
+<div class="art">♥</div>
+<button class="envelope" id="openGift" aria-label="Abrir regalo"><span class="env">💌</span><span style="display:block;color:#f6d78c;font-weight:700">Toca para abrir tu regalo</span></button>
+<p class="note">Una dedicatoria única, creada con cariño.</p>
+</div>
+<div id="revealed" class="hidden">
+<div class="art">♫</div>
+<h1 id="giftTitle">Una canción para ti</h1>
+<p class="subtitle" id="giftMessage">Porque tu historia merece convertirse en música.</p>
+<div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls class="hidden"></audio></div>
+<button class="btn secondary" id="shareGift">Compartir este regalo</button>
+</div>
+</section>
+<section class="card section" id="order">
+<h2>💝 Crea un regalo inolvidable</h2>
+<p style="color:#f4dce6;line-height:1.6">Cuéntanos a quién quieres sorprender. Prepararemos tu canción personalizada por encargo, desde S/20. Te confirmaremos el precio y el plazo por WhatsApp.</p>
+<form id="orderForm">
+<div class="grid"><div><label for="buyer">Tu nombre</label><input id="buyer" required placeholder="¿Cómo te llamas?"></div><div><label for="contact">Tu WhatsApp</label><input id="contact" required placeholder="Tu número de contacto"></div></div>
+<div class="grid"><div><label for="recipient">¿Para quién es?</label><input id="recipient" required placeholder="Nombre o apodo"></div><div><label for="occasion">Ocasión</label><select id="occasion" required><option value="">Elige una opción</option><option>Cumpleaños</option><option>Aniversario</option><option>Declaración de amor</option><option>Reconciliación</option><option>Serenata</option><option>Homenaje</option><option>Otra ocasión</option></select></div></div>
+<label for="story">Cuéntanos su historia y qué quieres expresar</label><textarea id="story" required placeholder="Recuerdos, sentimientos, frases importantes..."></textarea>
+<div class="grid"><div><label for="style">Estilo musical</label><select id="style"><option>Balada romántica</option><option>Cumbia peruana</option><option>Ranchera</option><option>Salsa</option><option>Reguetón romántico</option><option>Otro estilo</option></select></div><div><label for="voice">Tipo de voz</label><select id="voice"><option>Voz femenina</option><option>Voz masculina</option><option>Me da igual</option></select></div></div>
+<label for="date">¿Para qué fecha la necesitas?</label><input id="date" type="date">
+<button class="btn" style="margin-top:20px" type="submit">Enviar mi solicitud por WhatsApp ♥</button>
+<p class="note">El formulario abrirá WhatsApp con los datos del pedido. No se realiza ningún cobro en esta página.</p>
+</form>
+</section>
+<footer>© Canta con el corazón · Regalos musicales personalizados<br>Usamos tus datos solo para coordinar tu solicitud.</footer>
+</main>
+<script>
+const params=new URLSearchParams(location.search);
+const name=params.get('para');const message=params.get('mensaje');const audio=params.get('audio');
+if(name){document.getElementById('giftTitle').textContent='Para '+name}
+if(message){document.getElementById('giftMessage').textContent=message}
+if(audio && /^https:\/\//i.test(audio)){const p=document.getElementById('audioPlayer');p.src=audio;p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden')}
+document.getElementById('openGift').addEventListener('click',()=>{document.getElementById('intro').classList.add('hidden');document.getElementById('revealed').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})});
+document.getElementById('shareGift').addEventListener('click',async()=>{try{await navigator.share({title:'Canta con el corazón',text:'Te comparto este regalo musical',url:location.href})}catch(e){try{await navigator.clipboard.writeText(location.href);alert('Enlace copiado. Ya puedes compartirlo.')}catch(_){prompt('Copia este enlace:',location.href)}}});
+document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim();const phone=v('contact').replace(/\D/g,'');const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+v('buyer')+'\nMi WhatsApp: '+v('contact')+'\nPara: '+v('recipient')+'\nOcasión: '+v('occasion')+'\nHistoria/dedicatoria: '+v('story')+'\nEstilo: '+v('style')+'\nVoz: '+v('voice')+'\nFecha deseada: '+(v('date')||'Por coordinar');const owner=prompt('Escribe el número de WhatsApp de Canta con el corazón, con código de país y solo números. Ejemplo Perú: 519XXXXXXXX');if(!owner)return;const clean=owner.replace(/\D/g,'');if(clean.length<10){alert('Revisa el número de WhatsApp del negocio e inténtalo de nuevo.');return}window.open('https://wa.me/'+clean+'?text='+encodeURIComponent(text),'_blank')});
+</script></body></html>
