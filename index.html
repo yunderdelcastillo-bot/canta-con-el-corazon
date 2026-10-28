@@ -79,9 +79,14 @@ let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
-if(audio && /^https:\/\//i.test(audio)){const p=document.getElementById('audioPlayer');p.src=audio;p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden');if(lyricLines.length){p.addEventListener('timeupdate',()=>{const duration=p.duration;if(!Number.isFinite(duration)||duration<=0)return;const idx=Math.min(lyricLines.length-1,Math.floor((p.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'});p.addEventListener('ended',()=>{document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥'})}}
+const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;
+if(audio && /^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audio)){
+ const p=document.getElementById('audioPlayer');p.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio);p.classList.remove('hidden');document.getElementById('audioNote').classList.add('hidden');resolvedAudioUrl=p.src;
+ if(lyricLines.length){p.addEventListener('timeupdate',()=>{const duration=p.duration;if(!Number.isFinite(duration)||duration<=0)return;const idx=Math.min(lyricLines.length-1,Math.floor((p.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'});p.addEventListener('ended',()=>{document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥'})}
+}
+if(grantToken&&audio){fetch(API_BASE+'/api/verify-grant?token='+encodeURIComponent(grantToken)+'&path='+encodeURIComponent(audio)).then(r=>r.json()).then(result=>{downloadAllowed=!!result.valid;else{downloadNotice.textContent='El enlace de autorización no es válido o ha vencido.'}}).catch(()=>{downloadNotice.textContent='No se pudo verificar la autorización. Inténtalo de nuevo.'})}
 document.getElementById('openGift').addEventListener('click',()=>{document.getElementById('intro').classList.add('hidden');document.getElementById('revealed').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})});
-const downloadAllowed=params.get('descarga')==='autorizada';
+
 const downloadButton=document.getElementById('downloadGift');
 const downloadNotice=document.getElementById('downloadNotice');
 const videoNotice=document.getElementById('videoNotice');
@@ -91,11 +96,11 @@ voucherLink.href='https://wa.me/51977974730?text='+encodeURIComponent(voucherMes
 if(downloadAllowed){downloadButton.textContent='⬇️ Crear y descargar mi regalo en video';downloadNotice.textContent='Tu descarga está habilitada. Pulsa para crear tu video.';voucherLink.classList.add('hidden');document.getElementById('voucherNote').classList.add('hidden')}
 downloadButton.addEventListener('click',async()=>{
  if(!downloadAllowed){downloadNotice.textContent='🔒 La descarga está bloqueada hasta que Canta con el corazón confirme tu pago.';return}
- if(!audio||!/^https:\\/\\//i.test(audio)){downloadNotice.textContent='Todavía no hay una canción disponible para crear el video.';return}
+ if(!audio||!resolvedAudioUrl){downloadNotice.textContent='Todavía no hay una canción disponible para crear el video.';return}
  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream){downloadNotice.textContent='Tu navegador no permite crear el video aquí. Prueba con Chrome actualizado.';return}
  try{
   downloadButton.disabled=true;downloadNotice.textContent='Preparando la canción y el diseño del video…';
-  const response=await fetch(audio);if(!response.ok)throw new Error('No se pudo cargar el audio');
+  const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio');
   const audioBlob=await response.blob();const audioUrl=URL.createObjectURL(audioBlob);
   const audioEl=new Audio();audioEl.src=audioUrl;audioEl.crossOrigin='anonymous';audioEl.preload='auto';
   await new Promise((resolve,reject)=>{audioEl.oncanplaythrough=resolve;audioEl.onerror=()=>reject(new Error('No se pudo preparar el audio'));audioEl.load()});
