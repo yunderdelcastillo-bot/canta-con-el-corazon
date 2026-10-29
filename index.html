@@ -110,6 +110,13 @@ const theme=params.get('tema')||'romantico';
 const allowedThemes=['romantico','cumpleanos','aniversario','serenata','homenaje','amistad'];
 document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 
+
+
+let lyricLines=[];
+if(name){document.getElementById('giftTitle').textContent='Para '+name}
+if(message){document.getElementById('giftMessage').textContent=message}
+if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
+const API_BASE='https://canta-corazon-private-api.onrender.com';
 /* Carga un clip romántico de Pixabay en la portada del regalo; falla de forma segura a la imagen fija. */
 (async function loadPixabayGiftBackground(){
  const themeQueries={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
@@ -133,12 +140,7 @@ document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
   video.play().catch(()=>{});
  }catch(e){console.warn("No se pudo cargar el fondo de Pixabay; se mantiene el fondo alternativo.");}
 })();
-
-let lyricLines=[];
-if(name){document.getElementById('giftTitle').textContent='Para '+name}
-if(message){document.getElementById('giftMessage').textContent=message}
-if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
-const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;let videoStatusManual=false;const previewKey='cch-preview-session-'+(audio||'');
+let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;let videoStatusManual=false;const previewKey='cch-preview-session-'+(audio||'');
 const audioPlayer=document.getElementById('audioPlayer');
 audioPlayer.setAttribute('controlsList','nodownload noplaybackrate');
 audioPlayer.setAttribute('disablePictureInPicture','');
