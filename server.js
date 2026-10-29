@@ -47,7 +47,7 @@ app.post("/api/preview/start",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||"");
   const token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de vista previa no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de vista previa no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,published,audio_path").eq("audio_path",path).maybeSingle();
   if(error||!song||!song.published)return res.status(404).json({error:"No se encontró la canción de muestra."});
@@ -64,7 +64,7 @@ app.post("/api/preview/complete",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||"");
   const token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de finalización no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de finalización no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id").eq("audio_path",path).maybeSingle();
   if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
@@ -98,7 +98,7 @@ app.get("/api/audio",async(req,res)=>{
    const {data:session,error:sessionError}=await db.from("song_preview_sessions").select("song_id,lease_until,completed_at").eq("song_id",song.id).eq("token_hash",previewHash).gt("lease_until",new Date().toISOString()).is("completed_at",null).maybeSingle();
    if(sessionError||!session)return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
   }
-  const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,60);
+  const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,300);
   if(signError||!data?.signedUrl)return res.status(500).json({error:"No se pudo crear el enlace temporal."});
   res.set("Cache-Control","no-store").redirect(302,data.signedUrl);
  }catch(e){res.status(500).json({error:"Error interno al preparar el audio."});}
