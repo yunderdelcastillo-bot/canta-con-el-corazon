@@ -42,6 +42,39 @@ async function ensureAudioBucket(){
 }
 ensureAudioBucket();
 app.get("/health",(req,res)=>res.json({ok:true,configured:ready(),storage:"private-signed-urls"}));
+app.post("/api/preview/start",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
+  const path=String(req.body?.path||"");
+  const token=String(req.body?.token||"");
+  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de vista previa no válida."});
+  const db=admin();
+  const {data:song,error}=await db.from("songs").select("id,published,audio_path").eq("audio_path",path).maybeSingle();
+  if(error||!song||!song.published)return res.status(404).json({error:"No se encontró la canción de muestra."});
+  const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+  const {data:status,error:claimError}=await db.rpc("claim_song_preview",{p_song_id:song.id,p_token_hash:tokenHash,p_lease_minutes:15});
+  if(claimError){console.error("claim_song_preview failed:",claimError.message);return res.status(503).json({error:"Falta activar la migración de vista previa en Supabase."});}
+  if(status==="completed")return res.status(410).json({error:"Esta vista previa ya terminó una reproducción. Solicita el enlace de pago para continuar."});
+  if(status!=="claimed")return res.status(409).json({error:"Esta canción ya se está escuchando en otro dispositivo. Si se interrumpió, espera 15 minutos e inténtalo de nuevo."});
+  res.set("Cache-Control","no-store").json({ok:true,token,leaseMinutes:15});
+ }catch(e){console.error("preview start:",e?.message||e);res.status(500).json({error:"No se pudo iniciar la vista previa."});}
+});
+app.post("/api/preview/complete",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
+  const path=String(req.body?.path||"");
+  const token=String(req.body?.token||"");
+  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de finalización no válida."});
+  const db=admin();
+  const {data:song,error}=await db.from("songs").select("id").eq("audio_path",path).maybeSingle();
+  if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
+  const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+  const {data:completed,error:completeError}=await db.rpc("complete_song_preview",{p_song_id:song.id,p_token_hash:tokenHash});
+  if(completeError){console.error("complete_song_preview failed:",completeError.message);return res.status(503).json({error:"No se pudo registrar el final de la vista previa."});}
+  if(!completed)return res.status(409).json({error:"La sesión de vista previa venció. Solicita un nuevo enlace de muestra."});
+  res.set("Cache-Control","no-store").json({ok:true,completed:true});
+ }catch(e){console.error("preview complete:",e?.message||e);res.status(500).json({error:"No se pudo finalizar la vista previa."});}
+});
 app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
@@ -51,12 +84,21 @@ app.get("/api/audio",async(req,res)=>{
   const {data:song,error}=await db.from("songs").select("id,published,audio_path,owner_id").eq("audio_path",path).maybeSingle();
   if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
   const grant=String(req.query.grant||"");
-  if(!song.published){
-   if(!grant)return res.status(403).json({error:"Canción no publicada."});
-   const {data:g}=await db.from("download_grants").select("id,song_id,expires_at").eq("token_hash",crypto.createHash("sha256").update(grant).digest("hex")).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
-   if(!g)return res.status(403).json({error:"Autorización inválida o vencida."});
+  const preview=String(req.query.preview||"");
+  let grantAuthorized=false;
+  if(grant){
+   const grantHash=crypto.createHash("sha256").update(grant).digest("hex");
+   const {data:g}=await db.from("download_grants").select("id,song_id,expires_at").eq("token_hash",grantHash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
+   grantAuthorized=!!g;
   }
-  const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,300);
+  if(!grantAuthorized){
+   if(!song.published)return res.status(403).json({error:"Canción no publicada."});
+   if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
+   const previewHash=crypto.createHash("sha256").update(preview).digest("hex");
+   const {data:session,error:sessionError}=await db.from("song_preview_sessions").select("song_id,lease_until,completed_at").eq("song_id",song.id).eq("token_hash",previewHash).gt("lease_until",new Date().toISOString()).is("completed_at",null).maybeSingle();
+   if(sessionError||!session)return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
+  }
+  const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,60);
   if(signError||!data?.signedUrl)return res.status(500).json({error:"No se pudo crear el enlace temporal."});
   res.set("Cache-Control","no-store").redirect(302,data.signedUrl);
  }catch(e){res.status(500).json({error:"Error interno al preparar el audio."});}
