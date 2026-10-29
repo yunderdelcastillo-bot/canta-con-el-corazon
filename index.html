@@ -72,6 +72,7 @@ body[data-theme="amistad"] .art{background:radial-gradient(circle,#8ad9c2,#28665
 const params=new URLSearchParams(location.search);
 const name=params.get('para');const message=params.get('mensaje');const audio=params.get('audio');
 const lyricText=params.get('letra');
+const previewLinkToken=params.get('previewLink')||'';
 const theme=params.get('tema')||'romantico';
 const allowedThemes=['romantico','cumpleanos','aniversario','serenata','homenaje','amistad'];
 document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
@@ -108,15 +109,15 @@ async function startPreview(){
  const playButton=document.getElementById('playPreview');
  playButton.disabled=true;playButton.textContent='Preparando tu vista previa…';
  try{
-  try{previewToken=sessionStorage.getItem(previewKey)||''}catch(e){previewToken=''}
-  if(!previewToken)previewToken=crypto.randomUUID();
+  previewToken=previewLinkToken;
+  if(!previewToken)throw new Error('Este enlace no incluye una muestra autorizada. Solicita otro enlace.');
   const response=await fetch(API_BASE+'/api/preview/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
   const result=await response.json();
   if(!response.ok){
    if(response.status===410){try{sessionStorage.removeItem(previewKey)}catch(e){}lockPreview(result.error||'Esta vista previa ya terminó. Solicita el enlace de pago.');return}
    throw new Error(result.error||'No se pudo iniciar la vista previa.');
   }
-  try{sessionStorage.setItem(previewKey,previewToken)}catch(e){}
+  /* Token único incluido en el enlace generado desde el panel. */
   audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewToken);
   resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');playButton.classList.add('hidden');previewLastTime=0;
   try{await audioPlayer.play()}catch(e){audioNote.textContent='Pulsa reproducir en el reproductor para comenzar. Esta vista previa está reservada a este dispositivo durante 15 minutos.';audioNote.classList.remove('hidden')}
@@ -131,7 +132,7 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   let playButton=document.getElementById('playPreview');
   if(!playButton){playButton=document.createElement('button');playButton.id='playPreview';playButton.type='button';playButton.className='btn secondary';playButton.textContent='▶ Escuchar vista previa gratis';audioNote.after(playButton)}
   playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
-  try{if(localStorage.getItem('cch-preview-played-'+audio)==='1')lockPreview()}catch(e){}
+  try{if(!previewLinkToken||localStorage.getItem('cch-preview-played-'+audio+'-'+previewLinkToken)==='1')lockPreview('Este enlace de muestra ya se utilizó. Solicita otro enlace desde el panel.')}catch(e){}
  }
  audioPlayer.addEventListener('timeupdate',()=>{const duration=audioPlayer.duration;if(Number.isFinite(duration)&&duration>0&&lyricLines.length){const idx=Math.min(lyricLines.length-1,Math.floor((audioPlayer.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'}});
  audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
@@ -142,7 +143,7 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
    try{
     const response=await fetch(API_BASE+'/api/preview/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
     const result=await response.json();
-    try{localStorage.setItem('cch-preview-played-'+audio,'1');sessionStorage.removeItem(previewKey)}catch(e){}
+    try{localStorage.setItem('cch-preview-played-'+audio+'-'+previewLinkToken,'1')}catch(e){}
     lockPreview(result.ok?'La vista previa gratuita ya terminó. Si te encantó, solicita tu enlace de pago.':'La vista previa terminó. Solicita el enlace de pago para continuar.');
    }catch(e){lockPreview('La vista previa terminó. Solicita el enlace de pago para continuar.')}
   }
