@@ -24,6 +24,54 @@ create policy "Owners delete own song audio"
 on storage.objects for delete to authenticated
 using (bucket_id='songs-audio' and (storage.foldername(name))[1]=auth.uid()::text);
 
+
+-- Reafirma los permisos RLS de la tabla de canciones para el usuario autenticado.
+-- El propietario solo puede crear, modificar y borrar sus propias canciones.
+alter table public.songs enable row level security;
+
+drop policy if exists "Owners can insert their songs" on public.songs;
+create policy "Owners can insert their songs"
+on public.songs for insert to authenticated
+with check (owner_id = auth.uid());
+
+drop policy if exists "Owners can update their songs" on public.songs;
+create policy "Owners can update their songs"
+on public.songs for update to authenticated
+using (owner_id = auth.uid())
+with check (owner_id = auth.uid());
+
+drop policy if exists "Owners can delete their songs" on public.songs;
+create policy "Owners can delete their songs"
+on public.songs for delete to authenticated
+using (owner_id = auth.uid());
+
+drop policy if exists "Public can read published songs" on public.songs;
+create policy "Public can read published songs"
+on public.songs for select to anon, authenticated
+using (published = true or owner_id = auth.uid());
+
+-- Permisos de Storage: solo cada usuario autenticado puede gestionar archivos
+-- dentro de la carpeta cuyo nombre es su propio UUID.
+drop policy if exists "Authenticated users upload song audio" on storage.objects;
+drop policy if exists "Authenticated users upload own song audio" on storage.objects;
+drop policy if exists "Owners update own song audio" on storage.objects;
+drop policy if exists "Owners delete own song audio" on storage.objects;
+
+create policy "Authenticated users upload own song audio"
+on storage.objects for insert to authenticated
+with check (bucket_id='songs-audio' and (storage.foldername(name))[1]=auth.uid()::text);
+
+create policy "Owners update own song audio"
+on storage.objects for update to authenticated
+using (bucket_id='songs-audio' and (storage.foldername(name))[1]=auth.uid()::text)
+with check (bucket_id='songs-audio' and (storage.foldername(name))[1]=auth.uid()::text);
+
+create policy "Owners delete own song audio"
+on storage.objects for delete to authenticated
+using (bucket_id='songs-audio' and (storage.foldername(name))[1]=auth.uid()::text);
+
+notify pgrst, 'reload schema';
+
 -- Guarda la ruta de archivo (no una URL pública permanente).
 alter table public.songs add column if not exists audio_path text;
 -- Las filas antiguas que solo tienen audio_url no se migran automáticamente:
