@@ -186,7 +186,33 @@ downloadButton.addEventListener('click',async()=>{
   const recorderOptions={videoBitsPerSecond:1400000,audioBitsPerSecond:128000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-  const draw=()=>{const w=canvas.width,h=canvas.height;const grad=ctx.createLinearGradient(0,0,w,h);const themes={cumpleanos:['#8154a5','#160b22'],aniversario:['#b17a38','#1e1018'],serenata:['#a94e42','#1b0a15'],homenaje:['#3e6b82','#08151d'],amistad:['#3b887e','#081b1b'],romantico:['#7a3158','#180b19']};const colors=themes[theme]||themes.romantico;grad.addColorStop(0,colors[0]);grad.addColorStop(1,colors[1]);ctx.fillStyle=grad;ctx.fillRect(0,0,w,h);ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='28px sans-serif';ctx.fillText('✦ CANTA CON EL CORAZÓN ✦',w/2,105);ctx.fillStyle='#fff0e8';ctx.font='bold 48px Georgia,serif';const title='Para '+(name||'ti');wrapText(ctx,title,w/2,270,610,58);ctx.strokeStyle='#f6d78c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(w/2,440,105,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#f2b7c9';ctx.font='78px sans-serif';ctx.fillText('♫',w/2,466);ctx.fillStyle='#fff0e8';ctx.font='30px Georgia,serif';wrapText(ctx,message||'Un regalo creado desde el corazón',w/2,610,590,43);const idx=lyricLines.length&&audioEl.duration?Math.min(lyricLines.length-1,Math.floor(audioEl.currentTime/audioEl.duration*lyricLines.length)):-1;const lyric=idx>=0?lyricLines[idx]:'♪ Una canción hecha para ti ♪';ctx.fillStyle='#f6d78c';ctx.font='bold 34px Georgia,serif';wrapText(ctx,lyric,w/2,900,610,46);ctx.fillStyle='#f4dce6';ctx.font='24px sans-serif';ctx.fillText('Con cariño, para guardar y compartir ♥',w/2,1155);ctx.fillStyle='#f6d78c';ctx.fillRect(70,1200,580,5);ctx.fillStyle='#e9a5bd';ctx.fillRect(70,1200,580*(audioEl.duration?audioEl.currentTime/audioEl.duration:0),5);if(recorder.state==='recording')requestAnimationFrame(draw)};
+  const draw=()=>{
+   const w=canvas.width,h=canvas.height;
+   const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#33213f');sky.addColorStop(.42,'#b77b64');sky.addColorStop(.72,'#e0b17b');sky.addColorStop(1,'#211321');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+   const sun=ctx.createRadialGradient(w*.62,h*.24,8,w*.62,h*.24,260);sun.addColorStop(0,'rgba(255,226,157,.9)');sun.addColorStop(1,'rgba(255,218,150,0)');ctx.fillStyle=sun;ctx.fillRect(0,0,w,h);
+   const mountain=(points,color)=>{ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.lineTo(w,h*.72);ctx.lineTo(0,h*.72);ctx.closePath();ctx.fillStyle=color;ctx.fill()};
+   mountain([[0,390],[95,280],[170,360],[275,220],[370,355],[490,245],[590,335],[720,205]],'#4b3448');
+   mountain([[0,480],[110,345],[200,425],[310,310],[410,430],[530,315],[650,390],[720,340]],'#70505a');
+   mountain([[0,590],[100,470],[190,535],[300,445],[400,555],[520,430],[620,510],[720,455]],'#8d665f');
+   ctx.fillStyle='#c59a6a';ctx.beginPath();ctx.moveTo(0,630);ctx.quadraticCurveTo(170,530,315,650);ctx.quadraticCurveTo(490,730,720,590);ctx.lineTo(720,920);ctx.lineTo(0,920);ctx.closePath();ctx.fill();
+   ctx.fillStyle='#70513f';ctx.beginPath();ctx.moveTo(0,720);ctx.quadraticCurveTo(200,630,370,740);ctx.quadraticCurveTo(540,830,720,700);ctx.lineTo(720,1020);ctx.lineTo(0,1020);ctx.closePath();ctx.fill();
+   ctx.strokeStyle='rgba(246,215,140,.3)';ctx.lineWidth=3;for(let k=0;k<5;k++){ctx.beginPath();ctx.moveTo(0,700+k*38);ctx.quadraticCurveTo(250,650+k*36,720,710+k*38);ctx.stroke()}
+   // Casa acogedora al pie de las montañas
+   ctx.fillStyle='#4b302b';ctx.fillRect(390,535,150,100);ctx.fillStyle='#2c2028';ctx.beginPath();ctx.moveTo(370,540);ctx.lineTo(455,475);ctx.lineTo(560,540);ctx.closePath();ctx.fill();ctx.fillStyle='#f6d78c';ctx.fillRect(420,565,24,28);ctx.fillRect(482,565,24,28);ctx.fillStyle='#21151d';ctx.fillRect(452,585,27,50);
+   // Siluetas de árboles
+   for(const t of [[95,570,1],[155,600,.75],[330,625,.8],[585,605,.85]]){const x=t[0],y=t[1],s=t[2];ctx.fillStyle='#30252b';ctx.fillRect(x-5*s,y,10*s,75*s);ctx.beginPath();ctx.moveTo(x,y-75*s);ctx.lineTo(x-32*s,y-10*s);ctx.lineTo(x+32*s,y-10*s);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(x,y-48*s);ctx.lineTo(x-27*s,y+5*s);ctx.lineTo(x+27*s,y+5*s);ctx.closePath();ctx.fill()}
+   const shade=ctx.createLinearGradient(0,420,0,h);shade.addColorStop(0,'rgba(24,10,24,.08)');shade.addColorStop(.48,'rgba(24,10,24,.38)');shade.addColorStop(1,'rgba(14,7,18,.96)');ctx.fillStyle=shade;ctx.fillRect(0,400,w,h-400);
+   ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 24px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,90);
+   ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
+   const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
+   ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
+   const idx=lyricLines.length&&audioEl.duration?Math.min(lyricLines.length-1,Math.floor(audioEl.currentTime/audioEl.duration*lyricLines.length)):-1;
+   const lyric=idx>=0?lyricLines[idx]:'♪ Una canción hecha para ti ♪';
+   ctx.fillStyle='#f6d78c';ctx.font='bold 30px Georgia,serif';wrapText(ctx,lyric,w/2,1010,620,42);
+   ctx.fillStyle='#f4dce6';ctx.font='22px sans-serif';ctx.fillText('Hecha con amor ♥ para guardar y compartir',w/2,1155);
+   ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(60,1200,600,5);ctx.fillStyle='#f6d78c';ctx.fillRect(60,1200,600*(audioEl.duration?audioEl.currentTime/audioEl.duration:0),5);
+   if(recorder.state==='recording')requestAnimationFrame(draw)
+  };
   function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
   const chunksPromise=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=()=>reject(new Error('Falló la grabación del video'))});
   let progressTimer=null, endedHandler=null, timeoutId=null;
