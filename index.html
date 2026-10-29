@@ -236,6 +236,19 @@ downloadButton.addEventListener('click',async()=>{
   videoStatusManual=true;downloadButton.disabled=true;downloadNotice.textContent='Preparando la canción y el diseño del video…';
   const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio');
   const audioBlob=await response.blob();const audioUrl=URL.createObjectURL(audioBlob);
+  let stockVideo=null;
+  try{
+   const queryByTheme={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
+   const stockResponse=await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(queryByTheme[theme]||"romantic couple sunset"));
+   if(stockResponse.ok){
+    const stockData=await stockResponse.json();const stock=(stockData.videos||[]).find(v=>v.preview);
+    if(stock){
+     stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src=stock.preview;
+     await new Promise((resolve,reject)=>{stockVideo.onloadeddata=resolve;stockVideo.onerror=()=>reject(new Error("No se pudo cargar el clip de Pixabay"));stockVideo.load()});
+     await stockVideo.play().catch(()=>{});
+    }
+   }
+  }catch(stockError){console.warn("Se usará el fondo animado alternativo para el MP4.",stockError?.message||"");stockVideo=null}
   const audioEl=new Audio();audioEl.src=audioUrl;audioEl.crossOrigin='anonymous';audioEl.preload='auto';
   await new Promise((resolve,reject)=>{audioEl.oncanplaythrough=resolve;audioEl.onerror=()=>reject(new Error('No se pudo preparar el audio'));audioEl.load()});
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
@@ -252,7 +265,14 @@ downloadButton.addEventListener('click',async()=>{
    const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
    // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
    ctx.save();ctx.translate(w/2,h/2);const cinematicZoom=1.015+progress*.045+Math.sin(motionTime*.42)*.008;ctx.scale(cinematicZoom,cinematicZoom);ctx.translate(-w/2,-h/2);
-   const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#33213f');sky.addColorStop(.42,'#b77b64');sky.addColorStop(.72,'#e0b17b');sky.addColorStop(1,'#211321');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+   if(stockVideo&&stockVideo.readyState>=2){
+    const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
+    const offsetX=(w-dw)/2,offsetY=(h-dh)/2;
+    try{ctx.drawImage(stockVideo,offsetX,offsetY,dw,dh)}catch(e){ctx.fillStyle="#33213f";ctx.fillRect(0,0,w,h)}
+    ctx.fillStyle="rgba(20,8,22,.24)";ctx.fillRect(0,0,w,h);
+   }else{
+    const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#33213f');sky.addColorStop(.42,'#b77b64');sky.addColorStop(.72,'#e0b17b');sky.addColorStop(1,'#211321');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
+   }
    const sun=ctx.createRadialGradient(w*(.62+Math.sin(motionTime*.18)*.035),h*(.24+Math.sin(motionTime*.23)*.012),8,w*(.62+Math.sin(motionTime*.18)*.035),h*(.24+Math.sin(motionTime*.23)*.012),290);sun.addColorStop(0,'rgba(255,226,157,.9)');sun.addColorStop(1,'rgba(255,218,150,0)');ctx.fillStyle=sun;ctx.fillRect(0,0,w,h);
    const mountain=(points,color)=>{ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.lineTo(w,h*.72);ctx.lineTo(0,h*.72);ctx.closePath();ctx.fillStyle=color;ctx.fill()};
    mountain([[0,390],[95,280],[170,360],[275,220],[370,355],[490,245],[590,335],[720,205]],'#4b3448');
