@@ -194,8 +194,8 @@ downloadButton.addEventListener('click',async()=>{
    const finish=()=>{if(finished)return;finished=true;downloadNotice.textContent='Finalizando el archivo de video…';resolve()};
    endedHandler=finish;
    audioEl.addEventListener('ended',finish,{once:true});
-   audioEl.addEventListener('timeupdate',()=>{if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(pct>=100||audioEl.currentTime>=audioEl.duration-0.5)finish()}});
-   const monitorEnd=()=>{if(finished)return;if(audioEl.duration&&Number.isFinite(audioEl.duration)&&audioEl.currentTime>=audioEl.duration-0.5){finish();return}requestAnimationFrame(monitorEnd)};
+   audioEl.addEventListener('timeupdate',()=>{if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended)finish()}});
+   const monitorEnd=()=>{if(finished)return;if(audioEl.ended){finish();return}requestAnimationFrame(monitorEnd)};
    requestAnimationFrame(monitorEnd);
    timeoutId=setTimeout(()=>{if(audioEl.duration&&audioEl.currentTime>=audioEl.duration-1)finish();else reject(new Error('La creación tardó demasiado. Mantén Chrome abierto y la pantalla encendida; vuelve a intentarlo.'))},Math.max(180000,(Number(audioEl.duration)||240)*1000+10000));
   });
