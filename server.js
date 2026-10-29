@@ -67,7 +67,7 @@ app.post("/api/preview/start",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||""),token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de muestra no válido."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de muestra no válido."});
   const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
   const {data:link,error}=await db.from("song_preview_links").select("id,song_id,started_at,completed_at").eq("token_hash",hash).maybeSingle();
   if(error||!link)return res.status(410).json({error:"Este enlace no existe o ya venció."});
@@ -84,7 +84,7 @@ app.post("/api/preview/complete",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||""),token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Solicitud no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Solicitud no válida."});
   const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
   const {data:link,error}=await db.from("song_preview_links").select("id,song_id,completed_at").eq("token_hash",hash).maybeSingle();
   if(error||!link||link.completed_at)return res.status(409).json({error:"Este enlace ya fue utilizado."});
