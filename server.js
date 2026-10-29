@@ -13,6 +13,34 @@ const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anonKey=process.env.SUPABASE_ANON_KEY;
 const ready=()=>Boolean(url&&serviceKey&&anonKey);
 const admin=()=>createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+
+// Garantiza que exista el bucket privado usado por las canciones.
+// No lo hace público: las descargas siguen usando enlaces temporales firmados.
+async function ensureAudioBucket(){
+ if(!ready()){
+  console.error("Supabase no está configurado: faltan SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY o SUPABASE_ANON_KEY.");
+  return;
+ }
+ try{
+  const db=admin();
+  const {data:buckets,error:listError}=await db.storage.listBuckets();
+  if(listError) throw listError;
+  if(!(buckets||[]).some(b=>b.name==="songs-audio")){
+   const {error:createError}=await db.storage.createBucket("songs-audio",{
+    public:false,
+    fileSizeLimit:"50MB",
+    allowedMimeTypes:["audio/mpeg","audio/mp3"]
+   });
+   if(createError && !/already exists/i.test(createError.message||"")) throw createError;
+   console.log("Bucket privado songs-audio creado.");
+  }else{
+   console.log("Bucket songs-audio encontrado.");
+  }
+ }catch(e){
+  console.error("No se pudo verificar/crear el bucket songs-audio:",e?.message||e);
+ }
+}
+ensureAudioBucket();
 app.get("/health",(req,res)=>res.json({ok:true,configured:ready(),storage:"private-signed-urls"}));
 app.get("/api/audio",async(req,res)=>{
  try{
