@@ -87,7 +87,7 @@ app.get("/api/verify-preview-download",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({valid:false});
   const token=String(req.query.token||""),path=String(req.query.path||"");
-  if(!/^[A-Za-z0-9_-]{40,100}$/.test(token)||!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path))return res.status(400).json({valid:false});
+  if(!/^[A-Za-z0-9_-]{40,100}$/.test(token)||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(path))return res.status(400).json({valid:false});
   const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",path).maybeSingle();
   if(!song)return res.status(404).json({valid:false});
