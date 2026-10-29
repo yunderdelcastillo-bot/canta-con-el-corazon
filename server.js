@@ -242,7 +242,7 @@ app.post("/api/convert-video",async(req,res)=>{
   const audioPath=String(req.query.path||"");
   const previewToken=String(req.query.previewToken||"");
   const grantToken=String(req.query.grantToken||"");
-  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
   if(!song)return res.status(404).json({error:"No se encontró la canción."});
