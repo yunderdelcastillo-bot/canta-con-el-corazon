@@ -251,6 +251,12 @@ downloadButton.addEventListener('click',async()=>{
   }catch(stockError){console.warn("Se usará el fondo animado alternativo para el MP4.",stockError?.message||"");stockVideo=null}
   const audioEl=new Audio();audioEl.src=audioUrl;audioEl.crossOrigin='anonymous';audioEl.preload='auto';
   await new Promise((resolve,reject)=>{audioEl.oncanplaythrough=resolve;audioEl.onerror=()=>reject(new Error('No se pudo preparar el audio'));audioEl.load()});
+  await new Promise((resolve,reject)=>{if(Number.isFinite(audioEl.duration)&&audioEl.duration>0)return resolve();audioEl.onloadedmetadata=resolve;audioEl.onerror=()=>reject(new Error('No se pudo comprobar la duración de la canción.'));});
+  const sourceDuration=Number(audioPlayer.duration);
+  const recordingDuration=Number(audioEl.duration);
+  if(!Number.isFinite(recordingDuration)||recordingDuration<=0)throw new Error('No se pudo leer la duración completa de la canción.');
+  if(Number.isFinite(sourceDuration)&&sourceDuration>0&&recordingDuration<sourceDuration-2)throw new Error('El audio descargado está incompleto ('+Math.round(recordingDuration)+' s frente a '+Math.round(sourceDuration)+' s). No se generó un video recortado; vuelve a intentarlo.');
+
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
@@ -342,9 +348,9 @@ downloadButton.addEventListener('click',async()=>{
    const finish=()=>{if(finished)return;finished=true;downloadNotice.textContent='Finalizando el archivo de video…';resolve()};
    endedHandler=finish;
    audioEl.addEventListener('ended',finish,{once:true});
-   timeUpdateHandler=()=>{if(finished)return;if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-1.5||pct>=100)finish()}};
+   timeUpdateHandler=()=>{if(finished)return;if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-0.35)finish()}};
    audioEl.addEventListener('timeupdate',timeUpdateHandler);
-   const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-1.5||Math.floor(audioEl.currentTime/audioEl.duration*100)>=100)){finish();return}requestAnimationFrame(monitorEnd)};
+   const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-0.35)){finish();return}requestAnimationFrame(monitorEnd)};
    requestAnimationFrame(monitorEnd);
    timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(180000,(Number(audioEl.duration)||240)*1000+15000));
   });
