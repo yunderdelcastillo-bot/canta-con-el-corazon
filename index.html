@@ -49,7 +49,7 @@ body[data-theme="amistad"] .art{background:radial-gradient(circle,#8ad9c2,#28665
 <div class="art">♫</div>
 <h1 id="giftTitle">Una canción para ti</h1>
 <p class="subtitle" id="giftMessage">Porque tu historia merece convertirse en música.</p>
-<div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls class="hidden"></audio><div id="lyricsBox" class="hidden" style="margin-top:18px;padding:16px 10px;border-top:1px solid #d9a5ba55;text-align:center"><div style="font-size:.75rem;letter-spacing:.16em;color:#f6d78c;text-transform:uppercase;margin-bottom:10px">La letra de tu canción</div><p id="lyricsCurrent" style="font-family:Georgia,serif;font-size:1.35rem;line-height:1.5;color:#fff0e8;min-height:3em;margin:0">♪</p><p id="lyricsHint" class="note">La letra irá avanzando mientras suena la canción.</p></div></div>
+<div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls controlsList="nodownload noplaybackrate" disablePictureInPicture class="hidden"></audio><div id="lyricsBox" class="hidden" style="margin-top:18px;padding:16px 10px;border-top:1px solid #d9a5ba55;text-align:center"><div style="font-size:.75rem;letter-spacing:.16em;color:#f6d78c;text-transform:uppercase;margin-bottom:10px">La letra de tu canción</div><p id="lyricsCurrent" style="font-family:Georgia,serif;font-size:1.35rem;line-height:1.5;color:#fff0e8;min-height:3em;margin:0">♪</p><p id="lyricsHint" class="note">La letra irá avanzando mientras suena la canción.</p></div></div>
 <button class="btn" id="downloadGift" type="button">🔒 Descargar mi regalo en video</button><p class="note" id="downloadNotice">La descarga del video se habilitará después de confirmar tu pago.</p><p class="note" id="videoNotice">El video se creará con el fondo, la dedicatoria, la letra y la canción. Formato de descarga: WebM, compatible con navegadores modernos.</p><a class="btn secondary" id="sendVoucher" href="https://wa.me/51977974730" target="_blank" rel="noopener">📩 Ya pagué: enviar mi voucher</a><p class="note" id="voucherNote">Se abrirá WhatsApp. Adjunta la captura o foto de tu comprobante en el chat y envíala para que podamos revisarla.</p><button class="btn secondary" id="shareGift">Compartir este regalo</button>
 </div>
 </section>
@@ -81,6 +81,9 @@ if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
 const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;const previewKey='cch-preview-session-'+(audio||'');
 const audioPlayer=document.getElementById('audioPlayer');
+audioPlayer.setAttribute('controlsList','nodownload noplaybackrate');
+audioPlayer.setAttribute('disablePictureInPicture','');
+audioPlayer.addEventListener('contextmenu',e=>e.preventDefault());
 const audioNote=document.getElementById('audioNote');
 let previewToken='';
 let previewLastTime=0;
