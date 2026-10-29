@@ -265,7 +265,7 @@ downloadButton.addEventListener('click',async()=>{
   });
   recorder.start(1000);
   downloadNotice.textContent='Creando video… 0%. Mantén esta página abierta y la pantalla encendida hasta que termine.';
-  try{await audioEl.play();draw();await waitForEnd()}finally{
+  try{await audioEl.play();draw();await waitForEnd}finally{
    if(timeoutId)clearTimeout(timeoutId);
    if(endedHandler)audioEl.removeEventListener('ended',endedHandler);
    if(timeUpdateHandler)audioEl.removeEventListener('timeupdate',timeUpdateHandler);
