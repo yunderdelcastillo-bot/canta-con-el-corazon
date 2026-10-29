@@ -12,8 +12,10 @@ const execFileAsync=promisify(execFile);
 
 const app=express();
 app.use(express.json({limit:"40mb"}));
-const allowed=(process.env.ALLOWED_ORIGINS||"https://canta-con-el-corazon.onrender.com").split(",").map(s=>s.trim());
-app.use(cors({origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);cb(new Error("Origin not allowed"));}}));
+const allowed=[...new Set(["https://canta-con-el-corazon.onrender.com",...(process.env.ALLOWED_ORIGINS||"").split(",").map(s=>s.trim()).filter(Boolean)])];
+const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);console.error("CORS blocked origin:",origin);cb(new Error("Origin not allowed: "+origin));},methods:["GET","POST","OPTIONS"],allowedHeaders:["Content-Type","Authorization"],maxAge:86400};
+app.use(cors(corsOptions));
+app.options(/.*/,cors(corsOptions));
 const port=process.env.PORT||10000;
 const url=process.env.SUPABASE_URL;
 const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -236,6 +238,7 @@ app.post("/api/grants",async(req,res)=>{
 });
 
 app.post("/api/convert-video",async(req,res)=>{
+ console.log("MP4 conversion request received; origin:",req.headers.origin||"(none)");
  let dir="";
  try{
   if(!ready())return res.status(503).json({error:"El servicio de conversión no está configurado."});
@@ -257,7 +260,7 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant;
   }
-  if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
+  if(!allowedDownload){console.warn("MP4 conversion denied: no valid download grant for song",song.id);return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});}
   const chunks=[];let total=0;const maxBytes=90*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El video es demasiado grande. Intenta una canción más corta."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
