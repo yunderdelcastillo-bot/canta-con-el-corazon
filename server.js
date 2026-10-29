@@ -276,4 +276,28 @@ app.post("/api/convert-video",async(req,res)=>{
  finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
 });
 
+
+/* Busca clips de fondo en Pixabay. Las respuestas se guardan 24 h según las reglas de la API. */
+const pixabayVideoCache=new Map();
+app.get("/api/pixabay/videos",async(req,res)=>{
+ try{
+  const apiKey=process.env.PIXABAY_API_KEY;
+  if(!apiKey)return res.status(503).json({error:"La búsqueda de videos no está configurada. Añade PIXABAY_API_KEY en Render."});
+  const allowedQueries=new Set(["romantic couple sunset","romantic roses","sunset ocean","romantic candles","birthday celebration","wedding anniversary","beautiful nature","friendship","serenade romantic"]);
+  const raw=String(req.query.q||"romantic couple sunset").toLowerCase().replace(/[^a-z0-9 áéíóúñ-]/gi,"").trim().slice(0,80);
+  const q=allowedQueries.has(raw)?raw:"romantic couple sunset";
+  const cacheKey=q;
+  const cached=pixabayVideoCache.get(cacheKey);
+  if(cached&&cached.expires>Date.now())return res.set("Cache-Control","public, max-age=3600").json(cached.data);
+  const endpoint="https://pixabay.com/api/videos/?key="+encodeURIComponent(apiKey)+"&q="+encodeURIComponent(q)+"&safesearch=true&per_page=12&order=popular";
+  const response=await fetch(endpoint,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(12000)});
+  if(!response.ok){console.error("Pixabay API status:",response.status);return res.status(response.status===429?429:502).json({error:response.status===429?"Pixabay alcanzó el límite temporal de búsquedas. Inténtalo más tarde.":"Pixabay no pudo completar la búsqueda."});}
+  const payload=await response.json();
+  const hits=(payload.hits||[]).map(v=>({id:v.id,tags:String(v.tags||"").slice(0,180),duration:v.duration,source:v.pageURL,preview:v.videos?.small?.url||v.videos?.medium?.url||v.videos?.tiny?.url,thumbnail:v.videos?.small?.thumbnail||v.videos?.medium?.thumbnail||v.videos?.tiny?.thumbnail})).filter(v=>v.preview);
+  const data={provider:"Pixabay",attributionUrl:"https://pixabay.com/videos/",query:q,videos:hits};
+  pixabayVideoCache.set(cacheKey,{data,expires:Date.now()+24*60*60*1000});
+  res.set("Cache-Control","public, max-age=3600").json(data);
+ }catch(e){console.error("Pixabay video search:",e?.message||e);res.status(502).json({error:"No se pudo buscar videos en Pixabay en este momento."});}
+});
+
 app.listen(port,"0.0.0.0",()=>console.log("Private storage API listening on "+port));
