@@ -251,13 +251,14 @@ downloadButton.addEventListener('click',async()=>{
   };
   function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
   const chunksPromise=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=()=>reject(new Error('Falló la grabación del video'))});
-  let progressTimer=null, endedHandler=null, timeoutId=null;
+  let progressTimer=null, endedHandler=null, timeUpdateHandler=null, timeoutId=null;
   const waitForEnd=new Promise((resolve,reject)=>{
    let finished=false;
    const finish=()=>{if(finished)return;finished=true;downloadNotice.textContent='Finalizando el archivo de video…';resolve()};
    endedHandler=finish;
    audioEl.addEventListener('ended',finish,{once:true});
-   audioEl.addEventListener('timeupdate',()=>{if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-1.5||pct>=100)finish()}});
+   timeUpdateHandler=()=>{if(finished)return;if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-1.5||pct>=100)finish()}};
+   audioEl.addEventListener('timeupdate',timeUpdateHandler);
    const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-1.5||Math.floor(audioEl.currentTime/audioEl.duration*100)>=100)){finish();return}requestAnimationFrame(monitorEnd)};
    requestAnimationFrame(monitorEnd);
    timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(180000,(Number(audioEl.duration)||240)*1000+15000));
@@ -267,9 +268,12 @@ downloadButton.addEventListener('click',async()=>{
   try{await audioEl.play();draw();await waitForEnd()}finally{
    if(timeoutId)clearTimeout(timeoutId);
    if(endedHandler)audioEl.removeEventListener('ended',endedHandler);
-   if(recorder.state!=='inactive')recorder.stop();
+   if(timeUpdateHandler)audioEl.removeEventListener('timeupdate',timeUpdateHandler);
+   if(recorder.state!=='inactive'){downloadNotice.textContent='Cerrando la grabación del video…';recorder.stop();}
   }
-  await chunksPromise;
+  downloadNotice.textContent='Esperando que el navegador cierre el archivo de video…';
+  await Promise.race([chunksPromise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('El navegador no terminó de cerrar la grabación. Prueba desde Chrome actualizado, sin salir de la página.')),20000))]);
+  downloadNotice.textContent='Grabación cerrada. Preparando el archivo para convertirlo a MP4…';
   stream.getTracks().forEach(t=>t.stop());
   await audioCtx.close();
   URL.revokeObjectURL(audioUrl);
