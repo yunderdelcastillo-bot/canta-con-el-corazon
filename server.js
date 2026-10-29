@@ -282,6 +282,7 @@ const pixabayVideoCache=new Map();
 app.get("/api/pixabay/videos",async(req,res)=>{
  try{
   const apiKey=String(process.env.PIXABAY_API_KEY||"").trim();
+  console.log("Pixabay key diagnostic:", { present: Boolean(apiKey), length: apiKey.length });
   if(!apiKey)return res.status(503).json({error:"La búsqueda de videos no está configurada. Añade PIXABAY_API_KEY en Render."});
   const allowedQueries=new Set(["romantic couple sunset","romantic roses","sunset ocean","romantic candles","birthday celebration","wedding anniversary","beautiful nature","friendship","serenade romantic"]);
   const raw=String(req.query.q||"romantic couple sunset").toLowerCase().replace(/[^a-z0-9 áéíóúñ-]/gi,"").trim().slice(0,80);
