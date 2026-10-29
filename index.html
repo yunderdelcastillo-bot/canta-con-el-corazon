@@ -136,7 +136,22 @@ downloadButton.addEventListener('click',async()=>{
   if(!chunks.length)throw new Error('El navegador no produjo datos de video. Prueba con Chrome actualizado y mantén la pantalla encendida.');
   const videoBlob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
   if(!videoBlob.size)throw new Error('El archivo de video quedó vacío. Inténtalo otra vez en Chrome.');
-  const videoUrl=URL.createObjectURL(videoBlob);const a=document.createElement('a');a.href=videoUrl;a.download=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.webm';document.body.appendChild(a);a.click();a.remove();downloadNotice.textContent='¡Video creado! Revisa Descargas. Puedes compartirlo por WhatsApp.';videoNotice.textContent='Tu video vertical incluye la canción, el fondo y la letra. Se descargó en formato WebM.';setTimeout(()=>URL.revokeObjectURL(videoUrl),60000);
+  const videoUrl=URL.createObjectURL(videoBlob);
+  const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.webm';
+  let preview=document.getElementById('generatedVideoPreview');
+  if(!preview){preview=document.createElement('section');preview.id='generatedVideoPreview';preview.style.cssText='margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(30,10,25,.25)';document.getElementById('videoNotice').after(preview)}
+  preview.replaceChildren();
+  const heading=document.createElement('h3');heading.textContent='Tu video está listo';heading.style.color='#fff0e8';preview.appendChild(heading);
+  const player=document.createElement('video');player.controls=true;player.playsInline=true;player.preload='metadata';player.src=videoUrl;player.style.cssText='display:block;width:100%;max-height:65vh;border-radius:12px;background:#120811';preview.appendChild(player);
+  const help=document.createElement('p');help.textContent='Primero reproduce aquí el video. Para guardarlo en tu celular, pulsa Descargar video.';help.style.color='#fff0e8';preview.appendChild(help);
+  const a=document.createElement('a');a.href=videoUrl;a.download=fileName;a.textContent='⬇️ Descargar video';a.className='btn';a.style.cssText='display:block;text-align:center;margin:10px 0;text-decoration:none';preview.appendChild(a);
+  const share=document.createElement('button');share.type='button';share.className='btn secondary';share.textContent='Compartir video';share.style.cssText='display:block;width:100%;margin:10px 0';
+  share.addEventListener('click',async()=>{try{const videoFile=new File([videoBlob],fileName,{type:videoBlob.type||'video/webm'});if(navigator.canShare&&navigator.canShare({files:[videoFile]})){await navigator.share({files:[videoFile],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Tu navegador no permite compartir el archivo directamente. Pulsa Descargar video y adjúntalo en WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo abrir compartir. Usa el botón Descargar video.'}});
+  preview.appendChild(share);
+  a.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video. Si no aparece, abre el menú del reproductor o mantén pulsado el enlace Descargar video.'});
+  downloadNotice.textContent='¡Video creado! Reprodúcelo aquí y pulsa Descargar video para guardarlo en tu celular.';
+  videoNotice.textContent='Video vertical listo en formato WebM. Puedes revisarlo, descargarlo o compartirlo desde aquí.';
+  preview.scrollIntoView({behavior:'smooth',block:'center'});
  }catch(err){downloadNotice.textContent='No se pudo crear el video en este navegador: '+(err.message||'intenta de nuevo')+'. Prueba Chrome actualizado.'}finally{downloadButton.disabled=false}
 });
 function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
