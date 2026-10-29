@@ -47,7 +47,7 @@ app.post("/api/preview/start",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||"");
   const token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de vista previa no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de vista previa no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,published,audio_path").eq("audio_path",path).maybeSingle();
   if(error||!song||!song.published)return res.status(404).json({error:"No se encontró la canción de muestra."});
@@ -64,7 +64,7 @@ app.post("/api/preview/complete",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
   const path=String(req.body?.path||"");
   const token=String(req.body?.token||"");
-  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de finalización no válida."});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path)||!/^[A-Za-z0-9_-]{24,100}$/.test(token))return res.status(400).json({error:"Solicitud de finalización no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id").eq("audio_path",path).maybeSingle();
   if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
