@@ -72,7 +72,8 @@ app.post("/api/preview/complete",async(req,res)=>{
   const {data:completed,error:completeError}=await db.rpc("complete_song_preview",{p_song_id:song.id,p_token_hash:tokenHash});
   if(completeError){console.error("complete_song_preview failed:",completeError.message);return res.status(503).json({error:"No se pudo registrar el final de la vista previa."});}
   if(!completed)return res.status(409).json({error:"La sesión de vista previa venció. Solicita un nuevo enlace de muestra."});
-  res.set("Cache-Control","no-store").json({ok:true,completed:true});
+  const {data:session}=await db.from("song_preview_sessions").select("play_count").eq("song_id",song.id).eq("token_hash",tokenHash).maybeSingle();
+  res.set("Cache-Control","no-store").json({ok:true,completed:true,playsUsed:session?.play_count||1,playsRemaining:Math.max(0,3-(session?.play_count||1))});
  }catch(e){console.error("preview complete:",e?.message||e);res.status(500).json({error:"No se pudo finalizar la vista previa."});}
 });
 app.get("/api/audio",async(req,res)=>{
