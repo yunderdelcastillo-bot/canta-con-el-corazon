@@ -143,10 +143,10 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
     const response=await fetch(API_BASE+'/api/preview/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
     const result=await response.json();
     try{localStorage.setItem('cch-preview-played-'+audio,'1');sessionStorage.removeItem(previewKey)}catch(e){}
-    lockPreview(result.ok?'La vista previa gratuita ya terminó. Si te encantó, solicita tu enlace de pago.':'La vista previa terminó. Solicita el enlace de pago para continuar.');
+    if(result.ok && result.playsRemaining>0){audioPlayer.controls=false;audioPlayer.classList.add('hidden');audioNote.textContent='Terminaste la muestra '+result.playsUsed+' de 3. Puedes volver a escucharla '+result.playsRemaining+' '+(result.playsRemaining===1?'vez':'veces')+' o solicitar tu canción completa.';audioNote.classList.remove('hidden');const again=document.getElementById('playPreview');if(again){again.disabled=false;again.textContent='▶ Volver a escuchar muestra ('+result.playsRemaining+' restantes)';again.classList.remove('hidden')}showPaymentCta();}else{try{localStorage.setItem('cch-preview-played-'+audio,'1')}catch(e){}lockPreview(result.ok?'Ya escuchaste las 3 vistas previas gratuitas. Si te encantó, solicita tu enlace de pago.':'La vista previa terminó. Solicita el enlace de pago para continuar.');}
    }catch(e){lockPreview('La vista previa terminó. Solicita el enlace de pago para continuar.')}
   }
- },{once:true});
+ });
 }
 if(grantToken&&audio){fetch(API_BASE+'/api/verify-grant?token='+encodeURIComponent(grantToken)+'&path='+encodeURIComponent(audio)).then(r=>r.json()).then(result=>{downloadAllowed=!!result.valid;if(!downloadAllowed){downloadNotice.textContent='El enlace de autorización no es válido o ha vencido.'}}).catch(()=>{downloadNotice.textContent='No se pudo verificar la autorización. Inténtalo de nuevo.'})}
 document.getElementById('openGift').addEventListener('click',()=>{document.getElementById('intro').classList.add('hidden');document.getElementById('revealed').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})});
