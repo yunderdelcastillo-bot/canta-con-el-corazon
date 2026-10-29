@@ -61,6 +61,12 @@ body.gift-mode #revealed:after{content:"Hecha con amor ♥ por Canta con el cora
 @keyframes giftFloat{from{transform:translateY(0)}to{transform:translateY(16px)}}
 @media(max-width:520px){body.gift-mode .envelope .env{width:142px;height:142px}body.gift-mode #intro{padding-bottom:90px}}
 
+
+/* Fondo de video de stock en la portada del regalo; la imagen fija queda como respaldo. */
+body.gift-mode #intro.stock-video-active{background-image:none!important;background-color:#100916}
+body.gift-mode #pixabayGiftBackground{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:.92;pointer-events:none}
+body.gift-mode #pixabayCredit{position:absolute;bottom:14px;left:0;right:0;z-index:2;text-align:center;font-size:.72rem;color:#fff;opacity:.8;text-shadow:0 1px 4px #000}
+
 </style></head>
 <body><main class="wrap">
 <div class="brand">✦ Un regalo que se siente ✦</div><nav class="nav"><a href="#como-funciona">Cómo funciona</a><a href="#paquetes">Paquetes</a><a href="#order">Pedir canción</a><a href="#preguntas">Preguntas</a></nav>
@@ -103,6 +109,31 @@ const previewLinkToken=params.get('previewLink')||'';
 const theme=params.get('tema')||'romantico';
 const allowedThemes=['romantico','cumpleanos','aniversario','serenata','homenaje','amistad'];
 document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
+
+/* Carga un clip romántico de Pixabay en la portada del regalo; falla de forma segura a la imagen fija. */
+(async function loadPixabayGiftBackground(){
+ const themeQueries={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
+ const q=themeQueries[allowedThemes.includes(theme)?theme:"romantico"]||"romantic couple sunset";
+ const intro=document.getElementById("intro");
+ if(!intro)return;
+ try{
+  const response=await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(q),{cache:"force-cache"});
+  if(!response.ok)return;
+  const result=await response.json();
+  const clips=Array.isArray(result.videos)?result.videos:[];
+  if(!clips.length)return;
+  const clip=clips[0];
+  const video=document.createElement("video");
+  video.id="pixabayGiftBackground";video.muted=true;video.autoplay=true;video.loop=true;video.playsInline=true;video.preload="metadata";video.setAttribute("aria-hidden","true");
+  video.src=clip.preview;
+  video.addEventListener("error",()=>{video.remove();intro.classList.remove("stock-video-active")},{once:true});
+  const credit=document.createElement("a");
+  credit.id="pixabayCredit";credit.href=result.attributionUrl||"https://pixabay.com/videos/";credit.target="_blank";credit.rel="noopener noreferrer";credit.textContent="Video de fondo: Pixabay";
+  intro.prepend(video);intro.append(credit);intro.classList.add("stock-video-active");
+  video.play().catch(()=>{});
+ }catch(e){console.warn("No se pudo cargar el fondo de Pixabay; se mantiene el fondo alternativo.");}
+})();
+
 let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
