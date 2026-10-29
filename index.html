@@ -114,7 +114,7 @@ async function startPreview(){
   try{await audioPlayer.play()}catch(e){audioNote.textContent='Pulsa reproducir en el reproductor para comenzar. Esta vista previa está reservada a este dispositivo durante 15 minutos.';audioNote.classList.remove('hidden')}
  }catch(e){playButton.disabled=false;playButton.textContent='▶ Escuchar vista previa gratis';audioNote.textContent=e.message;audioNote.classList.remove('hidden')}
 }
-if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\\.mp3$/i.test(audio)){
+if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
  if(grantToken){
   audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&grant='+encodeURIComponent(grantToken);
   resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
