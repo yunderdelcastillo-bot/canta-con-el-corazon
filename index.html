@@ -257,8 +257,8 @@ downloadButton.addEventListener('click',async()=>{
    const finish=()=>{if(finished)return;finished=true;downloadNotice.textContent='Finalizando el archivo de video…';resolve()};
    endedHandler=finish;
    audioEl.addEventListener('ended',finish,{once:true});
-   audioEl.addEventListener('timeupdate',()=>{if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-0.3)finish()}});
-   const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-0.3)){finish();return}requestAnimationFrame(monitorEnd)};
+   audioEl.addEventListener('timeupdate',()=>{if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-1.5||pct>=100)finish()}});
+   const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-1.5||Math.floor(audioEl.currentTime/audioEl.duration*100)>=100)){finish();return}requestAnimationFrame(monitorEnd)};
    requestAnimationFrame(monitorEnd);
    timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(180000,(Number(audioEl.duration)||240)*1000+15000));
   });
