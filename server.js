@@ -128,7 +128,7 @@ app.post("/api/grants",async(req,res)=>{
   const token_hash=crypto.createHash("sha256").update(token).digest("hex");
   const expires_at=new Date(Date.now()+7*24*60*60*1000).toISOString();
   const {error:insertError}=await db.from("download_grants").insert({song_id:song.id,token_hash,created_by:user.id,expires_at});
-  if(insertError)return res.status(500).json({error:"No se pudo guardar la autorización. Ejecuta la migración SQL."});
+  if(insertError){console.error("download_grants insert failed:",insertError.message,insertError.code);return res.status(500).json({error:"No se pudo guardar la autorización: "+insertError.message+" ("+(insertError.code||"sin código") + "). Ejecuta supabase-download-grants.sql en Supabase SQL Editor."});}
   res.set("Cache-Control","no-store").json({token,expiresAt:expires_at});
  }catch(e){res.status(500).json({error:"Error interno al autorizar la descarga."});}
 });
