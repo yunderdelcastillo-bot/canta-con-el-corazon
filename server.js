@@ -54,8 +54,7 @@ app.post("/api/preview-links",async(req,res)=>{
   const {data:song,error}=await db.from("songs").select("id,owner_id,audio_path,published").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para generar enlaces de esta canción."});
   const {count,error:countError}=await db.from("song_preview_links").select("id",{count:"exact",head:true}).eq("song_id",songId);
-  if(countError)return res.status(503).json({error:"Falta ejecutar el SQL de enlaces de muestra en Supabase."});
-  if((count||0)>=3)return res.status(409).json({error:"Ya generaste los 3 enlaces de muestra para esta canción."});
+  if(countError)return res.status(503).json({error:"No se pudo consultar el historial de enlaces de muestra."});
   const token=crypto.randomBytes(32).toString("base64url");
   const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
   const {error:insertError}=await db.from("song_preview_links").insert({song_id:songId,token_hash:tokenHash,created_by:user.id});
