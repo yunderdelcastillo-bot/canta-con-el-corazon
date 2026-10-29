@@ -34,6 +34,33 @@ body[data-theme="serenata"] .art{background:radial-gradient(circle,#e58a79,#742a
 body[data-theme="homenaje"] .art{background:radial-gradient(circle,#8fc9dd,#285a70 70%)}
 body[data-theme="amistad"] .art{background:radial-gradient(circle,#8ad9c2,#28665c 70%)}
 @media(max-width:520px){.grid{grid-template-columns:1fr}.card{padding:22px 18px}.art{width:125px;height:125px}}
+
+/* Vista de regalo cinematográfica, inspirada en el formato solicitado */
+body.gift-mode{background:#120a19;color:#fff;min-height:100svh}
+body.gift-mode .wrap{width:100%;max-width:none;padding:0;margin:0}
+body.gift-mode>.wrap>.brand,body.gift-mode>.wrap>.nav,
+body.gift-mode .wrap>section:not(#gift){display:none!important}
+body.gift-mode #gift{border:0;border-radius:0;padding:0;margin:0;min-height:100svh;box-shadow:none;background:#100916;overflow:hidden}
+body.gift-mode #intro{min-height:100svh;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 22px 110px;isolation:isolate;background:linear-gradient(180deg,rgba(18,10,18,.25),rgba(18,10,18,.1) 35%,rgba(8,4,12,.92) 100%),url('https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1400&q=85') center/cover no-repeat}
+body.gift-mode #intro:before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 60% 38%,rgba(255,203,120,.23),transparent 38%),linear-gradient(180deg,transparent 45%,rgba(7,3,12,.9));animation:giftGlow 7s ease-in-out infinite alternate}
+body.gift-mode #intro h1,body.gift-mode #intro>.subtitle,body.gift-mode #intro>.art,body.gift-mode #intro>.note{display:none!important}
+body.gift-mode .envelope{position:relative;display:flex;flex-direction:column;align-items:center;gap:24px;margin:0;max-width:100%;background:transparent}
+body.gift-mode .envelope .env{font-size:0;width:164px;height:164px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#e62c55,#c10a8b 75%);box-shadow:0 12px 60px #d20b7c66,0 0 0 12px #ffffff12;filter:none;animation:giftPulse 2.2s ease-in-out infinite}
+body.gift-mode .envelope .env:after{content:"";width:0;height:0;border-top:24px solid transparent;border-bottom:24px solid transparent;border-left:36px solid white;margin-left:9px}
+body.gift-mode .envelope span:last-child{font-size:clamp(1.35rem,4.5vw,2rem);color:#fff!important;text-shadow:0 2px 8px #000;font-weight:750}
+body.gift-mode #intro:after{content:"♥  ✦  ♥  ✧  ♥  ✦";position:absolute;top:8%;left:0;width:100%;text-align:center;letter-spacing:1.2rem;font-size:1.25rem;color:#ffc1db;opacity:.85;pointer-events:none;animation:giftFloat 5s ease-in-out infinite alternate}
+body.gift-mode #revealed{min-height:100svh;padding:28px 18px 40px;background:linear-gradient(180deg,#1b0b24,#09060d);text-align:center}
+body.gift-mode #revealed .art{display:none}
+body.gift-mode #revealed h1{font-size:clamp(2rem,7vw,3.5rem);margin:22px 0 12px}
+body.gift-mode #revealed .player{max-width:680px;margin:24px auto;background:#260d32;border-color:#9e69bc}
+body.gift-mode #revealed audio{display:block!important;width:100%}
+body.gift-mode #revealed .btn{max-width:680px;margin:10px auto}
+body.gift-mode #revealed:after{content:"Hecha con amor ♥ por Canta con el corazón";display:block;margin:34px auto 0;color:#f5d4e8;font-size:clamp(1rem,3.5vw,1.35rem)}
+@keyframes giftPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+@keyframes giftGlow{from{opacity:.65}to{opacity:1}}
+@keyframes giftFloat{from{transform:translateY(0)}to{transform:translateY(16px)}}
+@media(max-width:520px){body.gift-mode .envelope .env{width:142px;height:142px}body.gift-mode #intro{padding-bottom:90px}}
+
 </style></head>
 <body><main class="wrap">
 <div class="brand">✦ Un regalo que se siente ✦</div><nav class="nav"><a href="#como-funciona">Cómo funciona</a><a href="#paquetes">Paquetes</a><a href="#order">Pedir canción</a><a href="#preguntas">Preguntas</a></nav>
@@ -313,4 +340,15 @@ document.getElementById('shareGift').addEventListener('click',async()=>{try{awai
 document.querySelectorAll('.choose').forEach(b=>b.addEventListener('click',()=>{const sel=document.getElementById('package');if(sel){const match=Array.from(sel.options).find(o=>o.text===b.dataset.package);if(match)sel.value=match.value;else if(b.dataset.package.includes('S/20'))sel.selectedIndex=0;else if(b.dataset.package.includes('S/25'))sel.selectedIndex=1;else sel.selectedIndex=2}document.getElementById('order').scrollIntoView({behavior:'smooth'})}));
 const packageSelect=document.getElementById('package');const payAmount=document.getElementById('payAmount');function updatePayAmount(){payAmount.textContent=packageSelect.selectedIndex===0?'S/20':packageSelect.selectedIndex===1?'S/25':packageSelect.selectedIndex===2?'Desde S/30':'Por confirmar'}packageSelect.addEventListener('change',updatePayAmount);updatePayAmount();
 document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim();const phone=v('contact').replace(/\D/g,'');const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+v('buyer')+'\nMi WhatsApp: '+v('contact')+'\nPara: '+v('recipient')+'\nOcasión: '+v('occasion')+'\nHistoria/dedicatoria: '+v('story')+'\nGénero elegido: '+v('style')+'\nGénero o estilo adicional (opcional): '+(v('customGenre')||'No indicó')+'\nTipo de voz: '+v('voice')+'\nPaquete: '+v('package')+'\nPlazo solicitado: '+v('urgency')+(v('urgency').includes('30 minutos')?'\nAdicional express: S/5 (si se confirma disponibilidad)':'');const owner='51977974730';window.open('https://wa.me/'+owner+'?text='+encodeURIComponent(text),'_blank')});
-</script></body></html>
+</script>
+<script>
+(function(){
+ const p=new URLSearchParams(location.search);
+ const isGift=['audio','name','message','grant','preview','previewToken','video'].some(k=>p.has(k));
+ if(isGift){document.body.classList.add('gift-mode');}
+ const open=document.getElementById('openGift');
+ if(open){const label=open.querySelector('span:last-child');if(label)label.textContent='Toca para ver su canción';}
+})();
+</script>
+
+</body></html>
