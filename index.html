@@ -79,39 +79,66 @@ let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
-const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;const previewKey='cch-preview-played-'+(audio||'');
-if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
- const p=document.getElementById('audioPlayer');
- const audioNote=document.getElementById('audioNote');
- p.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio);
- resolvedAudioUrl=p.src;
- const showPaymentCta=()=>{
-  let cta=document.getElementById('previewPaymentCta');
-  if(!cta){
-   cta=document.createElement('a');cta.id='previewPaymentCta';cta.className='btn secondary';cta.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';
-   audioNote.after(cta);
+const API_BASE='https://canta-corazon-private-api.onrender.com';let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;const previewKey='cch-preview-session-'+(audio||'');
+const audioPlayer=document.getElementById('audioPlayer');
+const audioNote=document.getElementById('audioNote');
+let previewToken='';
+let previewLastTime=0;
+function showPaymentCta(){
+ let cta=document.getElementById('previewPaymentCta');
+ if(!cta){cta=document.createElement('a');cta.id='previewPaymentCta';cta.className='btn secondary';cta.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';audioNote.after(cta);}
+ const text='Hola, escuché la vista previa de mi canción para '+(name||'mi dedicatoria')+'. Quiero comprarla. Por favor, envíame el enlace de pago. Enlace del regalo: '+location.href;
+ cta.href='https://wa.me/51977974730?text='+encodeURIComponent(text);cta.textContent='💖 Me encantó, quiero pagar mi canción';cta.target='_blank';cta.rel='noopener';cta.classList.remove('hidden');
+}
+function lockPreview(message){
+ audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
+ const playButton=document.getElementById('playPreview');if(playButton)playButton.classList.add('hidden');
+ audioNote.textContent=message||'La vista previa gratuita ya terminó. Solicita el enlace de pago para recibir tu canción completa.';
+ audioNote.classList.remove('hidden');showPaymentCta();
+}
+async function startPreview(){
+ const playButton=document.getElementById('playPreview');
+ playButton.disabled=true;playButton.textContent='Preparando tu vista previa…';
+ try{
+  try{previewToken=sessionStorage.getItem(previewKey)||''}catch(e){previewToken=''}
+  if(!previewToken)previewToken=crypto.randomUUID();
+  const response=await fetch(API_BASE+'/api/preview/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
+  const result=await response.json();
+  if(!response.ok){
+   if(response.status===410){try{sessionStorage.removeItem(previewKey)}catch(e){}lockPreview(result.error||'Esta vista previa ya terminó. Solicita el enlace de pago.');return}
+   throw new Error(result.error||'No se pudo iniciar la vista previa.');
   }
-  const text='Hola, escuché la vista previa de mi canción para '+(name||'mi dedicatoria')+'. Quiero comprarla. Por favor, envíame el enlace de pago. Enlace del regalo: '+location.href;
-  cta.href='https://wa.me/51977974730?text='+encodeURIComponent(text);
-  cta.textContent='💖 Me encantó, quiero pagar mi canción';
-  cta.target='_blank';cta.rel='noopener';
-  cta.classList.remove('hidden');
- };
- const lockPreview=()=>{
-  p.pause();p.removeAttribute('src');p.load();p.controls=false;p.classList.add('hidden');
-  audioNote.textContent='La vista previa gratuita ya fue escuchada una vez. Si quieres recibir tu canción completa, solicita tu enlace de pago.';
-  audioNote.classList.remove('hidden');showPaymentCta();
- };
- let alreadyPlayed=false;
- if(!grantToken){try{alreadyPlayed=localStorage.getItem(previewKey)==='1'}catch(e){}}
- if(alreadyPlayed){lockPreview()}else{
-  p.controls=true;p.classList.remove('hidden');audioNote.classList.add('hidden');
-  if(lyricLines.length){p.addEventListener('timeupdate',()=>{const duration=p.duration;if(!Number.isFinite(duration)||duration<=0)return;const idx=Math.min(lyricLines.length-1,Math.floor((p.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'});}
-  p.addEventListener('ended',()=>{
-   if(lyricLines.length)document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥';
-   if(!grantToken){try{localStorage.setItem(previewKey,'1')}catch(e){}lockPreview();}
-  },{once:true});
+  try{sessionStorage.setItem(previewKey,previewToken)}catch(e){}
+  audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewToken);
+  resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');playButton.classList.add('hidden');previewLastTime=0;
+  try{await audioPlayer.play()}catch(e){audioNote.textContent='Pulsa reproducir en el reproductor para comenzar. Esta vista previa está reservada a este dispositivo durante 15 minutos.';audioNote.classList.remove('hidden')}
+ }catch(e){playButton.disabled=false;playButton.textContent='▶ Escuchar vista previa gratis';audioNote.textContent=e.message;audioNote.classList.remove('hidden')}
+}
+if(audio && /^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audio)){
+ if(grantToken){
+  audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&grant='+encodeURIComponent(grantToken);
+  resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
+ }else{
+  audioPlayer.removeAttribute('src');audioPlayer.controls=false;audioPlayer.classList.add('hidden');
+  let playButton=document.getElementById('playPreview');
+  if(!playButton){playButton=document.createElement('button');playButton.id='playPreview';playButton.type='button';playButton.className='btn secondary';playButton.textContent='▶ Escuchar vista previa gratis';audioNote.after(playButton)}
+  playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
+  try{if(localStorage.getItem('cch-preview-played-'+audio)==='1')lockPreview()}catch(e){}
  }
+ audioPlayer.addEventListener('timeupdate',()=>{const duration=audioPlayer.duration;if(Number.isFinite(duration)&&duration>0&&lyricLines.length){const idx=Math.min(lyricLines.length-1,Math.floor((audioPlayer.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'}});
+ audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
+ audioPlayer.addEventListener('timeupdate',()=>{if(!grantToken)previewLastTime=Math.max(previewLastTime,audioPlayer.currentTime)});
+ audioPlayer.addEventListener('ended',async()=>{
+  if(lyricLines.length)document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥';
+  if(!grantToken){
+   try{
+    const response=await fetch(API_BASE+'/api/preview/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
+    const result=await response.json();
+    try{localStorage.setItem('cch-preview-played-'+audio,'1');sessionStorage.removeItem(previewKey)}catch(e){}
+    lockPreview(result.ok?'La vista previa gratuita ya terminó. Si te encantó, solicita tu enlace de pago.':'La vista previa terminó. Solicita el enlace de pago para continuar.');
+   }catch(e){lockPreview('La vista previa terminó. Solicita el enlace de pago para continuar.')}
+  }
+ },{once:true});
 }
 if(grantToken&&audio){fetch(API_BASE+'/api/verify-grant?token='+encodeURIComponent(grantToken)+'&path='+encodeURIComponent(audio)).then(r=>r.json()).then(result=>{downloadAllowed=!!result.valid;if(!downloadAllowed){downloadNotice.textContent='El enlace de autorización no es válido o ha vencido.'}}).catch(()=>{downloadNotice.textContent='No se pudo verificar la autorización. Inténtalo de nuevo.'})}
 document.getElementById('openGift').addEventListener('click',()=>{document.getElementById('intro').classList.add('hidden');document.getElementById('revealed').classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'})});
