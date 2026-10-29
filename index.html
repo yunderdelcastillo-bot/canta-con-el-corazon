@@ -117,28 +117,30 @@ if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
 const API_BASE='https://canta-corazon-private-api.onrender.com';
-/* Carga un clip romántico de Pixabay en la portada del regalo; falla de forma segura a la imagen fija. */
+/* Prioriza Pixabay y usa un clip público de Pexels como respaldo si Pixabay rechaza la clave. */
 (async function loadPixabayGiftBackground(){
  const themeQueries={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
  const q=themeQueries[allowedThemes.includes(theme)?theme:"romantico"]||"romantic couple sunset";
  const intro=document.getElementById("intro");
  if(!intro)return;
+ let clipUrl="",creditUrl="https://www.pexels.com/video/back-view-of-couple-watching-the-sunset-7567029/",creditText="Video de fondo: Pexels";
  try{
-  const response=await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(q),{cache:"force-cache"});
-  if(!response.ok)return;
-  const result=await response.json();
-  const clips=Array.isArray(result.videos)?result.videos:[];
-  if(!clips.length)return;
-  const clip=clips[0];
-  const video=document.createElement("video");
-  video.id="pixabayGiftBackground";video.muted=true;video.autoplay=true;video.loop=true;video.playsInline=true;video.preload="metadata";video.setAttribute("aria-hidden","true");
-  video.src=clip.preview;
-  video.addEventListener("error",()=>{video.remove();intro.classList.remove("stock-video-active")},{once:true});
-  const credit=document.createElement("a");
-  credit.id="pixabayCredit";credit.href=result.attributionUrl||"https://pixabay.com/videos/";credit.target="_blank";credit.rel="noopener noreferrer";credit.textContent="Video de fondo: Pixabay";
-  intro.prepend(video);intro.append(credit);intro.classList.add("stock-video-active");
-  video.play().catch(()=>{});
- }catch(e){console.warn("No se pudo cargar el fondo de Pixabay; se mantiene el fondo alternativo.");}
+  const response=await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(q),{cache:"no-store"});
+  if(response.ok){
+   const result=await response.json();
+   const clips=Array.isArray(result.videos)?result.videos:[];
+   if(clips.length){clipUrl=clips[0].preview;creditUrl=result.attributionUrl||"https://pixabay.com/videos/";creditText="Video de fondo: Pixabay";}
+  }
+ }catch(e){console.warn("Pixabay no respondió; se usará el fondo alternativo.");}
+ if(!clipUrl)clipUrl="https://videos.pexels.com/video-files/8405683/8405683-hd_1920_1080_24fps.mp4";
+ const video=document.createElement("video");
+ video.id="pixabayGiftBackground";video.crossOrigin="anonymous";video.muted=true;video.autoplay=true;video.loop=true;video.playsInline=true;video.preload="metadata";video.setAttribute("aria-hidden","true");
+ video.src=clipUrl;
+ video.addEventListener("error",()=>{video.remove();intro.classList.remove("stock-video-active")},{once:true});
+ const credit=document.createElement("a");
+ credit.id="pixabayCredit";credit.href=creditUrl;credit.target="_blank";credit.rel="noopener noreferrer";credit.textContent=creditText;
+ intro.prepend(video);intro.append(credit);intro.classList.add("stock-video-active");
+ video.play().catch(()=>{});
 })();
 let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;let videoStatusManual=false;const previewKey='cch-preview-session-'+(audio||'');
 const audioPlayer=document.getElementById('audioPlayer');
@@ -248,7 +250,14 @@ downloadButton.addEventListener('click',async()=>{
      await stockVideo.play().catch(()=>{});
     }
    }
-  }catch(stockError){console.warn("Se usará el fondo animado alternativo para el MP4.",stockError?.message||"");stockVideo=null}
+  }catch(stockError){console.warn("Pixabay no disponible; se probará el fondo de Pexels.",stockError?.message||"");stockVideo=null}
+  if(!stockVideo){
+   try{
+    stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src="https://videos.pexels.com/video-files/8405683/8405683-hd_1920_1080_24fps.mp4";
+    await new Promise((resolve,reject)=>{stockVideo.onloadeddata=resolve;stockVideo.onerror=()=>reject(new Error("No se pudo cargar el clip alternativo"));stockVideo.load()});
+    await stockVideo.play().catch(()=>{});
+   }catch(fallbackError){console.warn("No se pudo cargar Pexels; se usará el fondo integrado.",fallbackError?.message||"");stockVideo=null}
+  }
   const audioEl=new Audio();audioEl.src=audioUrl;audioEl.crossOrigin='anonymous';audioEl.preload='auto';
   await new Promise((resolve,reject)=>{audioEl.oncanplaythrough=resolve;audioEl.onerror=()=>reject(new Error('No se pudo preparar el audio'));audioEl.load()});
   await new Promise((resolve,reject)=>{if(Number.isFinite(audioEl.duration)&&audioEl.duration>0)return resolve();audioEl.onloadedmetadata=resolve;audioEl.onerror=()=>reject(new Error('No se pudo comprobar la duración de la canción.'));});
