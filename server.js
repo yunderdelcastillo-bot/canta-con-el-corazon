@@ -63,6 +63,38 @@ app.post("/api/preview-links",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,token,number:(count||0)+1,audio_path:song.audio_path});
  }catch(e){console.error("preview link:",e?.message||e);res.status(500).json({error:"Error al generar el enlace."});}
 });
+app.post("/api/preview-download-toggle",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const bearer=String(req.headers.authorization||"").match(/^Bearer (.+)$/i);
+  if(!bearer)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const caller=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const {data:{user},error:authError}=await caller.auth.getUser(bearer[1]);
+  if(authError||!user)return res.status(401).json({error:"Sesión no válida."});
+  const songId=String(req.body?.songId||""),token=String(req.body?.token||""),enabled=Boolean(req.body?.enabled);
+  if(!/^[0-9a-f-]{36}$/i.test(songId)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Canción o enlace no válido."});
+  const db=admin();
+  const {data:song,error:songError}=await db.from("songs").select("id,owner_id").eq("id",songId).maybeSingle();
+  if(songError||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para cambiar esta canción."});
+  const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+  const {data:link,error:linkError}=await db.from("song_preview_links").update({download_enabled:enabled}).eq("song_id",songId).eq("token_hash",tokenHash).select("id").maybeSingle();
+  if(linkError)return res.status(503).json({error:"Actualiza la tabla song_preview_links con el archivo SQL de descargas."});
+  if(!link)return res.status(404).json({error:"No se encontró ese enlace de muestra."});
+  res.set("Cache-Control","no-store").json({ok:true,enabled});
+ }catch(e){console.error("preview download toggle:",e?.message||e);res.status(500).json({error:"No se pudo cambiar el permiso de descarga."});}
+});
+app.get("/api/verify-preview-download",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({valid:false});
+  const token=String(req.query.token||""),path=String(req.query.path||"");
+  if(!/^[A-Za-z0-9_-]{40,100}$/.test(token)||!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(path))return res.status(400).json({valid:false});
+  const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
+  const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",path).maybeSingle();
+  if(!song)return res.status(404).json({valid:false});
+  const {data:link,error}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",hash).eq("download_enabled",true).maybeSingle();
+  res.set("Cache-Control","no-store").json({valid:!!link&&!error});
+ }catch(e){res.status(500).json({valid:false});}
+});
 app.post("/api/preview/start",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El servicio de vista previa no está configurado."});
@@ -115,8 +147,10 @@ app.get("/api/audio",async(req,res)=>{
    if(!song.published)return res.status(403).json({error:"Canción no publicada."});
    if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
    const previewHash=crypto.createHash("sha256").update(preview).digest("hex");
-   const {data:session,error:sessionError}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",previewHash).not("started_at","is",null).is("completed_at",null).maybeSingle();
-   if(sessionError||!session)return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
+   const {data:session,error:sessionError}=await db.from("song_preview_links").select("id,started_at,completed_at,download_enabled").eq("song_id",song.id).eq("token_hash",previewHash).maybeSingle();
+   const activePreview=!!session&&!!session.started_at&&!session.completed_at;
+   const downloadEnabled=!!session&&!!session.download_enabled;
+   if(sessionError||(!activePreview&&!downloadEnabled))return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
   }
   const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,300);
   if(signError||!data?.signedUrl)return res.status(500).json({error:"No se pudo crear el enlace temporal."});
