@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
 
 const app=express();
-app.use(express.json({limit:"1mb"}));
+app.use(express.json({limit:"40mb"}));
 const allowed=(process.env.ALLOWED_ORIGINS||"https://canta-con-el-corazon.onrender.com").split(",").map(s=>s.trim());
 app.use(cors({origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);cb(new Error("Origin not allowed"));}}));
 const port=process.env.PORT||10000;
@@ -75,6 +75,43 @@ app.get("/api/verify-grant",async(req,res)=>{
   res.set("Cache-Control","no-store").json({valid:!!g});
  }catch(e){res.status(500).json({valid:false});}
 });
+
+app.post("/api/songs",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Faltan variables de Supabase en Render."});
+  const bearer=String(req.headers.authorization||"").match(/^Bearer (.+)$/i);
+  if(!bearer)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const caller=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const {data:{user},error:authError}=await caller.auth.getUser(bearer[1]);
+  if(authError||!user)return res.status(401).json({error:"La sesión expiró. Inicia sesión nuevamente."});
+  const body=req.body||{};
+  const id=String(body.id||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de canción no válido."});
+  const title=String(body.title||"").trim(),recipient=String(body.recipient||"").trim(),dedication=String(body.dedication||"").trim();
+  if(!title||!recipient||!dedication)return res.status(400).json({error:"Completa título, destinatario y dedicatoria."});
+  const db=admin();
+  const {data:old,error:oldError}=await db.from("songs").select("id,owner_id,audio_path").eq("id",id).maybeSingle();
+  if(oldError)return res.status(500).json({error:"No se pudo comprobar la canción en la base de datos: "+oldError.message});
+  if(old&&old.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para editar esta canción."});
+  let audio_path=old?.audio_path||null;
+  if(body.audioBase64){
+   const encoded=String(body.audioBase64);
+   if(encoded.length>36*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
+   const buffer=Buffer.from(encoded,"base64");
+   if(buffer.length>25*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
+   const path=user.id+"/"+id+".mp3";
+   const {error:uploadError}=await db.storage.from("songs-audio").upload(path,buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+   if(uploadError)return res.status(500).json({error:"No se pudo subir el MP3 al almacenamiento: "+uploadError.message});
+   audio_path=path;
+  }
+  if(!audio_path)return res.status(400).json({error:"Selecciona un MP3 antes de guardar."});
+  const row={id,title,recipient,dedication,lyrics:String(body.lyrics||""),theme:String(body.theme||"romantico"),audio_path,audio_url:null,owner_id:user.id,published:true,updated_at:new Date().toISOString()};
+  const {error:saveError}=await db.from("songs").upsert(row);
+  if(saveError)return res.status(500).json({error:"El archivo se subió, pero la base de datos rechazó la canción: "+saveError.message});
+  res.set("Cache-Control","no-store").json({ok:true,song:row});
+ }catch(e){console.error("Error saving song:",e?.message||e);res.status(500).json({error:"Error interno al guardar la canción."});}
+});
+
 app.post("/api/grants",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Configura las variables de Supabase en Render."});
