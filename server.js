@@ -291,7 +291,7 @@ app.get("/api/pixabay/videos",async(req,res)=>{
   if(cached&&cached.expires>Date.now())return res.set("Cache-Control","public, max-age=3600").json(cached.data);
   const endpoint="https://pixabay.com/api/videos/?key="+encodeURIComponent(apiKey)+"&q="+encodeURIComponent(q)+"&safesearch=true&per_page=12&order=popular";
   const response=await fetch(endpoint,{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(12000)});
-  if(!response.ok){console.error("Pixabay API status:",response.status);return res.status(response.status===429?429:502).json({error:response.status===429?"Pixabay alcanzó el límite temporal de búsquedas. Inténtalo más tarde.":"Pixabay no pudo completar la búsqueda."});}
+  if(!response.ok){const errorBody=(await response.text()).slice(0,500);console.error("Pixabay API status:",response.status,"detail:",errorBody);return res.status(response.status===429?429:502).json({error:response.status===429?"Pixabay alcanzó el límite temporal de búsquedas. Inténtalo más tarde.":"Pixabay no pudo completar la búsqueda."});}
   const payload=await response.json();
   const hits=(payload.hits||[]).map(v=>({id:v.id,tags:String(v.tags||"").slice(0,180),duration:v.duration,source:v.pageURL,preview:v.videos?.small?.url||v.videos?.medium?.url||v.videos?.tiny?.url,thumbnail:v.videos?.small?.thumbnail||v.videos?.medium?.thumbnail||v.videos?.tiny?.thumbnail})).filter(v=>v.preview);
   const data={provider:"Pixabay",attributionUrl:"https://pixabay.com/videos/",query:q,videos:hits};
