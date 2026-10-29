@@ -281,7 +281,7 @@ app.post("/api/convert-video",async(req,res)=>{
 const pixabayVideoCache=new Map();
 app.get("/api/pixabay/videos",async(req,res)=>{
  try{
-  const apiKey=process.env.PIXABAY_API_KEY;
+  const apiKey=String(process.env.PIXABAY_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"La búsqueda de videos no está configurada. Añade PIXABAY_API_KEY en Render."});
   const allowedQueries=new Set(["romantic couple sunset","romantic roses","sunset ocean","romantic candles","birthday celebration","wedding anniversary","beautiful nature","friendship","serenade romantic"]);
   const raw=String(req.query.q||"romantic couple sunset").toLowerCase().replace(/[^a-z0-9 áéíóúñ-]/gi,"").trim().slice(0,80);
