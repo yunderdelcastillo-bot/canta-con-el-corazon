@@ -85,10 +85,15 @@ const audioNote=document.getElementById('audioNote');
 let previewToken='';
 let previewLastTime=0;
 function showPaymentCta(){
- let cta=document.getElementById('previewPaymentCta');
- if(!cta){cta=document.createElement('a');cta.id='previewPaymentCta';cta.className='btn secondary';cta.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';audioNote.after(cta);}
- const text='Hola, escuché la vista previa de mi canción para '+(name||'mi dedicatoria')+'. Quiero comprarla. Por favor, envíame el enlace de pago. Enlace del regalo: '+location.href;
- cta.href='https://wa.me/51977974730?text='+encodeURIComponent(text);cta.textContent='💖 Me encantó, quiero pagar mi canción';cta.target='_blank';cta.rel='noopener';cta.classList.remove('hidden');
+ let box=document.getElementById('previewPaymentCta');
+ if(!box){
+  box=document.createElement('section');box.id='previewPaymentCta';box.className='payment';box.style.cssText='display:block;margin:18px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:#ffffff0b;text-align:center';
+  box.innerHTML='<h3 style="color:#ffe5ee;margin:0 0 8px">💖 ¡Me encantó! Quiero mi canción completa</h3><p style="color:#f1d9e3;line-height:1.5">Puedes pagar fácilmente con Yape: escanea este código QR desde la aplicación. Antes de confirmar, verifica el nombre del destinatario y el importe acordado por WhatsApp.</p><img src="/yape-qr.svg" alt="Código QR de Yape para Canta con el corazón" style="display:block;width:min(100%,280px);max-height:320px;object-fit:contain;margin:14px auto;background:#fff;border-radius:14px;padding:10px"><p style="color:#f6d78c;font-weight:800;font-size:1.1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p style="color:#f1d9e3;font-size:.86rem;line-height:1.5">El precio de tu pedido se confirma por WhatsApp antes de pagar. Después, envía tu comprobante para coordinar la entrega.</p><a id="previewSendVoucher" class="btn secondary" target="_blank" rel="noopener" style="display:flex;text-decoration:none;margin-top:12px">📲 Confirmar precio y enviar voucher por WhatsApp</a>';
+  audioNote.after(box);
+ }
+ const text='Hola, escuché la vista previa de mi canción para '+(name||'mi dedicatoria')+'. Quiero comprarla. Por favor, confírmame el importe y cómo continuar. Enlace del regalo: '+location.href;
+ const cta=document.getElementById('previewSendVoucher');
+ cta.href='https://wa.me/51977974730?text='+encodeURIComponent(text);box.classList.remove('hidden');
 }
 function lockPreview(message){
  audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
