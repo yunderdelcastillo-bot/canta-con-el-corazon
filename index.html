@@ -230,9 +230,21 @@ downloadButton.addEventListener('click',async()=>{
    ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
    const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
    ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
-   const idx=lyricLines.length&&audioEl.duration?Math.min(lyricLines.length-1,Math.floor(audioEl.currentTime/audioEl.duration*lyricLines.length)):-1;
+   const lyricCount=lyricLines.length;
+   const idx=lyricCount&&audioEl.duration?Math.min(lyricCount-1,Math.floor(audioEl.currentTime/audioEl.duration*lyricCount)):-1;
    const lyric=idx>=0?lyricLines[idx]:'♪ Una canción hecha para ti ♪';
-   ctx.fillStyle='#f6d78c';ctx.font='bold 30px Georgia,serif';wrapText(ctx,lyric,w/2,1010,620,42);
+   // Resalta la línea activa mientras avanza la canción (tiempo repartido entre líneas).
+   ctx.font='bold 30px Georgia,serif';
+   const lyricWidth=Math.min(640,Math.max(250,ctx.measureText(lyric).width+54));
+   const lyricY=1010;
+   ctx.save();
+   ctx.shadowColor='rgba(246,215,140,.65)';ctx.shadowBlur=18;
+   ctx.fillStyle='rgba(246,215,140,.16)';
+   const pillX=(w-lyricWidth)/2;ctx.beginPath();ctx.roundRect(pillX,lyricY-42,lyricWidth,58,18);ctx.fill();
+   ctx.shadowBlur=0;ctx.strokeStyle='#f6d78c';ctx.lineWidth=2;ctx.stroke();
+   ctx.fillStyle='#fff0b8';ctx.textAlign='center';
+   wrapText(ctx,lyric,w/2,lyricY,Math.min(600,lyricWidth-30),38);
+   ctx.restore();
    ctx.fillStyle='#f4dce6';ctx.font='22px sans-serif';ctx.fillText('Hecha con amor ♥ para guardar y compartir',w/2,1155);
    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(60,1200,600,5);ctx.fillStyle='#f6d78c';ctx.fillRect(60,1200,600*(audioEl.duration?audioEl.currentTime/audioEl.duration:0),5);
    if(recorder.state==='recording')requestAnimationFrame(draw)
