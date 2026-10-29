@@ -288,6 +288,7 @@ downloadButton.addEventListener('click',async()=>{
    }else{
     const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#33213f');sky.addColorStop(.42,'#b77b64');sky.addColorStop(.72,'#e0b17b');sky.addColorStop(1,'#211321');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
    }
+   if(!stockVideo){
    const sun=ctx.createRadialGradient(w*(.62+Math.sin(motionTime*.18)*.035),h*(.24+Math.sin(motionTime*.23)*.012),8,w*(.62+Math.sin(motionTime*.18)*.035),h*(.24+Math.sin(motionTime*.23)*.012),290);sun.addColorStop(0,'rgba(255,226,157,.9)');sun.addColorStop(1,'rgba(255,218,150,0)');ctx.fillStyle=sun;ctx.fillRect(0,0,w,h);
    const mountain=(points,color)=>{ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.lineTo(w,h*.72);ctx.lineTo(0,h*.72);ctx.closePath();ctx.fillStyle=color;ctx.fill()};
    mountain([[0,390],[95,280],[170,360],[275,220],[370,355],[490,245],[590,335],[720,205]],'#4b3448');
@@ -300,6 +301,7 @@ downloadButton.addEventListener('click',async()=>{
    ctx.fillStyle='#4b302b';ctx.fillRect(390,535,150,100);ctx.fillStyle='#2c2028';ctx.beginPath();ctx.moveTo(370,540);ctx.lineTo(455,475);ctx.lineTo(560,540);ctx.closePath();ctx.fill();ctx.fillStyle='#f6d78c';ctx.fillRect(420,565,24,28);ctx.fillRect(482,565,24,28);ctx.fillStyle='#21151d';ctx.fillRect(452,585,27,50);
    // Siluetas de árboles
    for(const t of [[95,570,1],[155,600,.75],[330,625,.8],[585,605,.85]]){const x=t[0],y=t[1],s=t[2];ctx.fillStyle='#30252b';ctx.fillRect(x-5*s,y,10*s,75*s);ctx.beginPath();ctx.moveTo(x,y-75*s);ctx.lineTo(x-32*s,y-10*s);ctx.lineTo(x+32*s,y-10*s);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(x,y-48*s);ctx.lineTo(x-27*s,y+5*s);ctx.lineTo(x+27*s,y+5*s);ctx.closePath();ctx.fill()}
+   }
    // Detalles visuales según la ocasión del regalo
    const occasionLabels={cumpleanos:'FELIZ CUMPLEAÑOS',aniversario:'FELIZ ANIVERSARIO',serenata:'UNA SERENATA PARA TI',homenaje:'CON TODO MI CARIÑO',amistad:'CELEBRANDO NUESTRA AMISTAD',romantico:'CON AMOR'};
    const occasionLabel=occasionLabels[theme]||occasionLabels.romantico;
