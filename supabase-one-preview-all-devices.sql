@@ -6,8 +6,13 @@ CREATE TABLE IF NOT EXISTS public.song_preview_sessions (
   token_hash TEXT NOT NULL,
   lease_until TIMESTAMPTZ NOT NULL,
   completed_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  play_count INTEGER NOT NULL DEFAULT 1 CHECK (play_count BETWEEN 1 AND 3)
 );
+
+ALTER TABLE public.song_preview_sessions ADD COLUMN IF NOT EXISTS play_count INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE public.song_preview_sessions DROP CONSTRAINT IF EXISTS song_preview_sessions_play_count_check;
+ALTER TABLE public.song_preview_sessions ADD CONSTRAINT song_preview_sessions_play_count_check CHECK (play_count BETWEEN 1 AND 3);
 
 ALTER TABLE public.song_preview_sessions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.song_preview_sessions FROM anon, authenticated;
@@ -26,6 +31,7 @@ DECLARE
   v_completed TIMESTAMPTZ;
   v_lease_until TIMESTAMPTZ;
   v_token_hash TEXT;
+  v_play_count INTEGER;
 BEGIN
   INSERT INTO public.song_preview_sessions(song_id, token_hash, lease_until, completed_at, created_at)
   VALUES (p_song_id, p_token_hash, now() + make_interval(mins => greatest(1, least(p_lease_minutes, 30))), NULL, now())
@@ -33,22 +39,29 @@ BEGIN
     SET token_hash = EXCLUDED.token_hash,
         lease_until = EXCLUDED.lease_until,
         completed_at = NULL,
-        created_at = now()
-    WHERE public.song_preview_sessions.completed_at IS NULL
-      AND (
+        created_at = now(),
+        play_count = CASE
+          WHEN public.song_preview_sessions.completed_at IS NOT NULL THEN public.song_preview_sessions.play_count + 1
+          ELSE public.song_preview_sessions.play_count
+        END
+    WHERE (public.song_preview_sessions.completed_at IS NULL AND (
         public.song_preview_sessions.lease_until < now()
         OR public.song_preview_sessions.token_hash = EXCLUDED.token_hash
-      )
+      )) OR (public.song_preview_sessions.completed_at IS NOT NULL AND public.song_preview_sessions.play_count < 3)
   RETURNING token_hash INTO v_token_hash;
 
   IF FOUND THEN
     RETURN 'claimed';
   END IF;
 
-  SELECT completed_at, lease_until, token_hash
-    INTO v_completed, v_lease_until, v_token_hash
+  SELECT completed_at, lease_until, token_hash, play_count
+    INTO v_completed, v_lease_until, v_token_hash, v_play_count
     FROM public.song_preview_sessions
     WHERE song_id = p_song_id;
+
+  IF v_completed IS NOT NULL AND COALESCE(v_play_count, 3) >= 3 THEN
+    RETURN 'completed';
+  END IF;
 
   IF v_completed IS NOT NULL THEN
     RETURN 'completed';
