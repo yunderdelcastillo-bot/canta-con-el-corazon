@@ -20,6 +20,19 @@ create table if not exists public.songs (
   updated_at timestamptz not null default now()
 );
 
+-- Compatibilidad con el panel actual (también actualiza tablas creadas con una versión anterior).
+alter table public.songs add column if not exists dedication text not null default '';
+alter table public.songs add column if not exists lyrics text not null default '';
+alter table public.songs add column if not exists theme text not null default 'romantico';
+alter table public.songs add column if not exists audio_path text;
+alter table public.songs add column if not exists published boolean not null default true;
+alter table public.songs add column if not exists updated_at timestamptz not null default now();
+alter table public.songs add column if not exists owner_id uuid references auth.users(id) on delete cascade;
+alter table public.songs alter column audio_url drop not null;
+
+-- Actualiza la caché de esquema que utiliza la API de Supabase.
+notify pgrst, 'reload schema';
+
 alter table public.songs enable row level security;
 
 drop policy if exists "Public can read published songs" on public.songs;
