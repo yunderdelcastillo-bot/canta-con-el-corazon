@@ -155,28 +155,6 @@ app.get("/api/admin-audio-url",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
  }catch(e){console.error("Admin audio URL error:",e?.message||e);res.status(500).json({error:"Error al preparar el reproductor."});}
 });
-app.get("/api/ready-video",async(req,res)=>{
- try{
-  if(!ready())return res.status(503).json({error:"Servicio no configurado."});
-  const path=String(req.query.path||""),token=String(req.query.token||""),mode=String(req.query.mode||"play");
-  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp4$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de video no válido."});
-  const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
-  const {data:link,error}=await db.from("song_preview_links").select("id,song_id,started_at,completed_at,download_enabled").eq("token_hash",hash).maybeSingle();
-  const songId=path.split("/")[0];
-  if(error||!link||link.song_id!==songId)return res.status(404).json({error:"Video no encontrado."});
-  if(mode==="download"&&!link.download_enabled)return res.status(403).json({error:"La descarga se habilitará después de confirmar el pago."});
-  if(mode!=="download"){
-   if(!link.started_at||link.completed_at)return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
-   const {data:claimed,error:claimError}=await db.from("song_preview_links").update({completed_at:new Date().toISOString()}).eq("id",link.id).is("completed_at",null).select("id").maybeSingle();
-   if(claimError||!claimed)return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
-  }
-  const {data:file,error:fileError}=await db.storage.from("shared-videos").download(path);
-  if(fileError||!file)return res.status(404).json({error:"No se pudo recuperar el video."});
-  const buffer=Buffer.from(await file.arrayBuffer());
-  res.set({"Content-Type":"video/mp4","Content-Length":String(buffer.length),"Cache-Control":"no-store","Content-Disposition":mode==="download"?'attachment; filename="canta-con-el-corazon.mp4"':"inline"});
-  res.send(buffer);
- }catch(e){console.error("ready video:",e?.message||e);res.status(500).json({error:"No se pudo preparar el video."});}
-});
 app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
@@ -318,26 +296,10 @@ app.post("/api/convert-video",async(req,res)=>{
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
   if(mp4.length>45*1024*1024)return res.status(413).json({error:"El video todavía supera el límite de almacenamiento después de optimizarlo ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración o el tamaño del video."});
   console.log("Optimized MP4 ready:",{megabytes:Number((mp4.length/1024/1024).toFixed(2)),videoCodec:"H.264",audioCodec:"AAC"});
-  // Guardar una copia pública para el enlace sorpresa. Si Storage falla, no bloquear la descarga MP4.
-  let shareUrl=null;
-  try{
-   const {data:buckets,error:listError}=await db.storage.listBuckets();
-   if(listError)throw listError;
-   if(!(buckets||[]).some(b=>b.name==="shared-videos")){
-    const {error:createError}=await db.storage.createBucket("shared-videos",{public:false,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
-    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
-   }
-   const sharePath=song.id+"/"+crypto.randomUUID()+".mp4";
-   const {error:privateError}=await db.storage.updateBucket("shared-videos",{public:false,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});if(privateError)throw privateError;
-   const {error:uploadError}=await db.storage.from("shared-videos").upload(sharePath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
-   if(uploadError)throw uploadError;
-   shareUrl=sharePath;
-  }catch(storageError){console.error("shared video storage failed:",storageError?.message||storageError);throw new Error("El MP4 se creó, pero no se pudo guardar de forma privada. Revisa el bucket shared-videos en Supabase. "+(storageError?.message||""));}
-  if(!shareUrl)throw new Error("No se guardó el video privado; no se puede crear el enlace de prueba.");
-  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Path","X-Video-Share-Path":shareUrl};
+  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length)};
   res.set(headers);
   res.send(mp4);
- }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo convertir el video a MP4. Inténtalo otra vez."});}
+ }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo preparar el MP4: "+(e?.message||"error interno")});}
  finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
 });
 
