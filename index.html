@@ -251,11 +251,13 @@ downloadButton.addEventListener('click',async()=>{
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   const draw=()=>{
-   const w=canvas.width,h=canvas.height;
+   // Diseño lógico 720x1280, reducido proporcionalmente al lienzo 540x960.
+   ctx.setTransform(canvas.width/720,0,0,canvas.height/1280,0,0);
+   const w=720,h=1280;
    const motionTime=audioEl.currentTime||0;
    const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
    // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
-   ctx.save();ctx.translate(w/2,h/2);const cinematicZoom=1.015+progress*.045+Math.sin(motionTime*.42)*.008;ctx.scale(cinematicZoom,cinematicZoom);ctx.translate(-w/2,-h/2);
+   ctx.save(); // Sin zoom automático: conserva el encuadre natural del video de fondo.
    if(stockVideo&&stockVideo.readyState>=2){
     const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
     const offsetX=(w-dw)/2,offsetY=(h-dh)/2;
@@ -349,7 +351,7 @@ downloadButton.addEventListener('click',async()=>{
    audioEl.addEventListener('timeupdate',timeUpdateHandler);
    const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-0.35)){finish();return}requestAnimationFrame(monitorEnd)};
    requestAnimationFrame(monitorEnd);
-   timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(180000,(Number(audioEl.duration)||240)*1000+15000));
+   timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(300000,(Number(audioEl.duration)||240)*1000+60000));
   });
   recorder.start(1000);
   downloadNotice.textContent='Creando video… 0%. Mantén esta página abierta y la pantalla encendida hasta que termine.';
