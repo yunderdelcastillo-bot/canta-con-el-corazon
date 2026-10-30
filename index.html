@@ -258,16 +258,16 @@ downloadButton.addEventListener('click',async()=>{
   if(!Number.isFinite(recordingDuration)||recordingDuration<=0)throw new Error('No se pudo leer la duración completa de la canción.');
   if(Number.isFinite(sourceDuration)&&sourceDuration>0&&recordingDuration<sourceDuration-2)throw new Error('El audio descargado está incompleto ('+Math.round(recordingDuration)+' s frente a '+Math.round(sourceDuration)+' s). No se generó un video recortado; vuelve a intentarlo.');
 
-  const canvas=document.createElement('canvas');canvas.width=480;canvas.height=854;const ctx=canvas.getContext('2d');
+  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
-  const stream=canvas.captureStream(15);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  const stream=canvas.captureStream(24);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
-  const recorderOptions={videoBitsPerSecond:400000,audioBitsPerSecond:64000};if(mime)recorderOptions.mimeType=mime;
+  const recorderOptions={videoBitsPerSecond:1600000,audioBitsPerSecond:64000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   const draw=()=>{
-   // Diseño lógico 720x1280, reducido proporcionalmente al lienzo 540x960.
+   // Lienzo HD vertical 720x1280.
    ctx.setTransform(canvas.width/720,0,0,canvas.height/1280,0,0);
    const w=720,h=1280;
    const motionTime=audioEl.currentTime||0;
