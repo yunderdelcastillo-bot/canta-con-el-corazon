@@ -366,9 +366,9 @@ app.post("/api/share-video",async(req,res)=>{
  }catch(e){console.error("share MP4 upload:",e?.message||e);res.status(500).json({error:"No se pudo crear el enlace público del video: "+(e?.message||"error interno")});}
 });
 
+const videoConversionJobs=new Map();
 app.post("/api/convert-video",async(req,res)=>{
- console.log("MP4 conversion request received; origin:",req.headers.origin||"(none)");
- let dir="";
+ console.log("MP4 conversion job received; origin:",req.headers.origin||"(none)");
  try{
   if(!ready())return res.status(503).json({error:"El servicio de conversión no está configurado."});
   const audioPath=String(req.query.path||"");
@@ -389,35 +389,54 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant;
   }
-  if(!allowedDownload){console.warn("MP4 conversion denied: no valid download grant for song",song.id);return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});}
+  if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
   const chunks=[];let total=0;const maxBytes=45*1024*1024;
-  for await(const chunk of req){total+=chunk.length;if(total>maxBytes){console.warn("MP4 input rejected at size limit:",total);return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});}chunks.push(chunk);}
+  for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
-  // Usar el MP3 original guardado en Supabase como pista maestra.
-  // Si Android detiene la grabación visual antes de tiempo, FFmpeg repetirá el video
-  // hasta el final exacto de la canción, sin cortar el audio a los 45 segundos.
-  const {data:originalAudio,error:originalAudioError}=await db.storage.from("songs-audio").download(audioPath);
-  if(originalAudioError||!originalAudio)throw new Error("No se pudo recuperar el MP3 original para completar la duración del video: "+(originalAudioError?.message||"archivo vacío"));
-  const originalAudioBuffer=Buffer.from(await originalAudio.arrayBuffer());
-  if(!originalAudioBuffer.length)throw new Error("El MP3 original está vacío.");
-  dir=await mkdtemp(path.join(os.tmpdir(),"cch-video-"));
-  const input=path.join(dir,"input.webm"),audioInput=path.join(dir,"original.mp3"),output=path.join(dir,"output.mp4");
-  await writeFile(input,Buffer.concat(chunks));chunks.length=0;
-  await writeFile(audioInput,originalAudioBuffer);
-  const conversionStartedAt=Date.now();
-  console.log("Starting full-song MP4 conversion:",{inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:480,fps:15});
-  await execFileAsync(ffmpegPath,["-y","-threads","1","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
-  const mp4=await readFile(output);
-  if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
-  if(mp4.length>30*1024*1024)return res.status(413).json({error:"El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración de la canción."});
-  console.log("Fast mobile MP4 ready:",{megabytes:Number((mp4.length/1024/1024).toFixed(2)),videoCodec:"H.264",audioCodec:"AAC",conversionSeconds:Number(((Date.now()-conversionStartedAt)/1000).toFixed(1))});
-  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length)};
-  res.set(headers);
-  res.send(mp4);
- }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo preparar el MP4: "+(e?.message||"error interno")});}
- finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
+  const jobId=crypto.randomUUID();
+  videoConversionJobs.set(jobId,{status:"processing",createdAt:Date.now(),songId:song.id});
+  res.status(202).set("Cache-Control","no-store").json({ok:true,jobId,status:"processing"});
+  setImmediate(async()=>{
+   let dir="";
+   try{
+    const {data:originalAudio,error:originalAudioError}=await db.storage.from("songs-audio").download(audioPath);
+    if(originalAudioError||!originalAudio)throw new Error("No se pudo recuperar el MP3 original: "+(originalAudioError?.message||"archivo vacío"));
+    const originalAudioBuffer=Buffer.from(await originalAudio.arrayBuffer());
+    if(!originalAudioBuffer.length)throw new Error("El MP3 original está vacío.");
+    dir=await mkdtemp(path.join(os.tmpdir(),"cch-video-"));
+    const input=path.join(dir,"input.webm"),audioInput=path.join(dir,"original.mp3"),output=path.join(dir,"output.mp4");
+    await writeFile(input,Buffer.concat(chunks));chunks.length=0;
+    await writeFile(audioInput,originalAudioBuffer);
+    const conversionStartedAt=Date.now();
+    console.log("Starting asynchronous full-song MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:480,fps:15});
+    await execFileAsync(ffmpegPath,["-y","-threads","1","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
+    const mp4=await readFile(output);
+    if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
+    if(mp4.length>30*1024*1024)throw new Error("El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB).");
+    const {data:buckets,error:listError}=await db.storage.listBuckets();
+    if(listError)throw listError;
+    if(!(buckets||[]).some(b=>b.name==="shared-videos")){
+     const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"30MB",allowedMimeTypes:["video/mp4"]});
+     if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+    }
+    const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
+    const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
+    if(uploadError)throw uploadError;
+    const {data:{publicUrl}}=db.storage.from("shared-videos").getPublicUrl(objectPath);
+    console.log("Asynchronous MP4 conversion ready:",{jobId,megabytes:Number((mp4.length/1024/1024).toFixed(2)),conversionSeconds:Number(((Date.now()-conversionStartedAt)/1000).toFixed(1))});
+    videoConversionJobs.set(jobId,{status:"done",videoUrl:publicUrl,createdAt:Date.now(),songId:song.id});
+   }catch(e){
+    console.error("Asynchronous video conversion failed:",jobId,e?.message||e);
+    videoConversionJobs.set(jobId,{status:"error",error:e?.message||"No se pudo preparar el MP4.",createdAt:Date.now(),songId:song.id});
+   }finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
+  });
+ });
+app.get("/api/convert-video-status/:jobId",(req,res)=>{
+ const job=videoConversionJobs.get(String(req.params.jobId||""));
+ if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
+ if(Date.now()-job.createdAt>30*60*1000){videoConversionJobs.delete(String(req.params.jobId));return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});}
+ res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
 });
-
 
 /* Busca clips de fondo en Pixabay. Las respuestas se guardan 24 h según las reglas de la API. */
 const pixabayVideoCache=new Map();
