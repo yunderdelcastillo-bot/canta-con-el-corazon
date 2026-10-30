@@ -331,7 +331,7 @@ app.post("/api/convert-video",async(req,res)=>{
   const input=path.join(dir,"input.webm"),output=path.join(dir,"output.mp4");
   await writeFile(input,Buffer.concat(chunks));chunks.length=0;
   console.log("Starting low-memory MP4 conversion:",{inputMB:Number((total/1024/1024).toFixed(2))});
-  await execFileAsync(ffmpegPath,["-y","-threads","1","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='min(480,iw)':-2:force_original_aspect_ratio=decrease","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","32","-maxrate","550k","-bufsize","1100k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
+  await execFileAsync(ffmpegPath,["-y","-threads","1","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='min(720,iw)':-2:force_original_aspect_ratio=decrease","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","27","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
   if(mp4.length>30*1024*1024)return res.status(413).json({error:"El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración de la canción."});
