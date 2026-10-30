@@ -412,13 +412,22 @@ downloadButton.addEventListener('click',async()=>{
   if(!conversionResponse.ok){let detail='No se pudo convertir a MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
   const mp4Blob=await conversionResponse.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
   downloadNotice.textContent='Subiendo el MP4 para crear tu enlace privado compartible…';
-  const shareUploadUrl=API_BASE+'/api/share-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
-  const shareUploadResponse=await fetch(shareUploadUrl,{method:'POST',headers:{'Content-Type':'video/mp4'},body:mp4Blob});
-  if(!shareUploadResponse.ok){let detail='No se pudo crear el enlace compartible.';try{const problem=await shareUploadResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-  const shareUploadData=await shareUploadResponse.json();
-  if(!shareUploadData.videoUrl)throw new Error('El servidor no devolvió el enlace del video.');
-  const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
-  window.lastVideoShareLink=sharePageUrl.toString();
+  // El MP4 local debe quedar disponible aunque falle la subida del enlace compartible.
+  window.lastVideoShareLink='';
+  let shareUploadWarning='';
+  if(mp4Blob.size<=28*1024*1024){
+   try{
+    const shareUploadUrl=API_BASE+'/api/share-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
+    const shareUploadResponse=await fetch(shareUploadUrl,{method:'POST',headers:{'Content-Type':'video/mp4'},body:mp4Blob});
+    if(!shareUploadResponse.ok){let detail='HTTP '+shareUploadResponse.status;try{const problem=await shareUploadResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
+    const shareUploadData=await shareUploadResponse.json();
+    if(!shareUploadData.videoUrl)throw new Error('El servidor no devolvió el enlace del video.');
+    const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
+    window.lastVideoShareLink=sharePageUrl.toString();
+   }catch(uploadError){console.warn('El MP4 está creado, pero no se pudo subir el enlace compartible:',uploadError);shareUploadWarning=' El video quedó creado y podrás descargarlo, pero no se pudo generar el enlace para compartirlo automáticamente.'}
+  }else{
+   shareUploadWarning=' El video quedó creado y podrás descargarlo, pero pesa demasiado para generar el enlace automático.';
+  }
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   window.lastGeneratedVideoFile=new File([mp4Blob],fileName,{type:'video/mp4'});
   const videoUrl=URL.createObjectURL(mp4Blob);
@@ -433,7 +442,7 @@ downloadButton.addEventListener('click',async()=>{
   share.textContent='📲 Compartir MP4 por WhatsApp';share.addEventListener('click',async()=>{try{const videoFile=new File([mp4Blob],fileName,{type:'video/mp4'});if(navigator.canShare&&navigator.canShare({files:[videoFile]})){await navigator.share({files:[videoFile],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Este navegador no permite adjuntar el MP4 directamente. Descarga el video y luego adjúntalo en WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo compartir el archivo. Descarga el MP4 y adjúntalo en WhatsApp.'}});
   preview.appendChild(share);
   a.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video. Si no aparece, abre el menú del reproductor o mantén pulsado el enlace Descargar video.'});
-  downloadNotice.textContent=window.lastVideoShareLink?'¡Video creado! Ya puedes compartir el enlace sorpresa por WhatsApp o descargar el MP4.':'¡Video creado y listo para descargar! No se pudo crear el enlace sorpresa esta vez; tu MP4 sigue disponible para descargar.';
+  downloadNotice.textContent=window.lastVideoShareLink?'¡Video creado! Ya puedes compartir el enlace sorpresa por WhatsApp o descargar el MP4.':'¡Video creado y listo para descargar!'+shareUploadWarning;
   videoNotice.textContent=window.lastVideoShareLink?'Video vertical listo en MP4. También se creó un enlace privado de sorpresa para compartir.':'Video vertical listo en MP4. Puedes revisarlo y descargarlo desde aquí.';
   preview.scrollIntoView({behavior:'smooth',block:'center'});
  }catch(err){downloadNotice.textContent='No se pudo crear el video en este navegador: '+(err.message||'intenta de nuevo')+'. Prueba Chrome actualizado.'}finally{downloadButton.disabled=false}
