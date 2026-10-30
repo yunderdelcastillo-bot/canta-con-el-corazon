@@ -440,25 +440,7 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
  }
 })();
 </script>
-<script>
-(function(){
- const p=new URLSearchParams(location.search),videoUrl=p.get('video');
- if(!videoUrl)return;
- let parsed;try{parsed=new URL(videoUrl)}catch(e){return}
- if(parsed.protocol!=='https:'||!parsed.pathname.includes('/storage/v1/object/public/shared-videos/'))return;
- document.body.classList.add('video-share-mode');
- const root=document.createElement('section');root.id='sharedVideoLanding';
- const cover=document.createElement('div');cover.className='share-cover';
- const brand=document.createElement('div');brand.textContent='CANTA CON EL CORAZÓN';brand.style.cssText='font-weight:800;letter-spacing:.12em;color:#f6d78c';
- const title=document.createElement('h1');title.textContent='Una sorpresa para ti';
- const play=document.createElement('button');play.className='share-play';play.type='button';play.textContent='▶';play.setAttribute('aria-label','Reproducir video');
- const prompt=document.createElement('p');prompt.textContent='🎁 Toca para descubrir tu sorpresa';
- cover.append(brand,title,play,prompt);root.appendChild(cover);
- const footer=document.createElement('div');footer.className='share-brand';footer.textContent='Hecha con amor ♥ por Canta con el corazón';root.appendChild(footer);
- document.querySelector('main.wrap').appendChild(root);
- play.addEventListener('click',()=>{cover.remove();footer.remove();const player=document.createElement('video');player.src=videoUrl;player.controls=true;player.playsInline=true;player.autoplay=true;player.preload='auto';root.appendChild(player);const credit=document.createElement('div');credit.className='share-brand';credit.textContent='Hecha con amor ♥ por Canta con el corazón';root.appendChild(credit);player.play().catch(()=>{player.controls=true});});
-})();
-</script>
+
 
 
 </body></html>
