@@ -326,9 +326,9 @@ app.post("/api/convert-video",async(req,res)=>{
    const {error:uploadError}=await db.storage.from("shared-videos").upload(sharePath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
    if(uploadError)throw uploadError;
    shareUrl=sharePath;
-  }catch(storageError){console.error("shared video storage failed; MP4 download will continue:",storageError?.message||storageError);}
-  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Path"};
-  if(shareUrl)headers["X-Video-Share-Path"]=shareUrl;
+  }catch(storageError){console.error("shared video storage failed:",storageError?.message||storageError);throw new Error("El MP4 se creó, pero no se pudo guardar de forma privada. Revisa el bucket shared-videos en Supabase. "+(storageError?.message||""));}
+  if(!shareUrl)throw new Error("No se guardó el video privado; no se puede crear el enlace de prueba.");
+  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Path","X-Video-Share-Path":shareUrl};
   res.set(headers);
   res.send(mp4);
  }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo convertir el video a MP4. Inténtalo otra vez."});}
