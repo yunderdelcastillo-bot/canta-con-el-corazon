@@ -66,7 +66,7 @@ app.post("/api/preview-links",async(req,res)=>{
   if(countError)return res.status(503).json({error:"No se pudo consultar el historial de enlaces de muestra."});
   const token=crypto.randomBytes(32).toString("base64url");
   const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
-  const {error:insertError}=await db.from("song_preview_links").insert({song_id:songId,token_hash:tokenHash,created_by:user.id});
+  const {error:insertError}=await db.from("song_preview_links").insert({song_id:songId,token_hash:tokenHash,created_by:user.id,download_enabled:false});
   if(insertError)return res.status(500).json({error:"No se pudo guardar el enlace de muestra."});
   res.set("Cache-Control","no-store").json({ok:true,token,number:(count||0)+1,audio_path:song.audio_path});
  }catch(e){console.error("preview link:",e?.message||e);res.status(500).json({error:"Error al generar el enlace."});}
