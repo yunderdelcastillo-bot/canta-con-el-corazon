@@ -394,13 +394,24 @@ downloadButton.addEventListener('click',async()=>{
    const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
    // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
    ctx.save(); // Conserva el encuadre y movimiento natural de los videos.
-   const stills=[...(window.platformVideoImages||[]).map(url=>({url})),...customerImages];
-   const showStill=stills.length>0&&Math.floor(motionTime/8)%3===2;
+   // Cada foto personal recibe un espacio propio repartido durante toda la canción.
+   // Se muestra durante el 42% de su intervalo; el resto conserva el video de biblioteca.
+   const photoCount=customerImages.length;
+   const photoSlot=photoCount?Math.min(photoCount-1,Math.floor((motionTime/Math.max(0.001,audioEl.duration))*photoCount)):-1;
+   const photoProgress=photoCount?((motionTime/Math.max(0.001,audioEl.duration))*photoCount)-photoSlot:1;
+   const showCustomerPhoto=photoCount>0&&motionTime>=3&&photoProgress<0.42;
+   const platformStills=(window.platformVideoImages||[]).map(url=>({url}));
+   const showPlatformStill=!photoCount&&platformStills.length>0&&Math.floor(motionTime/24)%3===2;
+   const showStill=showCustomerPhoto||showPlatformStill;
    if(showStill){
-    const item=stills[Math.floor(motionTime/24*stills.length)%stills.length];
-    let img=item.image;if(!img){img=new Image();img.src=item.url;item.image=img;}
-    if(img.complete&&img.naturalWidth){const iw=img.naturalWidth,ih=img.naturalHeight,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);}
-    else if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.drawImage(stockVideo,(w-dw)/2,(h-dh)/2,dw,dh);}
+    const item=showCustomerPhoto?customerImages[photoSlot]:platformStills[Math.floor(motionTime/24)%platformStills.length];
+    let img=item.image;if(!img){img=new Image();img.crossOrigin='anonymous';img.src=item.url;item.image=img;}
+    if(img.complete&&img.naturalWidth){
+     const iw=img.naturalWidth,ih=img.naturalHeight,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;
+     const fadeIn=Math.min(1,photoProgress/0.08),fadeOut=Math.min(1,(0.42-photoProgress)/0.08);
+     ctx.save();ctx.globalAlpha=Math.max(0,Math.min(fadeIn,fadeOut));
+     ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);ctx.restore();
+    }else if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.drawImage(stockVideo,(w-dw)/2,(h-dh)/2,dw,dh);}
     else{ctx.fillStyle='#33213f';ctx.fillRect(0,0,w,h);}
    }else if(stockImage){const iw=stockImage.naturalWidth||w,ih=stockImage.naturalHeight||h,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;ctx.drawImage(stockImage,(w-dw)/2,(h-dh)/2,dw,dh)}else if(stockVideo&&!useAnimatedFallback&&stockVideo.readyState>=2&&!stockVideo.paused&&!stockVideo.ended){
     const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
