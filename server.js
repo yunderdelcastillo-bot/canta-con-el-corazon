@@ -398,7 +398,7 @@ app.post("/api/convert-video",async(req,res)=>{
   await writeFile(input,Buffer.concat(chunks));chunks.length=0;
   const conversionStartedAt=Date.now();
   console.log("Starting fast mobile MP4 conversion:",{inputMB:Number((total/1024/1024).toFixed(2)),targetWidth:480,fps:15});
-  await execFileAsync(ffmpegPath,["-y","-threads","1","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='min(480,iw)':-2:force_original_aspect_ratio=decrease","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
+  await execFileAsync(ffmpegPath,["-y","-threads","1","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
   if(mp4.length>30*1024*1024)return res.status(413).json({error:"El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración de la canción."});
