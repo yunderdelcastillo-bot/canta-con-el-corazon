@@ -67,7 +67,7 @@ body.gift-mode #intro.stock-video-active{background-image:none!important;backgro
 body.gift-mode #pixabayGiftBackground{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2;opacity:.92;pointer-events:none}
 body.gift-mode #pixabayCredit{position:absolute;bottom:14px;left:0;right:0;z-index:2;text-align:center;font-size:.72rem;color:#fff;opacity:.8;text-shadow:0 1px 4px #000}
 
-</style></head>
+body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode .wrap{width:100%;max-width:none;min-height:100svh;margin:0;padding:0}body.video-share-mode .wrap>*{display:none!important}body.video-share-mode #sharedVideoLanding{display:flex!important;min-height:100svh;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:26px 20px;background:radial-gradient(circle at top,#6b3158,#170b1b 70%)}#sharedVideoLanding{width:100%;color:#fff0e8}#sharedVideoLanding .share-cover{width:min(100%,560px);min-height:min(72svh,760px);border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:30px 22px;background:linear-gradient(180deg,#26102b99,#0c0710d9),url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=1200&q=85') center/cover;box-shadow:0 20px 60px #0008}#sharedVideoLanding .share-play{width:150px;height:150px;border:0;border-radius:50%;background:linear-gradient(135deg,#ed2459,#c10a91);color:white;font-size:4rem;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 45px #d20b7c66}#sharedVideoLanding h1{font:500 clamp(2rem,8vw,3.6rem) Georgia,serif;color:#fff0e8}#sharedVideoLanding p{font-size:1.2rem;text-shadow:0 2px 8px #000}#sharedVideoLanding video{display:block;width:min(100%,760px);max-height:88svh;background:#000;border-radius:16px}#sharedVideoLanding .share-brand{margin-top:22px;color:#f5d4e8;font-size:1rem}</style></head>
 <body><main class="wrap">
 <div class="brand">✦ Un regalo que se siente ✦</div><nav class="nav"><a href="#como-funciona">Cómo funciona</a><a href="#paquetes">Paquetes</a><a href="#order">Pedir canción</a><a href="#preguntas">Preguntas</a></nav>
 <section class="card" id="gift">
@@ -375,6 +375,9 @@ downloadButton.addEventListener('click',async()=>{
   const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
   if(!conversionResponse.ok){let detail='No se pudo convertir a MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
   const mp4Blob=await conversionResponse.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
+  const sharedVideoFileUrl=conversionResponse.headers.get('X-Video-Share-Url');
+  if(!sharedVideoFileUrl)throw new Error('El MP4 se creó, pero no se pudo guardar para compartirlo mediante un enlace.');
+  window.lastVideoShareLink=location.origin+location.pathname+'?video='+encodeURIComponent(sharedVideoFileUrl)+'&para='+encodeURIComponent(name||'');
   const videoUrl=URL.createObjectURL(mp4Blob);
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   let preview=document.getElementById('generatedVideoPreview');
@@ -394,7 +397,7 @@ downloadButton.addEventListener('click',async()=>{
  }catch(err){downloadNotice.textContent='No se pudo crear el video en este navegador: '+(err.message||'intenta de nuevo')+'. Prueba Chrome actualizado.'}finally{downloadButton.disabled=false}
 });
 function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
-document.getElementById('shareGift').addEventListener('click',()=>{const shareText='🎁 Te prepararon una sorpresa musical. Toca aquí para descubrirla: '+location.href;const whatsappUrl='https://wa.me/?text='+encodeURIComponent(shareText);window.location.href=whatsappUrl;});
+document.getElementById('shareGift').addEventListener('click',()=>{if(!window.lastVideoShareLink){document.getElementById('downloadNotice').textContent='Primero crea el video MP4. Cuando esté listo, este botón compartirá un enlace exclusivo para verlo.';document.getElementById('downloadGift').scrollIntoView({behavior:'smooth',block:'center'});return;}const shareText='🎁 Te prepararon una sorpresa musical. Toca aquí para descubrir tu video: '+window.lastVideoShareLink;window.location.href='https://wa.me/?text='+encodeURIComponent(shareText);});
 document.querySelectorAll('.choose').forEach(b=>b.addEventListener('click',()=>{const sel=document.getElementById('package');if(sel){const match=Array.from(sel.options).find(o=>o.text===b.dataset.package);if(match)sel.value=match.value;else if(b.dataset.package.includes('S/20'))sel.selectedIndex=0;else if(b.dataset.package.includes('S/25'))sel.selectedIndex=1;else sel.selectedIndex=2}document.getElementById('order').scrollIntoView({behavior:'smooth'})}));
 const packageSelect=document.getElementById('package');const payAmount=document.getElementById('payAmount');function updatePayAmount(){payAmount.textContent=packageSelect.selectedIndex===0?'S/20':packageSelect.selectedIndex===1?'S/25':packageSelect.selectedIndex===2?'Desde S/30':'Por confirmar'}packageSelect.addEventListener('change',updatePayAmount);updatePayAmount();
 document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const v=id=>document.getElementById(id).value.trim();const phone=v('contact').replace(/\D/g,'');const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+v('buyer')+'\nMi WhatsApp: '+v('contact')+'\nPara: '+v('recipient')+'\nOcasión: '+v('occasion')+'\nHistoria/dedicatoria: '+v('story')+'\nGénero elegido: '+v('style')+'\nGénero o estilo adicional (opcional): '+(v('customGenre')||'No indicó')+'\nTipo de voz: '+v('voice')+'\nPaquete: '+v('package')+'\nPlazo solicitado: '+v('urgency')+(v('urgency').includes('30 minutos')?'\nAdicional express: S/5 (si se confirma disponibilidad)':'');const owner='51977974730';window.open('https://wa.me/'+owner+'?text='+encodeURIComponent(text),'_blank')});
@@ -413,6 +416,25 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
   if(revealed)revealed.classList.add('hidden');
   window.scrollTo(0,0);
  }
+})();
+</script>
+<script>
+(function(){
+ const p=new URLSearchParams(location.search),videoUrl=p.get('video');
+ if(!videoUrl)return;
+ let parsed;try{parsed=new URL(videoUrl)}catch(e){return}
+ if(parsed.protocol!=='https:'||!parsed.pathname.includes('/storage/v1/object/public/shared-videos/'))return;
+ document.body.classList.add('video-share-mode');
+ const root=document.createElement('section');root.id='sharedVideoLanding';
+ const cover=document.createElement('div');cover.className='share-cover';
+ const brand=document.createElement('div');brand.textContent='CANTA CON EL CORAZÓN';brand.style.cssText='font-weight:800;letter-spacing:.12em;color:#f6d78c';
+ const title=document.createElement('h1');title.textContent='Una sorpresa para ti';
+ const play=document.createElement('button');play.className='share-play';play.type='button';play.textContent='▶';play.setAttribute('aria-label','Reproducir video');
+ const prompt=document.createElement('p');prompt.textContent='🎁 Toca para descubrir tu sorpresa';
+ cover.append(brand,title,play,prompt);root.appendChild(cover);
+ const footer=document.createElement('div');footer.className='share-brand';footer.textContent='Hecha con amor ♥ por Canta con el corazón';root.appendChild(footer);
+ document.querySelector('main.wrap').appendChild(root);
+ play.addEventListener('click',()=>{cover.remove();footer.remove();const player=document.createElement('video');player.src=videoUrl;player.controls=true;player.playsInline=true;player.autoplay=true;player.preload='auto';root.appendChild(player);const credit=document.createElement('div');credit.className='share-brand';credit.textContent='Hecha con amor ♥ por Canta con el corazón';root.appendChild(credit);player.play().catch(()=>{player.controls=true});});
 })();
 </script>
 
