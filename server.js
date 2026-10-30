@@ -393,12 +393,20 @@ app.post("/api/convert-video",async(req,res)=>{
   const chunks=[];let total=0;const maxBytes=45*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes){console.warn("MP4 input rejected at size limit:",total);return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});}chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
+  // Usar el MP3 original guardado en Supabase como pista maestra.
+  // Si Android detiene la grabación visual antes de tiempo, FFmpeg repetirá el video
+  // hasta el final exacto de la canción, sin cortar el audio a los 45 segundos.
+  const {data:originalAudio,error:originalAudioError}=await db.storage.from("songs-audio").download(audioPath);
+  if(originalAudioError||!originalAudio)throw new Error("No se pudo recuperar el MP3 original para completar la duración del video: "+(originalAudioError?.message||"archivo vacío"));
+  const originalAudioBuffer=Buffer.from(await originalAudio.arrayBuffer());
+  if(!originalAudioBuffer.length)throw new Error("El MP3 original está vacío.");
   dir=await mkdtemp(path.join(os.tmpdir(),"cch-video-"));
-  const input=path.join(dir,"input.webm"),output=path.join(dir,"output.mp4");
+  const input=path.join(dir,"input.webm"),audioInput=path.join(dir,"original.mp3"),output=path.join(dir,"output.mp4");
   await writeFile(input,Buffer.concat(chunks));chunks.length=0;
+  await writeFile(audioInput,originalAudioBuffer);
   const conversionStartedAt=Date.now();
-  console.log("Starting fast mobile MP4 conversion:",{inputMB:Number((total/1024/1024).toFixed(2)),targetWidth:480,fps:15});
-  await execFileAsync(ffmpegPath,["-y","-threads","1","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
+  console.log("Starting full-song MP4 conversion:",{inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:480,fps:15});
+  await execFileAsync(ffmpegPath,["-y","-threads","1","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
   if(mp4.length>30*1024*1024)return res.status(413).json({error:"El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración de la canción."});
