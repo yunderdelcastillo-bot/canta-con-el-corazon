@@ -160,9 +160,13 @@ app.get("/api/audio",async(req,res)=>{
    const downloadEnabled=!!session&&!!session.download_enabled;
    if(sessionError||(!activePreview&&!downloadEnabled))return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
   }
-  const {data,error:signError}=await db.storage.from("songs-audio").createSignedUrl(path,300);
-  if(signError||!data?.signedUrl)return res.status(500).json({error:"No se pudo crear el enlace temporal."});
-  res.set("Cache-Control","no-store").redirect(302,data.signedUrl);
+  // Servir el MP3 desde esta API evita fallos CORS al seguir la URL firmada de Supabase.
+  const {data:audioFile,error:audioError}=await db.storage.from("songs-audio").download(path);
+  if(audioError||!audioFile)return res.status(502).json({error:"No se pudo recuperar el archivo de audio. Inténtalo nuevamente."});
+  const audioBuffer=Buffer.from(await audioFile.arrayBuffer());
+  if(!audioBuffer.length)return res.status(502).json({error:"El archivo de audio está vacío."});
+  res.set({"Content-Type":"audio/mpeg","Content-Length":String(audioBuffer.length),"Cache-Control":"no-store","Access-Control-Expose-Headers":"Content-Length"});
+  res.send(audioBuffer);
  }catch(e){res.status(500).json({error:"Error interno al preparar el audio."});}
 });
 app.get("/api/verify-grant",async(req,res)=>{
