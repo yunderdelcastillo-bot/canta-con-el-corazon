@@ -113,8 +113,9 @@ app.post("/api/preview/start",async(req,res)=>{
   if(error||!link)return res.status(410).json({error:"Este enlace no existe o ya venció."});
   if(link.completed_at)return res.status(410).json({error:"Esta muestra ya se escuchó. Solicita otro enlace."});
   if(link.started_at)return res.status(409).json({error:"Este enlace ya se inició. Usa otro de los enlaces enviados."});
-  const {data:song,error:songError}=await db.from("songs").select("id,published").eq("id",link.song_id).eq("audio_path",path).maybeSingle();
-  if(songError||!song||!song.published)return res.status(404).json({error:"No se encontró la canción de muestra."});
+  const {data:song,error:songError}=await db.from("songs").select("id,published,audio_path").eq("id",link.song_id).maybeSingle();
+  if(songError||!song){console.error("Preview song lookup failed:",songError?.message||"missing song",{songId:link.song_id});return res.status(404).json({error:"No se encontró la canción vinculada a esta muestra."});}
+  if(song.audio_path!==path){console.error("Preview audio path mismatch:",{songId:link.song_id,requestedPath:path,storedPath:song.audio_path});return res.status(409).json({error:"El enlace de muestra apunta a un archivo anterior. Genera un enlace nuevo desde el panel."});}
   const {data:updated,error:updateError}=await db.from("song_preview_links").update({started_at:new Date().toISOString()}).eq("id",link.id).is("started_at",null).is("completed_at",null).select("id").maybeSingle();
   if(updateError||!updated)return res.status(409).json({error:"Este enlace ya se utilizó. Solicita otro."});
   res.set("Cache-Control","no-store").json({ok:true,token});
@@ -153,7 +154,6 @@ app.get("/api/audio",async(req,res)=>{
    grantAuthorized=!!g;
   }
   if(!grantAuthorized){
-   if(!song.published)return res.status(403).json({error:"Canción no publicada."});
    if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
    const previewHash=crypto.createHash("sha256").update(preview).digest("hex");
    const {data:session,error:sessionError}=await db.from("song_preview_links").select("id,started_at,completed_at,download_enabled").eq("song_id",song.id).eq("token_hash",previewHash).maybeSingle();
