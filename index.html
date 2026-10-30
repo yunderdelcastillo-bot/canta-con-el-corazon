@@ -376,8 +376,7 @@ downloadButton.addEventListener('click',async()=>{
   if(!conversionResponse.ok){let detail='No se pudo convertir a MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
   const mp4Blob=await conversionResponse.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
   const sharedVideoFileUrl=conversionResponse.headers.get('X-Video-Share-Url');
-  if(!sharedVideoFileUrl)throw new Error('El MP4 se creó, pero no se pudo guardar para compartirlo mediante un enlace.');
-  window.lastVideoShareLink=location.origin+location.pathname+'?video='+encodeURIComponent(sharedVideoFileUrl)+'&para='+encodeURIComponent(name||'');
+  window.lastVideoShareLink=sharedVideoFileUrl?location.origin+location.pathname+'?video='+encodeURIComponent(sharedVideoFileUrl)+'&para='+encodeURIComponent(name||''):null;
   const videoUrl=URL.createObjectURL(mp4Blob);
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   let preview=document.getElementById('generatedVideoPreview');
@@ -391,8 +390,8 @@ downloadButton.addEventListener('click',async()=>{
   share.textContent='📲 Compartir MP4 por WhatsApp';share.addEventListener('click',async()=>{try{const videoFile=new File([mp4Blob],fileName,{type:'video/mp4'});if(navigator.canShare&&navigator.canShare({files:[videoFile]})){await navigator.share({files:[videoFile],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Este navegador no permite adjuntar el MP4 directamente. Descarga el video y luego adjúntalo en WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo compartir el archivo. Descarga el MP4 y adjúntalo en WhatsApp.'}});
   preview.appendChild(share);
   a.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video. Si no aparece, abre el menú del reproductor o mantén pulsado el enlace Descargar video.'});
-  downloadNotice.textContent='¡Video creado! Reprodúcelo aquí y pulsa Descargar video para guardarlo en tu celular.';
-  videoNotice.textContent='Video vertical listo en formato MP4. Puedes revisarlo, descargarlo o compartirlo desde aquí.';
+  downloadNotice.textContent=window.lastVideoShareLink?'¡Video creado! Ya puedes compartir el enlace sorpresa por WhatsApp o descargar el MP4.':'¡Video creado y listo para descargar! No se pudo crear el enlace sorpresa esta vez; tu MP4 sigue disponible para descargar.';
+  videoNotice.textContent=window.lastVideoShareLink?'Video vertical listo en MP4. También se creó un enlace privado de sorpresa para compartir.':'Video vertical listo en MP4. Puedes revisarlo y descargarlo desde aquí.';
   preview.scrollIntoView({behavior:'smooth',block:'center'});
  }catch(err){downloadNotice.textContent='No se pudo crear el video en este navegador: '+(err.message||'intenta de nuevo')+'. Prueba Chrome actualizado.'}finally{downloadButton.disabled=false}
 });
