@@ -136,6 +136,25 @@ app.post("/api/preview/complete",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,completed:true});
  }catch(e){console.error("preview complete:",e?.message||e);res.status(500).json({error:"No se pudo finalizar la muestra."});}
 });
+app.get("/api/admin-audio-url",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado en el servidor."});
+  const bearer=String(req.headers.authorization||"").match(/^Bearer (.+)$/i);
+  if(!bearer)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const caller=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const {data:{user},error:authError}=await caller.auth.getUser(bearer[1]);
+  if(authError||!user)return res.status(401).json({error:"La sesión expiró. Inicia sesión nuevamente."});
+  const songId=String(req.query.songId||"");
+  if(!/^[0-9a-f-]{36}$/i.test(songId))return res.status(400).json({error:"ID de canción no válido."});
+  const db=admin();
+  const {data:song,error}=await db.from("songs").select("id,owner_id,audio_path").eq("id",songId).eq("owner_id",user.id).maybeSingle();
+  if(error||!song)return res.status(404).json({error:"Canción no encontrada o sin permiso."});
+  if(!song.audio_path)return res.status(404).json({error:"La canción no tiene archivo MP3."});
+  const {data,error:signedError}=await db.storage.from("songs-audio").createSignedUrl(song.audio_path,3600);
+  if(signedError||!data?.signedUrl){console.error("Admin signed audio URL failed:",signedError?.message||"empty URL");return res.status(502).json({error:"No se pudo generar el enlace seguro del MP3."});}
+  res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
+ }catch(e){console.error("Admin audio URL error:",e?.message||e);res.status(500).json({error:"Error al preparar el reproductor."});}
+});
 app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
