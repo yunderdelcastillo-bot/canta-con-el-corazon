@@ -256,8 +256,8 @@ downloadButton.addEventListener('click',async()=>{
   let stockVideo=null;
   try{
    const queryByTheme={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
-   const stockResponse=await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(queryByTheme[theme]||"romantic couple sunset"));
-   if(stockResponse.ok){
+   const stockResponse=stockVideo?null:await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(queryByTheme[theme]||"romantic couple sunset"));
+   if(stockResponse?.ok){
     const stockData=await stockResponse.json();const stock=(stockData.videos||[]).find(v=>v.preview);
     if(stock){
      stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src=stock.preview;
@@ -308,7 +308,7 @@ downloadButton.addEventListener('click',async()=>{
    const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
    // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
    ctx.save(); // Sin zoom automático: conserva el encuadre natural del video de fondo.
-   if(stockVideo&&!useAnimatedFallback&&stockVideo.readyState>=2&&!stockVideo.paused&&!stockVideo.ended){
+   if(stockImage){const iw=stockImage.naturalWidth||w,ih=stockImage.naturalHeight||h,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;ctx.drawImage(stockImage,(w-dw)/2,(h-dh)/2,dw,dh)}else if(stockVideo&&!useAnimatedFallback&&stockVideo.readyState>=2&&!stockVideo.paused&&!stockVideo.ended){
     const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
     const offsetX=(w-dw)/2,offsetY=(h-dh)/2;
     try{ctx.drawImage(stockVideo,offsetX,offsetY,dw,dh)}catch(e){ctx.fillStyle="#33213f";ctx.fillRect(0,0,w,h)}
