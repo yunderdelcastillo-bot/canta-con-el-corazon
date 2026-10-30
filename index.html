@@ -124,7 +124,7 @@ if(sharedVideoUrl){
  const heading=document.createElement('h3');heading.textContent='Tu regalo en video está listo';heading.style.color='#fff0e8';preview.appendChild(heading);
  const player=document.createElement('video');player.controls=true;player.playsInline=true;player.preload='metadata';player.src=sharedVideoUrl;player.style.cssText='display:block;width:100%;max-height:65vh;border-radius:12px;background:#120811';preview.appendChild(player);
  const help=document.createElement('p');help.textContent='Primero reproduce aquí el video. Para guardarlo en tu celular, pulsa Descargar video.';help.style.color='#fff0e8';preview.appendChild(help);
- const download=document.createElement('a');download.href=sharedVideoUrl;download.target='_blank';download.rel='noopener';download.textContent='⬇️ Descargar video';download.className='btn';download.style.cssText='display:block;text-align:center;margin:10px 0;text-decoration:none';preview.appendChild(download);
+ const download=document.createElement('a');download.href=sharedVideoUrl;download.textContent='⬇️ Descargar video';download.className='btn';download.style.cssText='display:block;text-align:center;margin:10px 0;text-decoration:none';download.addEventListener('click',async e=>{e.preventDefault();try{const response=await fetch(sharedVideoUrl);if(!response.ok)throw new Error('download');const blob=await response.blob();const objectUrl=URL.createObjectURL(blob);const a=document.createElement('a');a.href=objectUrl;a.download='regalo-canta-con-el-corazon.mp4';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);}catch(err){window.open(sharedVideoUrl,'_blank','noopener');}});preview.appendChild(download);
  const shareMp4=document.createElement('button');shareMp4.type='button';shareMp4.className='btn secondary';shareMp4.textContent='📲 Compartir MP4 por WhatsApp';shareMp4.style.cssText='display:block;width:100%;margin:10px 0';
  shareMp4.addEventListener('click',()=>{const text='🎁 Te comparto este regalo musical de Canta con el corazón. Puedes verlo y descargarlo aquí: '+location.href;location.href='https://wa.me/?text='+encodeURIComponent(text);});
  preview.appendChild(shareMp4);
@@ -222,7 +222,7 @@ downloadMp3Button.addEventListener('click',async()=>{
 });
 
 downloadButton.addEventListener('click',async()=>{
- if(sharedVideoUrl){const a=document.createElement('a');a.href=sharedVideoUrl;a.target='_blank';a.rel='noopener';a.click();downloadNotice.textContent='Abriendo el video MP4 para que puedas guardarlo en tu celular.';return;}
+ if(sharedVideoUrl){const link=document.querySelector('#generatedVideoPreview a');if(link)link.click();downloadNotice.textContent='Preparando la descarga del video MP4.';return;}
  if(!downloadAllowed){downloadNotice.textContent='🔒 La descarga está bloqueada hasta que Canta con el corazón confirme tu pago.';return}
  if(!audio||!resolvedAudioUrl){downloadNotice.textContent='Todavía no hay una canción disponible para crear el video.';return}
  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream){downloadNotice.textContent='Tu navegador no permite crear el video aquí. Prueba con Chrome actualizado.';return}
