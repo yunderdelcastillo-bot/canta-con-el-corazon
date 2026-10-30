@@ -261,6 +261,45 @@ app.post("/api/grants",async(req,res)=>{
  }catch(e){res.status(500).json({error:"Error interno al autorizar la descarga."});}
 });
 
+app.post("/api/share-video",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El almacenamiento no está configurado."});
+  const audioPath=String(req.query.path||"");
+  const previewToken=String(req.query.previewToken||"");
+  const grantToken=String(req.query.grantToken||"");
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+  const db=admin();
+  const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
+  if(!song)return res.status(404).json({error:"No se encontró la canción."});
+  let allowedDownload=false;
+  if(previewToken&&/^[A-Za-z0-9_-]{40,100}$/.test(previewToken)){
+   const hash=crypto.createHash("sha256").update(previewToken).digest("hex");
+   const {data:link}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",hash).eq("download_enabled",true).maybeSingle();
+   allowedDownload=!!link;
+  }
+  if(!allowedDownload&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
+   const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
+   const {data:grant}=await db.from("download_grants").select("id").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
+   allowedDownload=!!grant;
+  }
+  if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
+  const chunks=[];let total=0;const maxBytes=30*1024*1024;
+  for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 30 MB."});chunks.push(chunk);}
+  if(!total)return res.status(400).json({error:"No se recibió el MP4."});
+  const {data:buckets,error:listError}=await db.storage.listBuckets();
+  if(listError)throw listError;
+  if(!(buckets||[]).some(b=>b.name==="shared-videos")){
+   const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"30MB",allowedMimeTypes:["video/mp4"]});
+   if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+  }
+  const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
+  const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,Buffer.concat(chunks),{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
+  if(uploadError)throw uploadError;
+  const {data:{publicUrl}}=db.storage.from("shared-videos").getPublicUrl(objectPath);
+  res.set("Cache-Control","no-store").json({ok:true,videoUrl:publicUrl});
+ }catch(e){console.error("share MP4 upload:",e?.message||e);res.status(500).json({error:"No se pudo crear el enlace público del video: "+(e?.message||"error interno")});}
+});
+
 app.post("/api/convert-video",async(req,res)=>{
  console.log("MP4 conversion request received; origin:",req.headers.origin||"(none)");
  let dir="";
