@@ -458,6 +458,7 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
  [mp4,mp3,share].forEach(b=>{b.style.cssText='border:0;border-radius:30px;padding:13px;font-weight:700;background:#f6e7ed;color:#3b1028';actions.appendChild(b)});
  const note=document.createElement('p');note.textContent='Las descargas y el uso compartido se habilitarán cuando se confirme el pago.';note.style.cssText='font-size:14px;opacity:.95';root.appendChild(note);
  const revealed=document.getElementById('revealed');if(revealed)revealed.appendChild(root);else document.querySelector('main.wrap').appendChild(root);
+ const legacyPreview=document.getElementById('playPreview');if(legacyPreview)legacyPreview.remove();const legacyAudio=document.getElementById('audioPlayer');if(legacyAudio){legacyAudio.pause();legacyAudio.removeAttribute('src');legacyAudio.classList.add('hidden');}const legacyNote=document.getElementById('audioNote');if(legacyNote)legacyNote.classList.add('hidden');
  const openGift=document.getElementById('openGift');
  document.addEventListener('click',e=>{if(e.target===openGift||e.target.closest('#openGift')){e.preventDefault();e.stopImmediatePropagation();const intro=document.getElementById('intro');if(intro)intro.classList.add('hidden');if(revealed)revealed.classList.remove('hidden');root.scrollIntoView({behavior:'smooth'});}},true);
  let played=false,enabled=false;
