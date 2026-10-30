@@ -272,7 +272,7 @@ app.post("/api/convert-video",async(req,res)=>{
   dir=await mkdtemp(path.join(os.tmpdir(),"cch-video-"));
   const input=path.join(dir,"input.webm"),output=path.join(dir,"output.mp4");
   await writeFile(input,Buffer.concat(chunks));
-  await execFileAsync(ffmpegPath,["-y","-i",input,"-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p","-r","20","-c:a","aac","-b:a","128k","-movflags","+faststart","-shortest",output],{timeout:240000,maxBuffer:4*1024*1024});
+  await execFileAsync(ffmpegPath,["-y","-i",input,"-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p","-r","20","-c:a","aac","-b:a","128k","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:4*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
   res.set({"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length)});
