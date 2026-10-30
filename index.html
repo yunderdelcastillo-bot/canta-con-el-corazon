@@ -160,6 +160,15 @@ function lockPreview(message){
 }
 async function startPreview(){
  const playButton=document.getElementById('playPreview');
+ // Si el administrador ya autorizó la descarga, no volver a consumir el enlace de muestra.
+ // La autorización de descarga permite recuperar el audio aunque la vista previa ya se haya iniciado.
+ if(downloadAllowed&&previewLinkToken){
+  audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewLinkToken);
+  resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
+  if(playButton)playButton.classList.add('hidden');
+  try{await audioPlayer.play()}catch(e){audioNote.textContent='Tu canción está lista. Pulsa reproducir para escucharla.';audioNote.classList.remove('hidden')}
+  return;
+ }
  playButton.disabled=true;playButton.textContent='Preparando tu vista previa…';
  try{
   previewToken=previewLinkToken;
@@ -228,8 +237,19 @@ downloadButton.addEventListener('click',async()=>{
  if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream){downloadNotice.textContent='Tu navegador no permite crear el video aquí. Prueba con Chrome actualizado.';return}
  try{
   videoStatusManual=true;downloadButton.disabled=true;downloadNotice.textContent='Preparando la canción y el diseño del video…';
-  const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio');
-  const audioBlob=await response.blob();const audioUrl=URL.createObjectURL(audioBlob);
+  let response;
+  try{response=await fetch(resolvedAudioUrl,{cache:'no-store'})}
+  catch(networkError){
+   await new Promise(resolve=>setTimeout(resolve,900));
+   try{response=await fetch(resolvedAudioUrl,{cache:'no-store'})}
+   catch(retryError){throw new Error('No se pudo conectar con el servidor de audio. Comprueba tu conexión y vuelve a intentarlo. Detalle: '+(retryError?.message||'fallo de red'))}
+  }
+  if(!response.ok){
+   let detail='HTTP '+response.status;
+   try{const problem=await response.json();if(problem.error)detail=problem.error}catch(e){}
+   throw new Error('El servidor no autorizó o no pudo entregar el audio: '+detail);
+  }
+  const audioBlob=await response.blob();if(!audioBlob.size)throw new Error('El servidor devolvió un audio vacío.');const audioUrl=URL.createObjectURL(audioBlob);
   let stockVideo=null;
   try{
    const queryByTheme={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
