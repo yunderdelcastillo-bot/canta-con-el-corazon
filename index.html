@@ -486,6 +486,40 @@ downloadButton.addEventListener('click',async()=>{
   const share=document.createElement('button');share.type='button';share.className='btn secondary';share.textContent='Compartir video';share.style.cssText='display:block;width:100%;margin:10px 0';
   share.textContent='📲 Compartir MP4 por WhatsApp';share.addEventListener('click',async()=>{try{const videoFile=new File([mp4Blob],fileName,{type:'video/mp4'});if(navigator.canShare&&navigator.canShare({files:[videoFile]})){await navigator.share({files:[videoFile],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Este navegador no permite adjuntar el MP4 directamente. Descarga el video y luego adjúntalo en WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo compartir el archivo. Descarga el MP4 y adjúntalo en WhatsApp.'}});
   preview.appendChild(share);
+  // Segundo enlace independiente: portada web de sorpresa con botón para descubrir la canción.
+  const surpriseTitle=document.createElement('h3');
+  surpriseTitle.textContent='🎁 Enlace de sorpresa web';
+  surpriseTitle.style.cssText='color:#f6d78c;margin:24px 0 8px;text-align:center';
+  preview.appendChild(surpriseTitle);
+  const surpriseHelp=document.createElement('p');
+  surpriseHelp.textContent='Este es el enlace para enviar a la persona especial. Al abrirlo verá una portada y podrá tocar el botón para descubrir su canción.';
+  surpriseHelp.style.cssText='color:#fff0e8;text-align:center;line-height:1.5';
+  preview.appendChild(surpriseHelp);
+  const surpriseUrl=new URL(location.href);
+  surpriseUrl.hash='';
+  surpriseUrl.searchParams.delete('video');
+  window.lastSurpriseWebLink=surpriseUrl.toString();
+  const surpriseInput=document.createElement('input');
+  surpriseInput.type='url';surpriseInput.readOnly=true;surpriseInput.value=window.lastSurpriseWebLink;
+  surpriseInput.setAttribute('aria-label','Enlace web de sorpresa');
+  surpriseInput.style.cssText='width:100%;padding:12px;border-radius:12px;border:1px solid #f6d78c;background:#fff;color:#351426;font-size:13px;margin:8px 0;box-sizing:border-box';
+  preview.appendChild(surpriseInput);
+  const copySurprise=document.createElement('button');
+  copySurprise.type='button';copySurprise.className='btn secondary';copySurprise.textContent='🔗 Copiar enlace de sorpresa';
+  copySurprise.style.cssText='display:block;width:100%;margin:8px 0';
+  copySurprise.addEventListener('click',async()=>{
+   try{if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(window.lastSurpriseWebLink)}else{surpriseInput.focus();surpriseInput.select();document.execCommand('copy')}copySurprise.textContent='✓ Enlace copiado';}
+   catch(e){surpriseInput.focus();surpriseInput.select();copySurprise.textContent='Selecciona y copia el enlace';}
+  });
+  preview.appendChild(copySurprise);
+  const sendSurprise=document.createElement('button');
+  sendSurprise.type='button';sendSurprise.className='btn';sendSurprise.textContent='💌 Enviar sorpresa web por WhatsApp';
+  sendSurprise.style.cssText='display:block;width:100%;margin:8px 0';
+  sendSurprise.addEventListener('click',()=>{
+   const text='💖 Te prepararon una sorpresa musical. Abre este enlace y toca el botón para descubrir tu canción: '+window.lastSurpriseWebLink;
+   window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener');
+  });
+  preview.appendChild(sendSurprise);
   a.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video. Si no aparece, abre el menú del reproductor o mantén pulsado el enlace Descargar video.'});
   downloadNotice.textContent=window.lastVideoShareLink?'¡Video creado! Ya puedes compartir el enlace sorpresa por WhatsApp o descargar el MP4.':'¡Video creado y listo para descargar!'+shareUploadWarning;
   videoNotice.textContent=window.lastVideoShareLink?'Video vertical listo en MP4. También se creó un enlace privado de sorpresa para compartir.':'Video vertical listo en MP4. Puedes revisarlo y descargarlo desde aquí.';
