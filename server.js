@@ -17,6 +17,9 @@ const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return
 app.use(cors(corsOptions));
 app.options(/.*/,cors(corsOptions));
 const port=process.env.PORT||10000;
+const MEDIA_BUCKET="cch-media-library";
+const MEDIA_CATEGORIES=new Set(["romantico","cumpleanos","aniversario","serenata","homenaje","amistad","familia","dia-madre","dia-padre","otros"]);
+
 const url=process.env.SUPABASE_URL;
 const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anonKey=process.env.SUPABASE_ANON_KEY;
@@ -51,6 +54,69 @@ async function ensureAudioBucket(){
 }
 ensureAudioBucket();
 app.get("/health",(req,res)=>res.json({ok:true,configured:ready(),storage:"private-signed-urls"}));
+
+async function mediaUser(req){
+ const bearer=String(req.headers.authorization||"").match(/^Bearer (.+)$/i);
+ if(!bearer)return null;
+ const caller=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+ const {data:{user},error}=await caller.auth.getUser(bearer[1]);
+ return error?null:user;
+}
+async function ensureMediaBucket(){
+ const db=admin();const {data,error}=await db.storage.listBuckets();if(error)throw error;
+ if(!(data||[]).some(b=>b.name===MEDIA_BUCKET)){
+  const {error:createError}=await db.storage.createBucket(MEDIA_BUCKET,{public:true,fileSizeLimit:"50MB",allowedMimeTypes:["video/mp4","video/webm","video/quicktime","image/jpeg","image/png","image/webp"]});
+  if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+ }
+}
+app.get("/api/media/public",async(req,res)=>{
+ try{
+  const category=String(req.query.category||"");
+  if(!MEDIA_CATEGORIES.has(category))return res.status(400).json({error:"Categoría no válida."});
+  const db=admin();const {data,error}=await db.storage.from(MEDIA_BUCKET).list(category,{limit:100,sortBy:{column:"created_at",order:"desc"}});
+  if(error){if(/not found|does not exist/i.test(error.message||""))return res.json({items:[]});throw error;}
+  const items=(data||[]).filter(x=>x.name&&!x.name.startsWith(".")).map(x=>{const path=category+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);return {name:x.name,url:publicUrl,mimeType:x.metadata?.mimetype||"",createdAt:x.created_at||null};});
+  res.set("Cache-Control","public, max-age=60").json({items});
+ }catch(e){console.error("media public list:",e?.message||e);res.status(500).json({error:"No se pudo cargar la biblioteca multimedia."});}
+});
+app.get("/api/media",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const db=admin();await ensureMediaBucket();const items=[];
+  for(const category of MEDIA_CATEGORIES){const {data,error}=await db.storage.from(MEDIA_BUCKET).list(category,{limit:100,sortBy:{column:"created_at",order:"desc"}});if(error)continue;
+   for(const x of data||[]){if(!x.name||x.name.startsWith("."))continue;const path=category+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);items.push({category,name:x.name,url:publicUrl,mimeType:x.metadata?.mimetype||"",size:x.metadata?.size||0,createdAt:x.created_at||null});}
+  }
+  res.set("Cache-Control","no-store").json({items});
+ }catch(e){console.error("media admin list:",e?.message||e);res.status(500).json({error:"No se pudo listar la biblioteca."});}
+});
+app.put("/api/media",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const category=String(req.query.category||""),mime=String(req.headers["content-type"]||"").split(";")[0].trim().toLowerCase();
+  const extByMime={"video/mp4":"mp4","video/webm":"webm","video/quicktime":"mov","image/jpeg":"jpg","image/png":"png","image/webp":"webp"};
+  if(!MEDIA_CATEGORIES.has(category)||!extByMime[mime])return res.status(400).json({error:"Categoría o formato no permitido."});
+  const chunks=[];let total=0;for await(const chunk of req){total+=chunk.length;if(total>50*1024*1024)return res.status(413).json({error:"El archivo supera 50 MB."});chunks.push(chunk);}
+  if(!total)return res.status(400).json({error:"No se recibió ningún archivo."});
+  const name=crypto.randomUUID()+"."+extByMime[mime],db=admin();await ensureMediaBucket();
+  const {error}=await db.storage.from(MEDIA_BUCKET).upload(category+"/"+name,Buffer.concat(chunks),{contentType:mime,upsert:false,cacheControl:"3600"});
+  if(error)throw error;
+  const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(category+"/"+name);
+  res.status(201).json({ok:true,item:{category,name,url:publicUrl,mimeType:mime,size:total}});
+ }catch(e){console.error("media upload:",e?.message||e);res.status(500).json({error:"No se pudo subir el archivo: "+(e?.message||"error interno")});}
+});
+app.delete("/api/media",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const category=String(req.query.category||""),name=String(req.query.name||"");
+  if(!MEDIA_CATEGORIES.has(category)||!/^[0-9a-f-]{36}\.(mp4|webm|mov|jpg|png|webp)$/i.test(name))return res.status(400).json({error:"Archivo no válido."});
+  const {error}=await admin().storage.from(MEDIA_BUCKET).remove([category+"/"+name]);if(error)throw error;
+  res.json({ok:true});
+ }catch(e){console.error("media delete:",e?.message||e);res.status(500).json({error:"No se pudo eliminar el archivo."});}
+});
+
 app.post("/api/preview-links",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
