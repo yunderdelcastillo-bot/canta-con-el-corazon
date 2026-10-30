@@ -275,20 +275,25 @@ app.post("/api/convert-video",async(req,res)=>{
   await execFileAsync(ffmpegPath,["-y","-i",input,"-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p","-r","20","-c:a","aac","-b:a","128k","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:4*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
-  // Guardar una copia pública del MP4 para crear un enlace que pueda abrirse desde WhatsApp.
-  const {data:buckets,error:listError}=await db.storage.listBuckets();
-  if(listError)throw listError;
-  if(!(buckets||[]).some(b=>b.name==="shared-videos")){
-   const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
-   if(createError&&!/already exists/i.test(createError.message||""))throw createError;
-  }
-  const sharePath=song.id+"/"+crypto.randomUUID()+".mp4";
-  const {error:uploadError}=await db.storage.from("shared-videos").upload(sharePath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
-  if(uploadError)throw uploadError;
-  const {data:publicData}=db.storage.from("shared-videos").getPublicUrl(sharePath);
-  const shareUrl=publicData?.publicUrl;
-  if(!shareUrl)throw new Error("No se pudo crear el enlace público del video.");
-  res.set({"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"X-Video-Share-Url":shareUrl,"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Url"});
+  // Guardar una copia pública para el enlace sorpresa. Si Storage falla, no bloquear la descarga MP4.
+  let shareUrl=null;
+  try{
+   const {data:buckets,error:listError}=await db.storage.listBuckets();
+   if(listError)throw listError;
+   if(!(buckets||[]).some(b=>b.name==="shared-videos")){
+    const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+   }
+   const sharePath=song.id+"/"+crypto.randomUUID()+".mp4";
+   const {error:uploadError}=await db.storage.from("shared-videos").upload(sharePath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
+   if(uploadError)throw uploadError;
+   const {data:publicData}=db.storage.from("shared-videos").getPublicUrl(sharePath);
+   shareUrl=publicData?.publicUrl||null;
+   if(!shareUrl)throw new Error("No se pudo crear el enlace público del video.");
+  }catch(storageError){console.error("shared video storage failed; MP4 download will continue:",storageError?.message||storageError);}
+  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Url"};
+  if(shareUrl)headers["X-Video-Share-Url"]=shareUrl;
+  res.set(headers);
   res.send(mp4);
  }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo convertir el video a MP4. Inténtalo otra vez."});}
  finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
