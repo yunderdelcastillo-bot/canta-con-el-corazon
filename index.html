@@ -486,12 +486,13 @@ downloadButton.addEventListener('click',async()=>{
   // El MP4 local debe quedar disponible aunque falle la subida del enlace compartible.
   window.lastVideoShareLink='';
   let shareUploadWarning='';
+  let shareUploadData=null;
   if(mp4Blob.size<=28*1024*1024){
    try{
     const shareUploadUrl=API_BASE+'/api/share-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
     const shareUploadResponse=await fetch(shareUploadUrl,{method:'POST',headers:{'Content-Type':'video/mp4'},body:mp4Blob});
     if(!shareUploadResponse.ok){let detail='HTTP '+shareUploadResponse.status;try{const problem=await shareUploadResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-    const shareUploadData=await shareUploadResponse.json();
+    shareUploadData=await shareUploadResponse.json();
     if(!shareUploadData.videoUrl)throw new Error('El servidor no devolvió el enlace del video.');
     const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
     window.lastVideoShareLink=sharePageUrl.toString();
@@ -521,11 +522,15 @@ downloadButton.addEventListener('click',async()=>{
   surpriseHelp.textContent='Este es el enlace para enviar a la persona especial. Al abrirlo verá una portada especial; al tocar el botón se reproducirá el video completo.';
   surpriseHelp.style.cssText='color:#fff0e8;text-align:center;line-height:1.5';
   preview.appendChild(surpriseHelp);
-  const surpriseUrl=new URL(location.href);
-  surpriseUrl.hash='';
-  surpriseUrl.searchParams.set('video',shareUploadData.videoUrl);
-  surpriseUrl.searchParams.set('surprise','1');
-  window.lastSurpriseWebLink=surpriseUrl.toString();
+  if(shareUploadData&&shareUploadData.videoUrl){
+   const surpriseUrl=new URL(location.href);
+   surpriseUrl.hash='';
+   surpriseUrl.searchParams.set('video',shareUploadData.videoUrl);
+   surpriseUrl.searchParams.set('surprise','1');
+   window.lastSurpriseWebLink=surpriseUrl.toString();
+  }else{
+   window.lastSurpriseWebLink='';
+  }
   const surpriseInput=document.createElement('input');
   surpriseInput.type='url';surpriseInput.readOnly=true;surpriseInput.value=window.lastSurpriseWebLink;
   surpriseInput.setAttribute('aria-label','Enlace web de sorpresa');
