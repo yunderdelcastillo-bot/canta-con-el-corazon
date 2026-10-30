@@ -430,7 +430,11 @@ app.post("/api/convert-video",async(req,res)=>{
     videoConversionJobs.set(jobId,{status:"error",error:e?.message||"No se pudo preparar el MP4.",createdAt:Date.now(),songId:song.id});
    }finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
   });
- });
+ }catch(e){
+  console.error("MP4 conversion job setup failed:",e?.message||e);
+  if(!res.headersSent)res.status(500).json({error:"No se pudo iniciar el proceso de conversión: "+(e?.message||"error interno")});
+ }
+});
 app.get("/api/convert-video-status/:jobId",(req,res)=>{
  const job=videoConversionJobs.get(String(req.params.jobId||""));
  if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
