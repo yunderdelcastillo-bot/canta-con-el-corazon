@@ -254,43 +254,53 @@ downloadButton.addEventListener('click',async()=>{
   const audioBlob=await response.blob();if(!audioBlob.size)throw new Error('El servidor devolvió un audio vacío.');const audioUrl=URL.createObjectURL(audioBlob);
   videoStage='carga del fondo visual';
   let stockVideo=null,stockImage=null;
-  // Prioridad: biblioteca propia subida por la administradora para esta ocasión.
+  let libraryVideos=[],libraryVideoIndex=0,libraryVideoSwitching=false;
+  // SOLO se usan archivos de la biblioteca propia. Nunca se consulta Pixabay ni Pexels.
+  // Se reproducen todos los videos de la ocasión en secuencia y, al terminar el último,
+  // se vuelve al primero hasta que termine la canción.
   try{
    const mediaResponse=await fetch(API_BASE+"/api/media/public?category="+encodeURIComponent(theme),{cache:"no-store"});
-   if(mediaResponse.ok){
-    const mediaData=await mediaResponse.json();
-    const ownItems=(mediaData.items||[]).filter(x=>x&&x.url);
-    if(ownItems.length){
-     const chosen=ownItems[Math.floor(Math.random()*ownItems.length)];
-     if((chosen.mimeType||"").startsWith("image/")){
-      stockImage=new Image();stockImage.crossOrigin="anonymous";stockImage.src=chosen.url;
-      await new Promise((resolve,reject)=>{stockImage.onload=resolve;stockImage.onerror=()=>reject(new Error("No se pudo cargar la imagen de la biblioteca"));});
-     }else if((chosen.mimeType||"").startsWith("video/")){
-      stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src=chosen.url;
-      await new Promise((resolve,reject)=>{stockVideo.onloadeddata=resolve;stockVideo.onerror=()=>reject(new Error("No se pudo cargar el video de la biblioteca"));stockVideo.load()});
-      await stockVideo.play().catch(()=>{});
-     }
-    }
-   }
-  }catch(ownMediaError){console.warn("Biblioteca propia no disponible; se usará un fondo alternativo.",ownMediaError?.message||"");stockVideo=null;stockImage=null}
-  try{
-   const queryByTheme={romantico:"romantic couple sunset",cumpleanos:"birthday celebration",aniversario:"wedding anniversary",serenata:"romantic roses",homenaje:"beautiful nature",amistad:"friendship"};
-   const stockResponse=(!stockVideo&&!stockImage)?await fetch(API_BASE+"/api/pixabay/videos?q="+encodeURIComponent(queryByTheme[theme]||"romantic couple sunset")):null;
-   if(stockResponse?.ok){
-    const stockData=await stockResponse.json();const stock=(stockData.videos||[]).find(v=>v.preview);
-    if(stock){
-     stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src=stock.preview;
-     await new Promise((resolve,reject)=>{stockVideo.onloadeddata=resolve;stockVideo.onerror=()=>reject(new Error("No se pudo cargar el clip de Pixabay"));stockVideo.load()});
+   if(!mediaResponse.ok)throw new Error("No se pudo consultar la biblioteca ("+mediaResponse.status+").");
+   const mediaData=await mediaResponse.json();
+   const ownItems=(mediaData.items||[]).filter(x=>x&&x.url);
+   libraryVideos=ownItems.filter(x=>(x.mimeType||"").startsWith("video/"));
+   const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/"));
+   if(libraryVideos.length){
+    // Orden aleatorio por canción, pero cada clip se reproduce antes de repetir la lista.
+    libraryVideos=libraryVideos.slice().sort(()=>Math.random()-.5);
+    stockVideo=document.createElement("video");
+    stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=false;
+    stockVideo.playsInline=true;stockVideo.preload="auto";
+    const loadLibraryClip=async(index)=>{
+     libraryVideoIndex=(index+libraryVideos.length)%libraryVideos.length;
+     const clip=libraryVideos[libraryVideoIndex];
+     stockVideo.pause();stockVideo.src=clip.url;stockVideo.load();
+     await new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>reject(new Error("Tiempo de espera cargando un video de la biblioteca.")),20000);
+      stockVideo.onloadeddata=()=>{clearTimeout(timer);resolve()};
+      stockVideo.onerror=()=>{clearTimeout(timer);reject(new Error("No se pudo cargar un video de la biblioteca."))};
+     });
      await stockVideo.play().catch(()=>{});
-    }
+    };
+    stockVideo.addEventListener("ended",async()=>{
+     if(libraryVideoSwitching||!libraryVideos.length)return;
+     libraryVideoSwitching=true;
+     try{await loadLibraryClip(libraryVideoIndex+1)}
+     catch(clipError){console.warn("No se pudo cargar el siguiente clip de la biblioteca:",clipError?.message||"");}
+     finally{libraryVideoSwitching=false}
+    });
+    await loadLibraryClip(0);
+   }else if(ownImages.length){
+    // Si no hay videos, se permite usar una imagen subida a la misma biblioteca.
+    const chosen=ownImages[Math.floor(Math.random()*ownImages.length)];
+    stockImage=new Image();stockImage.crossOrigin="anonymous";stockImage.src=chosen.url;
+    await new Promise((resolve,reject)=>{stockImage.onload=resolve;stockImage.onerror=()=>reject(new Error("No se pudo cargar la imagen de la biblioteca"));});
+   }else{
+    console.warn("La biblioteca no tiene archivos para la ocasión:",theme);
    }
-  }catch(stockError){console.warn("Pixabay no disponible; se probará el fondo de Pexels.",stockError?.message||"");stockVideo=null}
-  if(!stockVideo&&!stockImage){
-   try{
-    stockVideo=document.createElement("video");stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=true;stockVideo.playsInline=true;stockVideo.preload="auto";stockVideo.src="https://videos.pexels.com/video-files/8405683/8405683-hd_1920_1080_24fps.mp4";
-    await new Promise((resolve,reject)=>{stockVideo.onloadeddata=resolve;stockVideo.onerror=()=>reject(new Error("No se pudo cargar el clip alternativo"));stockVideo.load()});
-    await stockVideo.play().catch(()=>{});
-   }catch(fallbackError){console.warn("No se pudo cargar Pexels; se usará el fondo integrado.",fallbackError?.message||"");stockVideo=null}
+  }catch(ownMediaError){
+   console.error("No se pudo cargar la biblioteca propia:",ownMediaError?.message||"");
+   stockVideo=null;stockImage=null;libraryVideos=[];
   }
   videoStage='preparación de la pista de audio';
   const audioEl=new Audio();audioEl.src=audioUrl;audioEl.crossOrigin='anonymous';audioEl.preload='auto';
