@@ -155,6 +155,24 @@ app.get("/api/admin-audio-url",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
  }catch(e){console.error("Admin audio URL error:",e?.message||e);res.status(500).json({error:"Error al preparar el reproductor."});}
 });
+app.get("/api/ready-video",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Servicio no configurado."});
+  const path=String(req.query.path||""),token=String(req.query.token||""),mode=String(req.query.mode||"play");
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp4$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de video no válido."});
+  const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
+  const {data:link,error}=await db.from("song_preview_links").select("song_id,started_at,completed_at,download_enabled").eq("token_hash",hash).maybeSingle();
+  const songId=path.split("/")[0];
+  if(error||!link||link.song_id!==songId)return res.status(404).json({error:"Video no encontrado."});
+  if(mode==="download"&&!link.download_enabled)return res.status(403).json({error:"La descarga se habilitará después de confirmar el pago."});
+  if(mode!=="download"&&(!link.started_at||link.completed_at))return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
+  const {data:file,error:fileError}=await db.storage.from("shared-videos").download(path);
+  if(fileError||!file)return res.status(404).json({error:"No se pudo recuperar el video."});
+  const buffer=Buffer.from(await file.arrayBuffer());
+  res.set({"Content-Type":"video/mp4","Content-Length":String(buffer.length),"Cache-Control":"no-store","Content-Disposition":mode==="download"?'attachment; filename="canta-con-el-corazon.mp4"':"inline"});
+  res.send(buffer);
+ }catch(e){console.error("ready video:",e?.message||e);res.status(500).json({error:"No se pudo preparar el video."});}
+});
 app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
@@ -300,18 +318,17 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:buckets,error:listError}=await db.storage.listBuckets();
    if(listError)throw listError;
    if(!(buckets||[]).some(b=>b.name==="shared-videos")){
-    const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+    const {error:createError}=await db.storage.createBucket("shared-videos",{public:false,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
     if(createError&&!/already exists/i.test(createError.message||""))throw createError;
    }
    const sharePath=song.id+"/"+crypto.randomUUID()+".mp4";
+   const {error:privateError}=await db.storage.updateBucket("shared-videos",{public:false,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});if(privateError)throw privateError;
    const {error:uploadError}=await db.storage.from("shared-videos").upload(sharePath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
    if(uploadError)throw uploadError;
-   const {data:publicData}=db.storage.from("shared-videos").getPublicUrl(sharePath);
-   shareUrl=publicData?.publicUrl||null;
-   if(!shareUrl)throw new Error("No se pudo crear el enlace público del video.");
+   shareUrl=sharePath;
   }catch(storageError){console.error("shared video storage failed; MP4 download will continue:",storageError?.message||storageError);}
-  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Url"};
-  if(shareUrl)headers["X-Video-Share-Url"]=shareUrl;
+  const headers={"Content-Type":"video/mp4","Content-Disposition":'attachment; filename="canta-con-el-corazon.mp4"',"Cache-Control":"no-store","Content-Length":String(mp4.length),"Access-Control-Expose-Headers":"Content-Length, X-Video-Share-Path"};
+  if(shareUrl)headers["X-Video-Share-Path"]=shareUrl;
   res.set(headers);
   res.send(mp4);
  }catch(e){console.error("video mp4 conversion:",e?.message||e);if(!res.headersSent)res.status(500).json({error:"No se pudo convertir el video a MP4. Inténtalo otra vez."});}
