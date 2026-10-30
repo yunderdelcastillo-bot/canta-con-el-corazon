@@ -431,11 +431,16 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
  if(isGift){
   document.body.classList.add('gift-mode');
   const label=document.querySelector('#openGift span:last-child');
-  if(label)label.textContent='🎁 Toca para descubrir tu sorpresa';
   const intro=document.getElementById('intro');
   const revealed=document.getElementById('revealed');
-  if(intro)intro.classList.remove('hidden');
-  if(revealed)revealed.classList.add('hidden');
+  if(p.has('video')){
+   if(intro)intro.classList.add('hidden');
+   if(revealed)revealed.classList.remove('hidden');
+  }else{
+   if(label)label.textContent='🎁 Toca para descubrir tu sorpresa';
+   if(intro)intro.classList.remove('hidden');
+   if(revealed)revealed.classList.add('hidden');
+  }
   window.scrollTo(0,0);
  }
 })();
