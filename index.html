@@ -286,12 +286,21 @@ downloadButton.addEventListener('click',async()=>{
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
-  const stream=canvas.captureStream(24);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  // 18 FPS estables para reducir saltos en Android sin perder nitidez HD 720p.
+  const stream=canvas.captureStream(18);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
   const recorderOptions={videoBitsPerSecond:1600000,audioBitsPerSecond:64000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-  const draw=()=>{
+  let lastDrawAt=0,lastStockTime=-1,stockStallSince=0,useAnimatedFallback=false;
+  const draw=(frameTime=0)=>{
+   if(frameTime-lastDrawAt<54){if(recorder.state==='recording')requestAnimationFrame(draw);return}
+   lastDrawAt=frameTime;
+   // Si el clip externo se congela o deja de avanzar, cambiar al fondo animado integrado.
+   if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){
+    if(Math.abs(stockVideo.currentTime-lastStockTime)>0.015){lastStockTime=stockVideo.currentTime;stockStallSince=frameTime}
+    else if(stockStallSince&&frameTime-stockStallSince>1800)useAnimatedFallback=true;
+   }else if(stockVideo&&!stockVideo.paused){useAnimatedFallback=true}
    // Lienzo HD vertical 720x1280.
    ctx.setTransform(canvas.width/720,0,0,canvas.height/1280,0,0);
    const w=720,h=1280;
@@ -299,7 +308,7 @@ downloadButton.addEventListener('click',async()=>{
    const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
    // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
    ctx.save(); // Sin zoom automático: conserva el encuadre natural del video de fondo.
-   if(stockVideo&&stockVideo.readyState>=2){
+   if(stockVideo&&!useAnimatedFallback&&stockVideo.readyState>=2&&!stockVideo.paused&&!stockVideo.ended){
     const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
     const offsetX=(w-dw)/2,offsetY=(h-dh)/2;
     try{ctx.drawImage(stockVideo,offsetX,offsetY,dw,dh)}catch(e){ctx.fillStyle="#33213f";ctx.fillRect(0,0,w,h)}
