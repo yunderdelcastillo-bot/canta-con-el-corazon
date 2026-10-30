@@ -313,9 +313,11 @@ app.post("/api/convert-video",async(req,res)=>{
   dir=await mkdtemp(path.join(os.tmpdir(),"cch-video-"));
   const input=path.join(dir,"input.webm"),output=path.join(dir,"output.mp4");
   await writeFile(input,Buffer.concat(chunks));
-  await execFileAsync(ffmpegPath,["-y","-i",input,"-map","0:v:0","-map","0:a:0?","-c:v","libx264","-preset","ultrafast","-pix_fmt","yuv420p","-r","20","-c:a","aac","-b:a","128k","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:4*1024*1024});
+  await execFileAsync(ffmpegPath,["-y","-i",input,"-map","0:v:0","-map","0:a:0?","-vf","scale='min(720,iw)':-2:force_original_aspect_ratio=decrease","-c:v","libx264","-preset","medium","-crf","30","-maxrate","1100k","-bufsize","2200k","-pix_fmt","yuv420p","-r","20","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:4*1024*1024});
   const mp4=await readFile(output);
   if(!mp4.length)return res.status(500).json({error:"La conversión produjo un MP4 vacío."});
+  if(mp4.length>45*1024*1024)return res.status(413).json({error:"El video todavía supera el límite de almacenamiento después de optimizarlo ("+(mp4.length/1024/1024).toFixed(1)+" MB). Reduce la duración o el tamaño del video."});
+  console.log("Optimized MP4 ready:",{megabytes:Number((mp4.length/1024/1024).toFixed(2)),videoCodec:"H.264",audioCodec:"AAC"});
   // Guardar una copia pública para el enlace sorpresa. Si Storage falla, no bloquear la descarga MP4.
   let shareUrl=null;
   try{
