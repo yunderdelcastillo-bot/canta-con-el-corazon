@@ -390,10 +390,17 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
 <script>
 (function(){
  const p=new URLSearchParams(location.search);
- const isGift=['audio','name','message','grant','preview','previewToken','video'].some(k=>p.has(k));
- if(isGift){document.body.classList.add('gift-mode');}
- const open=document.getElementById('openGift');
- if(open){const label=open.querySelector('span:last-child');if(label)label.textContent='Toca para ver su canción';}
+ const isGift=['audio','name','message','grant','preview','previewToken','previewLink','video'].some(k=>p.has(k));
+ if(isGift){
+  document.body.classList.add('gift-mode');
+  const label=document.querySelector('#openGift span:last-child');
+  if(label)label.textContent='🎁 Toca para descubrir tu sorpresa';
+  const intro=document.getElementById('intro');
+  const revealed=document.getElementById('revealed');
+  if(intro)intro.classList.remove('hidden');
+  if(revealed)revealed.classList.add('hidden');
+  window.scrollTo(0,0);
+ }
 })();
 </script>
 
