@@ -566,15 +566,31 @@ downloadButton.addEventListener('click',async()=>{
   downloadNotice.textContent='Convirtiendo el video a MP4 para que puedas reproducirlo en tu celular…';
   const conversionUrl=API_BASE+'/api/convert-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
   const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
-  if(!conversionResponse.ok){let detail='No se pudo convertir a MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-  const mp4Blob=await conversionResponse.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
-  downloadNotice.textContent='Subiendo el MP4 para crear tu enlace privado compartible…';
+  if(!conversionResponse.ok){let detail='No se pudo iniciar la conversión del MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
+  const conversionJob=await conversionResponse.json();
+  if(!conversionJob.jobId)throw new Error('El servidor no devolvió el identificador de conversión.');
+  let conversionResult=null;
+  const conversionStarted=Date.now();
+  while(Date.now()-conversionStarted<15*60*1000){
+   downloadNotice.textContent='Convirtiendo el video a MP4 en segundo plano… No cierres esta página.';
+   await new Promise(resolve=>setTimeout(resolve,4000));
+   const statusResponse=await fetch(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'});
+   if(!statusResponse.ok){let detail='No se pudo consultar el estado de la conversión.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
+   const statusData=await statusResponse.json();
+   if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
+   if(statusData.status==='error')throw new Error(statusData.error||'Falló la conversión del video.');
+  }
+  if(!conversionResult)throw new Error('La conversión sigue tardando más de lo esperado. No cierres esta página; vuelve a consultar el enlace o solicita ayuda antes de generar otro video.');
+  downloadNotice.textContent='MP4 listo. Preparando la descarga y el enlace de sorpresa…';
+  const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
+  if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
+  const mp4Blob=await mp4Response.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
+  downloadNotice.textContent='Preparando tu enlace de sorpresa…';
   videoStage='creación del enlace para compartir';
-  // El MP4 local debe quedar disponible aunque falle la subida del enlace compartible.
   window.lastVideoShareLink='';
   let shareUploadWarning='';
-  let shareUploadData=null;
-  if(mp4Blob.size<=28*1024*1024){
+  let shareUploadData={videoUrl:conversionResult.videoUrl};
+  if(false){
    try{
     const shareUploadUrl=API_BASE+'/api/share-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
     const shareUploadResponse=await fetch(shareUploadUrl,{method:'POST',headers:{'Content-Type':'video/mp4'},body:mp4Blob});
