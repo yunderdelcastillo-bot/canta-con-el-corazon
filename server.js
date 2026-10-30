@@ -13,7 +13,7 @@ const execFileAsync=promisify(execFile);
 const app=express();
 app.use(express.json({limit:"40mb"}));
 const allowed=[...new Set(["https://canta-con-el-corazon.onrender.com",...(process.env.ALLOWED_ORIGINS||"").split(",").map(s=>s.trim()).filter(Boolean)])];
-const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);console.error("CORS blocked origin:",origin);cb(new Error("Origin not allowed: "+origin));},methods:["GET","POST","OPTIONS"],allowedHeaders:["Content-Type","Authorization"],maxAge:86400};
+const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);console.error("CORS blocked origin:",origin);cb(new Error("Origin not allowed: "+origin));},methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization"],maxAge:86400};
 app.use(cors(corsOptions));
 app.options(/.*/,cors(corsOptions));
 const port=process.env.PORT||10000;
