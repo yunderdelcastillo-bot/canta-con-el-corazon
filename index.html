@@ -375,8 +375,8 @@ downloadButton.addEventListener('click',async()=>{
   const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
   if(!conversionResponse.ok){let detail='No se pudo convertir a MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
   const mp4Blob=await conversionResponse.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
-  const sharedVideoFileUrl=conversionResponse.headers.get('X-Video-Share-Url');
-  window.lastVideoShareLink=sharedVideoFileUrl?location.origin+location.pathname+'?video='+encodeURIComponent(sharedVideoFileUrl)+'&para='+encodeURIComponent(name||''):null;if(window.parent!==window&&window.parent){window.parent.postMessage({type:'cch-video-ready',shareLink:window.lastVideoShareLink,recipient:name||''},location.origin);}
+  const sharedVideoFilePath=conversionResponse.headers.get('X-Video-Share-Path');
+  window.lastVideoShareLink=null;if(window.parent!==window&&window.parent){window.parent.postMessage({type:'cch-video-ready',videoPath:sharedVideoFilePath||'',recipient:name||''},location.origin);}
   const videoUrl=URL.createObjectURL(mp4Blob);
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   let preview=document.getElementById('generatedVideoPreview');
