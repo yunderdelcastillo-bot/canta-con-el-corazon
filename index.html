@@ -262,18 +262,49 @@ generationWarning.id='generationWarning';
 generationWarning.style.cssText='display:none;position:fixed;inset:0;z-index:99999;background:rgba(12,4,12,.82);padding:20px;align-items:center;justify-content:center;';
 generationWarning.innerHTML='<div role="dialog" aria-modal="true" aria-labelledby="generationWarningTitle" style="width:min(100%,440px);background:#fff7f2;color:#351b2b;border:2px solid #f6d78c;border-radius:22px;padding:24px;box-shadow:0 20px 70px #0009;text-align:center"><div style="font-size:2.2rem">🎬</div><h2 id="generationWarningTitle" style="margin:8px 0;color:#681b43">Antes de crear tu video</h2><p style="line-height:1.6">La creación de tu video puede tardar aproximadamente <strong>de 10 a 15 minutos</strong>.</p><p style="line-height:1.6">Mantén tu celular <strong>encendido, con la pantalla activa y esta página abierta</strong> hasta que termine.</p><div style="margin:14px 0;padding:12px;border:1px dashed #b77b96;border-radius:14px;text-align:left"><label for="customerVideoPhotos" style="display:block;color:#681b43;font-weight:700;margin:0 0 7px">📷 Agrega tus fotos (opcional)</label><input id="customerVideoPhotos" type="file" accept="image/*" multiple style="font-size:.9rem;padding:8px;background:#fff;border-radius:9px;color:#351b2b"><small id="customerPhotoHint" style="display:block;color:#704b5c;margin-top:6px">Hasta 8 fotos. Se combinarán con los videos e imágenes de nuestra plataforma.</small></div><button type="button" id="acceptGenerationWarning" class="btn">Entendido, generar video</button><button type="button" id="cancelGenerationWarning" class="btn secondary" style="color:#681b43;border-color:#a66b83">Ahora no</button></div>';
 document.body.appendChild(generationWarning);
+const customerPhotoInput=document.getElementById('customerVideoPhotos');
+const customerPhotoHint=document.getElementById('customerPhotoHint');
+const acceptGenerationButton=document.getElementById('acceptGenerationWarning');
+customerPhotoInput.addEventListener('change',()=>{
+ const files=Array.from(customerPhotoInput.files||[]);
+ if(!files.length){customerPhotoHint.textContent='No has seleccionado fotos. Puedes continuar sin fotos.';customerPhotoHint.style.color='#704b5c';return;}
+ if(files.length>8){customerPhotoHint.textContent='Seleccionaste '+files.length+' fotos. El máximo permitido es 8.';customerPhotoHint.style.color='#b42318';return;}
+ const totalMB=(files.reduce((sum,file)=>sum+file.size,0)/1024/1024).toFixed(1);
+ customerPhotoHint.textContent='✓ '+files.length+' '+(files.length===1?'foto seleccionada':'fotos seleccionadas')+' ('+totalMB+' MB en total). Pulsa “Entendido” para comprobarlas.';
+ customerPhotoHint.style.color='#167647';
+});
 downloadButton.addEventListener('click',event=>{
  if(sharedVideoUrl||generationWarningAccepted)return;
  event.preventDefault();
  event.stopImmediatePropagation();
  generationWarning.style.display='flex';
 });
-document.getElementById('acceptGenerationWarning').addEventListener('click',()=>{
- const files=Array.from(document.getElementById('customerVideoPhotos').files||[]),hint=document.getElementById('customerPhotoHint');
- if(files.length>8){hint.textContent='Puedes elegir como máximo 8 fotos.';return;}
- if(files.some(f=>!f.type.startsWith('image/'))){hint.textContent='Selecciona solamente imágenes.';return;}
- if(files.some(f=>f.size>8*1024*1024)){hint.textContent='Cada foto debe pesar máximo 8 MB.';return;}
- window.customerVideoPhotoFiles=files;generationWarningAccepted=true;generationWarning.style.display='none';downloadButton.click();
+acceptGenerationButton.addEventListener('click',async()=>{
+ const files=Array.from(customerPhotoInput.files||[]);
+ if(files.length>8){customerPhotoHint.textContent='Puedes elegir como máximo 8 fotos.';customerPhotoHint.style.color='#b42318';return;}
+ if(files.some(f=>!f.type.startsWith('image/'))){customerPhotoHint.textContent='Selecciona solamente imágenes.';customerPhotoHint.style.color='#b42318';return;}
+ if(files.some(f=>f.size>8*1024*1024)){customerPhotoHint.textContent='Cada foto debe pesar máximo 8 MB.';customerPhotoHint.style.color='#b42318';return;}
+ acceptGenerationButton.disabled=true;
+ if(files.length){
+  customerPhotoHint.textContent='Comprobando '+files.length+' fotos…';
+  try{
+   for(let i=0;i<files.length;i++){
+    const url=URL.createObjectURL(files[i]);
+    try{await new Promise((resolve,reject)=>{const img=new Image();img.onload=resolve;img.onerror=()=>reject(new Error('No se pudo abrir la foto '+(i+1)+'. Vuelve a seleccionarla.'));img.src=url;});}
+    finally{URL.revokeObjectURL(url);}
+   }
+  }catch(error){customerPhotoHint.textContent=error.message;customerPhotoHint.style.color='#b42318';acceptGenerationButton.disabled=false;return;}
+  customerPhotoHint.textContent='✓ '+files.length+' fotos comprobadas y listas para el video.';
+  customerPhotoHint.style.color='#167647';
+ }else{
+  customerPhotoHint.textContent='Continuarás sin fotos personales.';
+  customerPhotoHint.style.color='#704b5c';
+ }
+ window.customerVideoPhotoFiles=files;
+ generationWarningAccepted=true;
+ generationWarning.style.display='none';
+ acceptGenerationButton.disabled=false;
+ downloadButton.click();
 });
 document.getElementById('cancelGenerationWarning').addEventListener('click',()=>{
  generationWarning.style.display='none';
