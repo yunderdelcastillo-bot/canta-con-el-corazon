@@ -117,6 +117,21 @@ if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
 const API_BASE='https://canta-corazon-private-api.onrender.com';
+const sharedVideoUrl=params.get('video')||'';
+if(sharedVideoUrl){
+ document.body.classList.add('video-share-mode');
+ const landing=document.createElement('section');landing.id='sharedVideoLanding';
+ const cover=document.createElement('div');cover.className='share-cover';
+ const title=document.createElement('h1');title.textContent=name?'Un regalo para '+name:'Tu regalo musical';
+ const subtitle=document.createElement('p');subtitle.textContent=message||'Una sorpresa creada con amor por Canta con el corazón.';
+ const video=document.createElement('video');video.controls=true;video.playsInline=true;video.preload='metadata';video.src=sharedVideoUrl;video.setAttribute('aria-label','Video regalo musical');
+ const download=document.createElement('a');download.className='btn';download.href=sharedVideoUrl;download.download='regalo-canta-con-el-corazon.mp4';download.textContent='⬇️ Descargar video MP4';download.style.cssText='display:block;width:100%;max-width:560px;text-align:center;text-decoration:none';
+ const share=document.createElement('button');share.type='button';share.className='btn secondary';share.textContent='📲 Compartir este regalo';share.style.cssText='display:block;width:100%;max-width:560px';
+ const brand=document.createElement('p');brand.className='share-brand';brand.textContent='Hecho con amor ♥ por Canta con el corazón';
+ share.addEventListener('click',async()=>{const shareText='🎁 Te comparto un regalo musical de Canta con el corazón:';try{if(navigator.share)await navigator.share({title:'Tu regalo musical',text:shareText,url:location.href});else location.href='https://wa.me/?text='+encodeURIComponent(shareText+' '+location.href);}catch(err){if(err&&err.name!=='AbortError')location.href='https://wa.me/?text='+encodeURIComponent(shareText+' '+location.href);}});
+ cover.append(title,subtitle,video,download,share,brand);landing.appendChild(cover);document.querySelector('main.wrap').appendChild(landing);
+}
+
 /* La portada permanece genérica y estática para proteger la sorpresa. */
 let resolvedAudioUrl=null;const grantToken=params.get('grant')||'';let downloadAllowed=false;let videoStatusManual=false;const previewKey='cch-preview-session-'+(audio||'');
 const audioPlayer=document.getElementById('audioPlayer');audioPlayer.setAttribute('controlsList','nodownload noplaybackrate');audioPlayer.addEventListener('contextmenu',e=>e.preventDefault());
@@ -381,11 +396,10 @@ downloadButton.addEventListener('click',async()=>{
   if(!shareUploadResponse.ok){let detail='No se pudo crear el enlace compartible.';try{const problem=await shareUploadResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
   const shareUploadData=await shareUploadResponse.json();
   if(!shareUploadData.videoUrl)throw new Error('El servidor no devolvió el enlace del video.');
-  const sharePageUrl=new URL(location.href);sharePageUrl.search='';sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
+  const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
   window.lastVideoShareLink=sharePageUrl.toString();
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   window.lastGeneratedVideoFile=new File([mp4Blob],fileName,{type:'video/mp4'});
-  window.lastVideoShareLink=null;
   const videoUrl=URL.createObjectURL(mp4Blob);
   let preview=document.getElementById('generatedVideoPreview');
   if(!preview){preview=document.createElement('section');preview.id='generatedVideoPreview';preview.style.cssText='margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(30,10,25,.25)';document.getElementById('videoNotice').after(preview)}
