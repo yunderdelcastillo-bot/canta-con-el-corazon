@@ -590,18 +590,9 @@ downloadButton.addEventListener('click',async()=>{
   window.lastVideoShareLink='';
   let shareUploadWarning='';
   let shareUploadData={videoUrl:conversionResult.videoUrl};
-  if(false){
-   try{
-    const shareUploadUrl=API_BASE+'/api/share-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
-    const shareUploadResponse=await fetch(shareUploadUrl,{method:'POST',headers:{'Content-Type':'video/mp4'},body:mp4Blob});
-    if(!shareUploadResponse.ok){let detail='HTTP '+shareUploadResponse.status;try{const problem=await shareUploadResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-    shareUploadData=await shareUploadResponse.json();
-    if(!shareUploadData.videoUrl)throw new Error('El servidor no devolvió el enlace del video.');
-    const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
-    window.lastVideoShareLink=sharePageUrl.toString();
-   }catch(uploadError){console.warn('El MP4 está creado, pero no se pudo subir el enlace compartible:',uploadError);shareUploadWarning=' El video quedó creado y podrás descargarlo, pero no se pudo generar el enlace para compartirlo automáticamente.'}
-  }else{
-   shareUploadWarning=' El video quedó creado y podrás descargarlo, pero pesa demasiado para generar el enlace automático.';
+  if(shareUploadData&&shareUploadData.videoUrl){
+   const sharePageUrl=new URL(location.href);sharePageUrl.hash='';sharePageUrl.searchParams.set('video',shareUploadData.videoUrl);
+   window.lastVideoShareLink=sharePageUrl.toString();
   }
   const fileName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.mp4';
   window.lastGeneratedVideoFile=new File([mp4Blob],fileName,{type:'video/mp4'});
