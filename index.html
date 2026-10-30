@@ -129,6 +129,21 @@ if(sharedVideoUrl){
  shareMp4.addEventListener('click',()=>{const text='🎁 Te comparto este regalo musical de Canta con el corazón. Puedes verlo y descargarlo aquí: '+location.href;location.href='https://wa.me/?text='+encodeURIComponent(text);});
  preview.appendChild(shareMp4);
  document.getElementById('videoNotice').after(preview);
+ if(params.get('surprise')==='1'){
+  document.body.classList.add('gift-mode');
+  document.querySelectorAll('body > .wrap').forEach(el=>el.style.display='none');
+  const cover=document.createElement('main');cover.style.cssText='position:fixed;inset:0;z-index:99999;min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px 22px;color:#fff;background:linear-gradient(180deg,rgba(20,8,25,.22),rgba(9,4,15,.84)),url(https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=1400&q=85) center/cover no-repeat;font-family:system-ui,sans-serif;overflow:auto';
+  const hearts=document.createElement('div');hearts.textContent='♥     ✦     ♥     ✧     ♥';hearts.style.cssText='color:#ffc0dc;font-size:1.5rem;letter-spacing:.6rem;margin-bottom:34px';cover.appendChild(hearts);
+  const title=document.createElement('h1');title.textContent='Una sorpresa para '+(name||'ti');title.style.cssText='font:500 clamp(2.2rem,9vw,3.8rem) Georgia,serif;text-shadow:0 3px 14px #000;margin:0 0 18px';cover.appendChild(title);
+  const subtitle=document.createElement('p');subtitle.textContent=message||'Alguien preparó algo muy especial para ti, con todo su corazón.';subtitle.style.cssText='font-size:clamp(1.1rem,4.5vw,1.45rem);line-height:1.55;max-width:620px;text-shadow:0 2px 10px #000;margin:0 0 38px';cover.appendChild(subtitle);
+  const play=document.createElement('button');play.type='button';play.textContent='▶';play.style.cssText='width:170px;height:170px;border:0;border-radius:50%;background:linear-gradient(135deg,#ed2459,#c10a91);color:white;font-size:5rem;padding-left:16px;box-shadow:0 12px 55px #d20b7c88,0 0 0 16px #ffffff18;cursor:pointer;animation:giftPulse 2s ease-in-out infinite';cover.appendChild(play);
+  const hint=document.createElement('p');hint.textContent='🎁 Toca para descubrir tu sorpresa';hint.style.cssText='font-size:1.3rem;font-weight:750;text-shadow:0 2px 10px #000;margin-top:28px';cover.appendChild(hint);
+  const stage=document.createElement('section');stage.style.cssText='display:none;position:fixed;inset:0;z-index:100000;background:#08050b;align-items:center;justify-content:center;flex-direction:column;padding:12px';
+  const vp=document.createElement('video');vp.src=sharedVideoUrl;vp.controls=true;vp.autoplay=true;vp.playsInline=true;vp.preload='auto';vp.style.cssText='width:100%;height:100%;max-height:92svh;object-fit:contain;background:#000';stage.appendChild(vp);
+  const caption=document.createElement('p');caption.textContent='Hecho con amor ♥ Canta con el corazón';caption.style.cssText='color:#f6d78c;text-align:center;margin:8px 0';stage.appendChild(caption);
+  document.body.appendChild(cover);document.body.appendChild(stage);
+  play.addEventListener('click',async()=>{cover.style.display='none';stage.style.display='flex';try{await vp.play()}catch(e){caption.textContent='Toca reproducir para descubrir tu regalo ♥'}});
+ }
  document.getElementById('downloadGift').textContent='⬇️ Descargar mi regalo en video';
  document.getElementById('downloadNotice').textContent='El video completo ya está creado. Puedes reproducirlo o descargarlo aquí.';
 }
@@ -492,12 +507,13 @@ downloadButton.addEventListener('click',async()=>{
   surpriseTitle.style.cssText='color:#f6d78c;margin:24px 0 8px;text-align:center';
   preview.appendChild(surpriseTitle);
   const surpriseHelp=document.createElement('p');
-  surpriseHelp.textContent='Este es el enlace para enviar a la persona especial. Al abrirlo verá una portada y podrá tocar el botón para descubrir su canción.';
+  surpriseHelp.textContent='Este es el enlace para enviar a la persona especial. Al abrirlo verá una portada especial; al tocar el botón se reproducirá el video completo.';
   surpriseHelp.style.cssText='color:#fff0e8;text-align:center;line-height:1.5';
   preview.appendChild(surpriseHelp);
   const surpriseUrl=new URL(location.href);
   surpriseUrl.hash='';
-  surpriseUrl.searchParams.delete('video');
+  surpriseUrl.searchParams.set('video',shareUploadData.videoUrl);
+  surpriseUrl.searchParams.set('surprise','1');
   window.lastSurpriseWebLink=surpriseUrl.toString();
   const surpriseInput=document.createElement('input');
   surpriseInput.type='url';surpriseInput.readOnly=true;surpriseInput.value=window.lastSurpriseWebLink;
@@ -516,7 +532,7 @@ downloadButton.addEventListener('click',async()=>{
   sendSurprise.type='button';sendSurprise.className='btn';sendSurprise.textContent='💌 Enviar sorpresa web por WhatsApp';
   sendSurprise.style.cssText='display:block;width:100%;margin:8px 0';
   sendSurprise.addEventListener('click',()=>{
-   const text='💖 Te prepararon una sorpresa musical. Abre este enlace y toca el botón para descubrir tu canción: '+window.lastSurpriseWebLink;
+   const text='💖 Te prepararon una sorpresa. Abre este enlace y toca el botón para descubrir tu video: '+window.lastSurpriseWebLink;
    window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener');
   });
   preview.appendChild(sendSurprise);
@@ -535,7 +551,7 @@ document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefa
 <script>
 (function(){
  const p=new URLSearchParams(location.search);
- const isGift=['audio','name','message','grant','preview','previewToken','previewLink','video'].some(k=>p.has(k));
+ const isGift=['audio','name','message','grant','preview','previewToken','previewLink','video','surprise'].some(k=>p.has(k));
  if(isGift){
   document.body.classList.add('gift-mode');
   const label=document.querySelector('#openGift span:last-child');
