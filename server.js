@@ -161,11 +161,15 @@ app.get("/api/ready-video",async(req,res)=>{
   const path=String(req.query.path||""),token=String(req.query.token||""),mode=String(req.query.mode||"play");
   if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp4$/i.test(path)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de video no válido."});
   const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
-  const {data:link,error}=await db.from("song_preview_links").select("song_id,started_at,completed_at,download_enabled").eq("token_hash",hash).maybeSingle();
+  const {data:link,error}=await db.from("song_preview_links").select("id,song_id,started_at,completed_at,download_enabled").eq("token_hash",hash).maybeSingle();
   const songId=path.split("/")[0];
   if(error||!link||link.song_id!==songId)return res.status(404).json({error:"Video no encontrado."});
   if(mode==="download"&&!link.download_enabled)return res.status(403).json({error:"La descarga se habilitará después de confirmar el pago."});
-  if(mode!=="download"&&(!link.started_at||link.completed_at))return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
+  if(mode!=="download"){
+   if(!link.started_at||link.completed_at)return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
+   const {data:claimed,error:claimError}=await db.from("song_preview_links").update({completed_at:new Date().toISOString()}).eq("id",link.id).is("completed_at",null).select("id").maybeSingle();
+   if(claimError||!claimed)return res.status(403).json({error:"Esta vista previa ya fue utilizada. Solicita un nuevo enlace."});
+  }
   const {data:file,error:fileError}=await db.storage.from("shared-videos").download(path);
   if(fileError||!file)return res.status(404).json({error:"No se pudo recuperar el video."});
   const buffer=Buffer.from(await file.arrayBuffer());
