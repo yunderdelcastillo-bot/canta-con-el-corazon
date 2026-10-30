@@ -139,10 +139,11 @@ app.get("/api/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Storage privado aún no está configurado en el servidor."});
   const path=String(req.query.path||"");
+  console.log("Audio request:",{pathPresent:!!path,grantPresent:!!req.query.grant,previewPresent:!!req.query.preview});
   if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({error:"Ruta de audio no válida."});
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,published,audio_path,owner_id").eq("audio_path",path).maybeSingle();
-  if(error||!song)return res.status(404).json({error:"Canción no encontrada."});
+  if(error||!song){console.error("Audio song lookup failed:",error?.message||"song not found");return res.status(404).json({error:"Canción no encontrada."});}
   const grant=String(req.query.grant||"");
   const preview=String(req.query.preview||"");
   let grantAuthorized=false;
@@ -158,16 +159,16 @@ app.get("/api/audio",async(req,res)=>{
    const {data:session,error:sessionError}=await db.from("song_preview_links").select("id,started_at,completed_at,download_enabled").eq("song_id",song.id).eq("token_hash",previewHash).maybeSingle();
    const activePreview=!!session&&!!session.started_at&&!session.completed_at;
    const downloadEnabled=!!session&&!!session.download_enabled;
-   if(sessionError||(!activePreview&&!downloadEnabled))return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});
+   if(sessionError||(!activePreview&&!downloadEnabled)){console.error("Audio preview permission denied:",{sessionError:sessionError?.message||null,activePreview,downloadEnabled});return res.status(403).json({error:"La vista previa no está activa o ya fue utilizada."});}
   }
   // Servir el MP3 desde esta API evita fallos CORS al seguir la URL firmada de Supabase.
   const {data:audioFile,error:audioError}=await db.storage.from("songs-audio").download(path);
-  if(audioError||!audioFile)return res.status(502).json({error:"No se pudo recuperar el archivo de audio. Inténtalo nuevamente."});
+  if(audioError||!audioFile){console.error("Supabase audio download failed:",audioError?.message||"empty file");return res.status(502).json({error:"No se pudo recuperar el archivo de audio. Inténtalo nuevamente."});}
   const audioBuffer=Buffer.from(await audioFile.arrayBuffer());
   if(!audioBuffer.length)return res.status(502).json({error:"El archivo de audio está vacío."});
   res.set({"Content-Type":"audio/mpeg","Content-Length":String(audioBuffer.length),"Cache-Control":"no-store","Access-Control-Expose-Headers":"Content-Length"});
   res.send(audioBuffer);
- }catch(e){res.status(500).json({error:"Error interno al preparar el audio."});}
+ }catch(e){console.error("Audio route unexpected error:",e?.message||e);res.status(500).json({error:"Error interno al preparar el audio."});}
 });
 app.get("/api/verify-grant",async(req,res)=>{
  try{
