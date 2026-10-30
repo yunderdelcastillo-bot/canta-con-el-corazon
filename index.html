@@ -278,7 +278,16 @@ downloadButton.addEventListener('click',async()=>{
    // Siluetas de árboles
    for(const t of [[95,570,1],[155,600,.75],[330,625,.8],[585,605,.85]]){const x=t[0],y=t[1],s=t[2];ctx.fillStyle='#30252b';ctx.fillRect(x-5*s,y,10*s,75*s);ctx.beginPath();ctx.moveTo(x,y-75*s);ctx.lineTo(x-32*s,y-10*s);ctx.lineTo(x+32*s,y-10*s);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(x,y-48*s);ctx.lineTo(x-27*s,y+5*s);ctx.lineTo(x+27*s,y+5*s);ctx.closePath();ctx.fill()}
    }
-   // Detalles visuales según la ocasión del regalo
+   if(motionTime<3){
+    // Portada sorpresa: no revelar nombre, dedicatoria ni letra durante los primeros 3 segundos.
+    ctx.fillStyle='rgba(20,8,22,.28)';ctx.fillRect(0,0,w,h);
+    ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 25px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,145);
+    ctx.fillStyle='#fff0e8';ctx.font='bold 38px Georgia,serif';ctx.fillText('Una sorpresa',w/2,390);ctx.fillText('especial te espera',w/2,440);
+    ctx.beginPath();ctx.arc(w/2,570,82,0,Math.PI*2);ctx.fillStyle='#d41483';ctx.fill();
+    ctx.beginPath();ctx.moveTo(w/2-18,530);ctx.lineTo(w/2+42,570);ctx.lineTo(w/2-18,610);ctx.closePath();ctx.fillStyle='#ffffff';ctx.fill();
+    ctx.fillStyle='#ffffff';ctx.font='bold 27px sans-serif';ctx.fillText('Prepárate para descubrirla',w/2,730);
+    for(let k=0;k<10;k++){const x=(k*67+35+Math.sin(motionTime*2+k)*12)%w,y=210+(k*113)%650;ctx.fillStyle=k%2?'rgba(242,183,209,.9)':'rgba(246,215,140,.9)';ctx.font='30px sans-serif';ctx.fillText(k%2?'♥':'✦',x,y)}
+   }else{
    const occasionLabels={cumpleanos:'FELIZ CUMPLEAÑOS',aniversario:'FELIZ ANIVERSARIO',serenata:'UNA SERENATA PARA TI',homenaje:'CON TODO MI CARIÑO',amistad:'CELEBRANDO NUESTRA AMISTAD',romantico:'CON AMOR'};
    const occasionLabel=occasionLabels[theme]||occasionLabels.romantico;
    ctx.save();
@@ -325,6 +334,7 @@ downloadButton.addEventListener('click',async()=>{
    ctx.fillStyle='#f4dce6';ctx.font='22px sans-serif';ctx.fillText('Hecha con amor ♥ para guardar y compartir',w/2,1155);
    ctx.fillStyle='rgba(255,255,255,.35)';ctx.fillRect(60,1200,600,5);ctx.fillStyle='#f6d78c';ctx.fillRect(60,1200,600*(audioEl.duration?audioEl.currentTime/audioEl.duration:0),5);
    ctx.restore();
+   }
    if(recorder.state==='recording')requestAnimationFrame(draw)
   };
   function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
