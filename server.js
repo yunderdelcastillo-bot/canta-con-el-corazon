@@ -445,7 +445,7 @@ app.get("/api/convert-video-status/:jobId",(req,res)=>{
 // Sincronización real: Gemini 3.5 Transcribe entrega marcas de tiempo por palabra.
 const lyricAlignLimits=new Map();
 function normalizeAlignWord(value){
- return String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^\\p{L}\\p{N}]/gu,"");
+ return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}]/gu,"");
 }
 function tokenEditDistance(a,b){
  const prev=Array.from({length:b.length+1},(_,i)=>i);
@@ -573,7 +573,7 @@ app.post("/api/lyrics/align",async(req,res)=>{
 
   const segments=[];let cursor=0;
   for(let lineIndex=0;lineIndex<lyrics.length;lineIndex++){
-   const expected=lyrics[lineIndex].split(/\\s+/).map(normalizeAlignWord).filter(Boolean);
+   const expected=lyrics[lineIndex].split(/\s+/).map(normalizeAlignWord).filter(Boolean);
    if(!expected.length)throw new Error("Una línea de la letra está vacía.");
    let best=null;
    const minLength=Math.max(1,Math.floor(expected.length*.65));
