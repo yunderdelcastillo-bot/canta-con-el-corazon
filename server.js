@@ -715,6 +715,56 @@ app.post("/api/assistant/chat",async(req,res)=>{
  }
 });
 
+// Generación musical Lyria 3.5: solo administradora autenticada; el MP3 vuelve al panel para revisión.
+const lyriaRateLimits=new Map();
+app.post("/api/music/generate",async(req,res)=>{
+ try{
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"Falta GEMINI_API_KEY en Render."});
+  const user=await mediaUser(req);
+  if(!user)return res.status(401).json({error:"Inicia sesión nuevamente en el panel administrador."});
+  const body=req.body||{};
+  const lyrics=String(body.lyrics||"").trim();
+  const style=String(body.style||"").trim().slice(0,180);
+  const voice=String(body.voice||"").trim().slice(0,100);
+  const duration=String(body.duration||"3 minutos").trim().slice(0,40);
+  const custom=String(body.custom||"").trim().slice(0,700);
+  if(lyrics.length<40||lyrics.length>12000)return res.status(400).json({error:"La letra debe tener entre 40 y 12 000 caracteres."});
+  if(!style)return res.status(400).json({error:"Selecciona el género musical."});
+  const now=Date.now(),record=lyriaRateLimits.get(user.id)||{start:now,count:0};
+  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  if(record.count>=5)return res.status(429).json({error:"Límite de 5 generaciones por hora alcanzado. Inténtalo más tarde."});
+  record.count++;lyriaRateLimits.set(user.id,record);
+  const prompt="Produce una canción completa en español latino, de aproximadamente "+duration+". Género: "+style+". Interpretación vocal: "+voice+". "+(custom?"Dirección musical adicional: "+custom+". ":"")+"Usa la letra proporcionada como letra principal, conserva los nombres propios y el sentido de la dedicatoria, no imites la voz de ningún artista. Crea una melodía original, arreglo profesional, estructura clara, intro, versos, coro, puente y cierre. La canción debe sonar terminada, no como una demo.\n\nLyrics:\n"+lyrics;
+  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
+   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+   body:JSON.stringify({model:"lyria-3.5",input:prompt}),
+   signal:AbortSignal.timeout(240000)
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok){
+   console.error("Lyria generation failed:",response.status,payload?.error?.message||"");
+   const status=response.status===429?429:(response.status===400||response.status===403?502:503);
+   return res.status(status).json({error:response.status===403?"Google no autorizó Lyria para esta clave. Revisa el acceso y la facturación de Gemini API.":response.status===429?"Lyria alcanzó el límite de uso. Espera antes de generar otra canción.":"Lyria no pudo generar el audio. Revisa que tu clave tenga acceso al modelo lyria-3.5."});
+  }
+  let audioBase64="",mimeType="audio/mpeg";
+  for(const step of payload.steps||[]){
+   if(step.type!=="model_output")continue;
+   for(const block of step.content||[]){
+    if(block.type==="audio"&&block.data){audioBase64=String(block.data);mimeType=String(block.mime_type||"audio/mpeg");}
+   }
+  }
+  if(!audioBase64&&payload.output_audio?.data)audioBase64=String(payload.output_audio.data);
+  if(!audioBase64)return res.status(502).json({error:"Lyria respondió, pero no devolvió un archivo de audio reconocible."});
+  const estimatedBytes=Math.floor(audioBase64.length*3/4);
+  if(estimatedBytes>25*1024*1024)return res.status(413).json({error:"El MP3 generado supera el límite actual de 25 MB. No se guardó; prueba una duración menor."});
+  res.set("Cache-Control","no-store").json({ok:true,audioBase64,mimeType,model:"lyria-3.5",sizeBytes:estimatedBytes});
+ }catch(e){
+  console.error("Lyria music generation:",e?.message||e);
+  res.status(e?.name==="TimeoutError"?504:502).json({error:e?.name==="TimeoutError"?"La generación musical tardó demasiado. Inténtalo nuevamente.":"No se pudo completar la generación musical."});
+ }
+});
+
 app.post("/api/lyrics/generate",async(req,res)=>{
  try{
   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
