@@ -890,10 +890,21 @@ app.post("/api/assistant/intake",async(req,res)=>{
   if(!customerMessages.length)return res.status(400).json({error:"No hay respuestas del cliente para revisar."});
   const transcript=customerMessages.map(m=>"Cliente: "+String(m.content||"").slice(0,1800)).join("\n");
   const prompt="Extrae los datos del CLIENTE para un pedido de Canta con el corazón. IMPORTANTE: analiza exclusivamente los mensajes del cliente incluidos abajo. Ignora por completo preguntas, ejemplos, opciones y sugerencias del asistente: nunca los conviertas en elecciones del cliente. Un dato solo se considera confirmado si el cliente lo expresó. Si el cliente corrige un dato, conserva su respuesta más reciente. Devuelve SOLO JSON válido con estas claves exactas: buyer, contact, recipient, occasion, story, style, customGenre, voice, specialPhrase, lyricDuration, lyricTone, package, urgency. Conserva la elección exacta del paquete: ESENCIAL — Solo audio — S/20; DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25; REGALO COMPLETO — Canción + video con fotos reales — desde S/30. Si el cliente dice audio solamente, asigna ESENCIAL; si pide video con imágenes ilustrativas y sin fotos reales, asigna DETALLE ESPECIAL; si aporta o quiere incluir fotos reales, asigna REGALO COMPLETO. No infieras fotos reales si no las menciona. Usa cadenas vacías para datos no mencionados. No inventes. story debe resumir solo recuerdos/hechos expresados. Si el cliente no dio un dato, déjalo vacío.\n\n"+transcript;
-  const result=await groqCompletion([{role:"system",content:"Eres un extractor de datos preciso. Devuelve únicamente un objeto JSON válido, sin texto adicional. No inventes información."},{role:"user",content:prompt}],{json:true,maxTokens:3000,temperature:0});
+  const extractionMessages=[{role:"system",content:"Eres un extractor de datos preciso. Devuelve únicamente un objeto JSON válido, sin markdown ni texto adicional. Incluye todas las claves solicitadas como cadenas. No inventes información."},{role:"user",content:prompt}];
+  let result;
+  try{result=await groqCompletion(extractionMessages,{json:true,maxTokens:3000,temperature:0});}
+  catch(firstError){
+   if(firstError?.status!==400)throw firstError;
+   console.warn("Groq JSON mode failed; retrying intake in plain-text JSON mode:",firstError?.message||firstError);
+   result=await groqCompletion(extractionMessages,{json:false,maxTokens:3000,temperature:0});
+  }
   let parsed;
-  try{parsed=JSON.parse(result.content.replace(/^```json/i,"").replace(/```$/,"").trim());}
-  catch{throw Object.assign(new Error("Groq no devolvió un JSON válido."),{status:502});}
+  try{
+   const cleaned=result.content.replace(/^```(?:json)?\s*/i,"").replace(/\s*```$/,"").trim();
+   const start=cleaned.indexOf("{"),end=cleaned.lastIndexOf("}");
+   parsed=JSON.parse(start>=0&&end>start?cleaned.slice(start,end+1):cleaned);
+  }catch{throw Object.assign(new Error("Groq no devolvió un JSON válido después del segundo intento."),{status:502});}
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))throw Object.assign(new Error("La respuesta de IA no tiene el formato esperado."),{status:502});
   const allowed=["buyer","contact","recipient","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency"];
   const data={};for(const k of allowed)data[k]=cleanOrderText(parsed[k],k==="story"?3500:500);
   res.set("Cache-Control","no-store").json({ok:true,data,model:result.model});
