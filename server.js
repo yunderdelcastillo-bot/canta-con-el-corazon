@@ -702,7 +702,10 @@ async function geminiCompletion(messages,{json=false,maxTokens=1200,temperature=
 
 async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.55}={}) {
  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
- if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
+ if(!apiKey){
+  if(process.env.GEMINI_API_KEY)return await geminiCompletion(messages,{json,maxTokens,temperature});
+  throw Object.assign(new Error("No hay un proveedor de IA configurado."),{status:503});
+ }
  let model="openai/gpt-oss-20b";
  let lastError;
  for(let attempt=0;attempt<4;attempt++){
@@ -718,7 +721,8 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
     const detail=String(payload?.error?.message||"Groq no pudo completar la solicitud.");
     if(response.status===429&&process.env.GEMINI_API_KEY){
      console.warn("Groq rate limit reached; switching this request to Gemini backup.");
-     return await geminiCompletion(messages,{json,maxTokens,temperature});
+     try{return await geminiCompletion(messages,{json,maxTokens,temperature});}
+     catch(backupError){throw Object.assign(new Error("Groq alcanzó su cuota y el respaldo Gemini tampoco respondió: "+String(backupError?.message||"error desconocido")),{status:502,noRetry:true});}
     }
     if(response.status===400&&/tool choice is none|model called a tool/i.test(detail)&&model!=="llama-3.3-70b-versatile"){
      console.warn("Groq primary model returned an incompatible tool-call response; switching to conversation fallback model.");
@@ -743,6 +747,7 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
    return {content,model:payload.model||model};
   }catch(error){
    lastError=error;
+   if(error?.noRetry)throw error;
    if(error?.status&&!([408,429,500,502,503,504].includes(error.status)))throw error;
    if(attempt===3)throw error;
    await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
