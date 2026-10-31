@@ -508,6 +508,55 @@ app.post("/api/video/design",async(req,res)=>{
  }
 });
 
+// Diagnóstico de errores del flujo de video. Gemini solo recomienda acciones seguras; nunca ejecuta código.
+const supportDiagnosisLimits=new Map();
+app.post("/api/support/diagnose",async(req,res)=>{
+ try{
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"Diagnóstico IA no disponible."});
+  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
+  const now=Date.now(),record=supportDiagnosisLimits.get(ip)||{start:now,count:0};
+  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  if(record.count>=12)return res.status(429).json({error:"Límite temporal de diagnósticos alcanzado."});
+  record.count++;supportDiagnosisLimits.set(ip,record);
+  const stage=String(req.body?.stage||"").slice(0,100);
+  const error=String(req.body?.error||"").slice(0,500);
+  if(!stage||!error)return res.status(400).json({error:"Falta la etapa o el detalle del error."});
+  const prompt="Eres soporte técnico de una web que genera videos MP4 de canciones. Clasifica el problema y devuelve SOLO JSON con category, action, message. category: network, temporary_service, lyric_data, browser, conversion, unknown. action: retry, refresh_page, check_lyrics, use_chrome, contact_support. No afirmes que reparaste nada. No recomiendes repetir pagos ni borrar datos. Mensaje breve en español, claro y seguro. Si parece temporal o de red, action=retry. Si son datos de letra, action=check_lyrics. Si es compatibilidad, action=use_chrome. Etapa: "+stage+". Error: "+error;
+  const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+  const models=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];
+  let payload=null,lastStatus=0;
+  for(const model of models){
+   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+    method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.1,maxOutputTokens:140}}),
+    signal:AbortSignal.timeout(10000)
+   });
+   const data=await response.json().catch(()=>({}));
+   if(response.ok){payload=data;break;}
+   lastStatus=response.status;
+   if(![404,429,500,502,503,504].includes(response.status))break;
+  }
+  const raw=(payload?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
+  if(!raw)return res.status(502).json({error:"Gemini no pudo diagnosticar el problema."});
+  const parsed=JSON.parse(raw.replace(/^```(?:json)?|```$/g,"").trim());
+  const actions=new Set(["retry","refresh_page","check_lyrics","use_chrome","contact_support"]);
+  const messages={
+   retry:"Gemini detectó un posible fallo temporal. Puedes volver a intentar la generación; tu canción original está protegida.",
+   refresh_page:"Gemini recomienda actualizar la página y volver a abrir el enlace de tu regalo.",
+   check_lyrics:"Gemini detectó un posible problema con el formato de la letra. Revisa que no haya líneas vacías o fragmentos incompletos.",
+   use_chrome:"Gemini detectó un posible problema de compatibilidad. Prueba con Google Chrome actualizado y mantén la página abierta.",
+   contact_support:"Gemini no pudo identificar una reparación segura. Envíanos esta captura para revisarlo."
+  };
+  const action=actions.has(parsed.action)?parsed.action:"contact_support";
+  const category=["network","temporary_service","lyric_data","browser","conversion","unknown"].includes(parsed.category)?parsed.category:"unknown";
+  res.set("Cache-Control","no-store").json({ok:true,category,action,message:messages[action]});
+ }catch(error){
+  console.error("Gemini support diagnosis:",error?.message||error);
+  res.status(502).json({error:"No se pudo completar el diagnóstico automático."});
+ }
+});
+
 app.post("/api/lyrics/align",async(req,res)=>{
  let uploadedFileName="";
  try{
