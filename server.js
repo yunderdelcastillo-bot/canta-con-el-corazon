@@ -550,7 +550,8 @@ app.post("/api/lyrics/align",async(req,res)=>{
  }finally{
   if(uploadedFileName){
    const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(uploadedFileName.replace(/^files\\//,""))+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
+   const fileId=uploadedFileName.startsWith("files/")?uploadedFileName.slice(6):uploadedFileName;
+   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(fileId)+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
   }
  }
 });
