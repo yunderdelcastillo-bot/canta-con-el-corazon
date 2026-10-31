@@ -939,10 +939,99 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
   document.getElementById('generateCustomerLyrics').scrollIntoView({behavior:'smooth',block:'center'});
  }
+ const manualFlow=[
+  ['buyer','Para continuar, ¿cómo te llamas?'],
+  ['contact','¿Cuál es tu número de WhatsApp para contactarte?'],
+  ['recipient','¿Para quién será la canción?'],
+  ['occasion','¿Qué ocasión quieres celebrar o recordar?'],
+  ['story','Cuéntame brevemente su historia y qué deseas expresar en la canción.'],
+  ['style','¿Qué género musical prefieres? Puedes elegir balada romántica, cumbia peruana, ranchera, salsa, reguetón romántico u otro.'],
+  ['voice','¿Prefieres voz femenina, masculina, dueto o te da igual?'],
+  ['lyricDuration','¿Qué duración aproximada deseas: 2, 3 o 4 minutos?'],
+  ['lyricTone','¿Qué emoción quieres transmitir? Por ejemplo, amor profundo, ternura, alegría, nostalgia o gratitud.'],
+  ['specialPhrase','¿Hay alguna frase, apodo o recuerdo especial que quieras incluir? Si no, responde «No».'],
+  ['package','¿Qué paquete prefieres: Esencial S/20, Detalle Especial S/25 o Regalo Completo desde S/30?'],
+  ['urgency','¿Cuándo necesitas tu regalo: entrega normal 24–48 horas, mañana, hoy (sujeto a disponibilidad), express 30 minutos (+S/5, sujeto a confirmación) o fecha flexible?']
+ ];
+ let manualMode=false,manualCurrentField='';
+ const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ function detectManualField(question){
+  const q=norm(question);
+  if(/whatsapp|numero de contacto|telefono/.test(q))return 'contact';
+  if(/como te llamas|tu nombre/.test(q))return 'buyer';
+  if(/para quien|destinatario/.test(q))return 'recipient';
+  if(/ocasion|que celebr|que motivo/.test(q))return 'occasion';
+  if(/historia|que quieres expresar|que deseas expresar|cuentame/.test(q))return 'story';
+  if(/genero musical|estilo musical|ritmo musical/.test(q))return 'style';
+  if(/\bvoz\b|femenina|masculina|dueto/.test(q))return 'voice';
+  if(/duracion|minutos/.test(q))return 'lyricDuration';
+  if(/emocion|amor profundo|ternura|nostalgia|gratitud/.test(q))return 'lyricTone';
+  if(/frase especial|frase.*incluir|apodo/.test(q))return 'specialPhrase';
+  if(/paquete|esencial|detalle especial|regalo completo/.test(q))return 'package';
+  if(/cuando.*necesitas|anticipacion|entrega normal|express/.test(q))return 'urgency';
+  return '';
+ }
+ function saveManualAnswer(field,answer,question=''){
+  const el=document.getElementById(field);if(!el)return;
+  let value=String(answer||'').trim();
+  if(!value)return;
+  if(el.tagName==='SELECT'){
+   const lines=String(question||'').split(/\n/).map(x=>x.trim()).filter(Boolean);
+   const numbered=lines.map(x=>x.match(/^(\d+)[).]\s*(.+)$/)).filter(Boolean);
+   const n=Number(value);
+   if(Number.isInteger(n)&&n>0&&numbered.length>=n)value=numbered[n-1][2];
+   const options=[...el.options].filter(o=>o.value||o.text);
+   const target=norm(value);
+   let opt=options.find(o=>norm(o.text)===target||norm(o.value)===target);
+   if(!opt)opt=options.find(o=>norm(o.text).includes(target)||target.includes(norm(o.text)));
+   if(!opt&&field==='lyricTone'){
+    const map=[['amor profundo','Amor profundo y romántico'],['ternura','Tierna y llena de cariño'],['alegria','Alegre, festiva y con energía'],['nostalgia','Nostálgica, para recordar momentos'],['gratitud','De gratitud y reconocimiento']];
+    const found=map.find(([k])=>target.includes(k));if(found)opt=options.find(o=>norm(o.text)===norm(found[1]));
+   }
+   if(!opt&&field==='style')opt=options.find(o=>norm(o.text).includes(target.split(' ')[0]));
+   if(!opt&&field==='occasion')opt=options.find(o=>norm(o.text).includes(target.split(' ')[0]));
+   if(opt)el.value=opt.value||opt.text;
+   else if(field==='package'){
+    const p=target.includes('completo')?'REGALO COMPLETO':target.includes('detalle')?'DETALLE ESPECIAL':target.includes('esencial')?'ESENCIAL':'';
+    if(p){const found=options.find(o=>norm(o.text).includes(norm(p)));if(found)el.value=found.value||found.text;}
+   }
+  }else if(field==='specialPhrase'&&/^(no|ninguna|ninguno|omitir)$/i.test(value)){el.value='';}
+  else el.value=value;
+  if(el.value)cachedOrderData[field]=el.value;
+ }
+ function nextManualField(){
+  return manualFlow.find(([field])=>{const el=document.getElementById(field);return el&&!String(el.value||'').trim()&&field!=='specialPhrase';})||
+   manualFlow.find(([field])=>field==='specialPhrase'&&!Object.prototype.hasOwnProperty.call(cachedOrderData,field))||null;
+ }
+ function askManualNext(){
+  const next=nextManualField();
+  if(!next){manualCurrentField='__final';add('assistant','¡Ya reuní tus datos! 💗 ¿Deseas agregar algo más a tu canción o a la dedicatoria?');return;}
+  manualCurrentField=next[0];add('assistant',next[1]);
+  autoStatus.textContent='El asistente continúa en modo manual y guarda tus respuestas automáticamente.';
+ }
+ function beginManualFallback(){
+  manualMode=true;
+  const lastAssistant=[...messages.slice(0,-1)].reverse().find(m=>m.role==='assistant');
+  const field=detectManualField(lastAssistant?.content||'');
+  if(field){saveManualAnswer(field,messages[messages.length-1]?.content,lastAssistant?.content);manualCurrentField=field;}
+  add('assistant','La IA está temporalmente sin disponibilidad. 💗 Para que puedas continuar, activé el modo manual automático. No perderemos lo que ya respondiste y te haré solo las preguntas que falten.');
+  askManualNext();
+ }
+ function handleManualReply(answer){
+  if(manualCurrentField==='__final'){
+   if(!/^(no|no gracias|ninguno|ninguna|nada|esta bien|todo bien|asi esta bien|eso es todo)$/i.test(norm(answer))){
+    const story=document.getElementById('story');story.value=(story.value?story.value+'\n':'')+'Detalle adicional: '+answer;cachedOrderData.story=story.value;
+   }
+   transferToForm();return;
+  }
+  if(manualCurrentField)saveManualAnswer(manualCurrentField,answer);
+  askManualNext();
+ }
  async function sendMessage(){
   const content=input.value.trim();if(!content||conversationTransferred)return;
   messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
   try{
+   if(manualMode){handleManualReply(content);return;}
    if(finalQuestionAsked){finalQuestionAsked=false;await transferToForm();return;}
    const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
@@ -956,8 +1045,8 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
     autoStatus.textContent='Ya reuní tus datos principales. Solo espero saber si deseas agregar algún detalle más.';
    }else{add('assistant',d.answer);autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';}
   }catch(e){
-   add('assistant','La conexión con la IA tuvo un problema temporal. 💗 Tus respuestas siguen en esta conversación; vuelve a intentarlo y no tendrás que empezar de nuevo.');
-   autoStatus.textContent='La conversación se conserva. Puedes volver a enviar tu último mensaje.';
+   console.warn('Chat IA no disponible; se activa el modo manual:',e?.message||e);
+   beginManualFallback();
   }finally{send.disabled=false;send.textContent='Enviar';}
  }
  send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
