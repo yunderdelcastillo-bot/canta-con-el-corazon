@@ -914,7 +914,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
 (function(){
  const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 Bienvenido/a a Canta con el corazón. Creamos canciones personalizadas para expresar lo que sientes y sorprender a alguien especial. 🎶\n\nTe ayudaré a elegir el tipo de regalo, contarme tu historia y escoger la música y la voz. No necesitas llenar el formulario: conversaré contigo y completaré tus datos automáticamente. Al final, prepararé la letra de tu canción para que puedas revisarla. 💝\n\nPara comenzar, ¿cómo te llamas y para quién será la canción?'}];
  const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend');
- const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let autoSavedOrderId='';let awaitingFinalConfirmation=false;let awaitingPackageSelection=false;
+ const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let autoSavedOrderId='';let awaitingFinalConfirmation=false;let awaitingPackageSelection=false;let cachedOrderData={};
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
@@ -924,13 +924,22 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   const data=extracted.data||{};fillForm(data);return data;
  }
  async function syncConversation(){
-  autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';
+  autoStatus.textContent='Voy organizando tus respuestas para completar el formulario…';
   try{
    const data=await extractConversation();
-   const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
-   autoStatus.textContent=ready?'Ya reuní tus datos. Al terminar de elegir el paquete, completaré el formulario y prepararé tu letra.':'Voy completando tus datos automáticamente mientras conversamos.';
-   return data;
-  }catch(e){autoStatus.textContent='Sigo aquí para ayudarte. '+e.message;throw e;}
+   cachedOrderData={...cachedOrderData,...data};
+   const ready=Boolean(cachedOrderData.recipient&&cachedOrderData.occasion&&cachedOrderData.story&&cachedOrderData.style);
+   autoStatus.textContent=ready?'Ya reuní los datos principales. Seguimos con tu elección y tu canción.':'Voy completando tus datos automáticamente mientras conversamos.';
+   return cachedOrderData;
+  }catch(e){
+   console.warn('Sincronización temporal de formulario pendiente:',e?.message||e);
+   autoStatus.textContent='Seguimos conversando. Tus respuestas se conservan y completaré el formulario al avanzar.';
+   return cachedOrderData;
+  }
+ }
+ function readFormData(){
+  const ids=['buyer','contact','recipient','occasion','story','style','customGenre','voice','specialPhrase','lyricDuration','lyricTone','package','urgency'];
+  const data={...cachedOrderData};ids.forEach(id=>{const el=document.getElementById(id);if(el&&String(el.value||'').trim())data[id]=String(el.value).trim();});return data;
  }
  function packageChoice(text,data){
   const t=String(text||'').toLowerCase();
@@ -978,7 +987,9 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
     return;
    }
    if(awaitingPackageSelection){
-    const data=await extractConversation();
+    let data=readFormData();
+    try{data={...data,...await extractConversation()};cachedOrderData={...cachedOrderData,...data};}
+    catch(e){console.warn('Se conserva la selección del paquete aunque falle la extracción:',e?.message||e);}
     const chosen=packageChoice(content,data);
     if(!chosen){
      add('assistant','Para continuar, elige uno de estos paquetes: ESENCIAL (S/20), DETALLE ESPECIAL (S/25) o REGALO COMPLETO (desde S/30). Puedes escribir el nombre o el número 1, 2 o 3.');
@@ -992,18 +1003,12 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
    messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
-   let collected=null;try{collected=await syncConversation();}catch(intakeError){
-    console.warn('No se pudieron sincronizar los datos del formulario:',intakeError?.message||intakeError);
-    awaitingFinalConfirmation=false;awaitingPackageSelection=false;
-    add('assistant','La conversación sigue disponible, pero no pude completar el formulario automáticamente. Para que no pierdas tu pedido, puedes continuar con el formulario manual.');
-    const fallback=document.createElement('button');fallback.type='button';fallback.textContent='Continuar con formulario manual';fallback.className='btn';fallback.style.marginTop='8px';
-    fallback.addEventListener('click',()=>{panel.classList.remove('open');document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('buyer').focus({preventScroll:true});});
-    const wrap=document.createElement('div');wrap.className='cchAiMsg cchAiBot';wrap.appendChild(fallback);box.appendChild(wrap);box.scrollTop=box.scrollHeight;
-    autoStatus.textContent='Modo manual disponible. La IA no pudo sincronizar los datos; completa el formulario y envía tu solicitud.';
-   }
+   const collected=await syncConversation();
    const ready=Boolean(collected?.recipient&&collected?.occasion&&collected?.story&&collected?.style);
-   awaitingFinalConfirmation=ready||/¿Deseas agregar algo más/i.test(d.answer||'');
-   if(ready&&!/¿Deseas agregar algo más/i.test(d.answer||''))add('assistant','Ya tengo los datos principales de tu canción y no te los volveré a pedir. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
+   const asksPackage=/cu[aá]l de los tres paquetes|qu[eé] paquete deseas|elige.*paquete/i.test(d.answer||'');
+   if(asksPackage)awaitingPackageSelection=true;
+   else if(ready||/¿Deseas agregar algo más/i.test(d.answer||''))awaitingFinalConfirmation=true;
+   if(ready&&!asksPackage&&!/¿Deseas agregar algo más/i.test(d.answer||''))add('assistant','Ya tengo los datos principales de tu canción y no te los volveré a pedir. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
   }catch(e){
     if(awaitingPackageSelection){
      add('assistant','Tu elección sigue guardada. 💗 Tuvimos una demora momentánea al organizar los datos; no necesitas empezar de nuevo. Vuelve a enviar el número o nombre del paquete y continuaré desde aquí.');
