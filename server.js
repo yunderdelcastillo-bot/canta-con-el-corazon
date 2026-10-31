@@ -662,7 +662,7 @@ const assistantChatLimits=new Map();
 async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.55}={}) {
  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
  if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
- const model="openai/gpt-oss-20b";
+ let model="openai/gpt-oss-20b";
  let lastError;
  for(let attempt=0;attempt<4;attempt++){
   try{
@@ -675,13 +675,18 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
    const payload=await response.json().catch(()=>({}));
    if(!response.ok){
     const detail=String(payload?.error?.message||"Groq no pudo completar la solicitud.");
+    if(response.status===400&&/tool choice is none|model called a tool/i.test(detail)&&model!=="llama-3.3-70b-versatile"){
+     console.warn("Groq primary model returned an incompatible tool-call response; switching to conversation fallback model.");
+     model="llama-3.3-70b-versatile";
+     continue;
+    }
     const error=Object.assign(new Error(detail),{status:response.status});
     if(![408,429,500,502,503,504].includes(response.status)||attempt===3){
      console.error("Groq request failed:",response.status,detail);
      throw error;
     }
     lastError=error;
-    const match=detail.match(/try again in\\s+([0-9.]+)s/i);
+    const match=detail.match(/try again in\s+([0-9.]+)s/i);
     const retryAfter=Number(response.headers.get("retry-after")||0);
     const waitMs=Math.min(12000,Math.max(1200,retryAfter*1000,(Number(match?.[1]||0)*1000)+500,1200*(attempt+1)));
     console.warn("Groq temporary limit; retrying after",waitMs,"ms");
