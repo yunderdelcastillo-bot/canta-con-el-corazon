@@ -662,7 +662,7 @@ const assistantChatLimits=new Map();
 async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.55}={}) {
  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
  if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
- const model=String(process.env.GROQ_MODEL||"openai/gpt-oss-20b").trim();
+ const model="openai/gpt-oss-20b";
  const response=await fetch("https://api.groq.com/openai/v1/chat/completions",{
   method:"POST",
   headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
