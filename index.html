@@ -350,21 +350,7 @@ downloadButton.addEventListener('click',async()=>{
    throw new Error('El servidor no autorizó o no pudo entregar el audio: '+detail);
   }
   const audioBlob=await response.blob();if(!audioBlob.size)throw new Error('El servidor devolvió un audio vacío.');const audioUrl=URL.createObjectURL(audioBlob);
-  // Alinea las frases con el audio real antes de grabar; no usa tiempos repartidos artificialmente.
-  lyricTimeline=[];
-  if(lyricLines.length){
-   videoStage='sincronización de la letra con la voz';
-   downloadNotice.textContent='Analizando la voz para sincronizar cada frase… No cierres esta página.';
-   const audioBase64=await new Promise((resolve,reject)=>{
-    const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar el audio para sincronizar la letra.'));reader.readAsDataURL(audioBlob);
-   });
-   const alignResponse=await fetch(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})});
-   const alignData=await alignResponse.json().catch(()=>({}));
-   if(!alignResponse.ok||!Array.isArray(alignData.segments)||alignData.segments.length!==lyricLines.length){
-    throw new Error(alignData.error||'No se pudo sincronizar toda la letra con la voz. No se generó un video descoordinado; inténtalo nuevamente.');
-   }
-   lyricTimeline=alignData.segments;
-  }
+
   videoStage='carga del fondo visual';
   let stockVideo=null,stockImage=null;
   let libraryVideos=[],libraryVideoIndex=0,libraryVideoSwitching=false,libraryTransitionAt=0;
@@ -432,6 +418,21 @@ downloadButton.addEventListener('click',async()=>{
   const recordingDuration=Number(audioEl.duration);
   if(!Number.isFinite(recordingDuration)||recordingDuration<=0)throw new Error('No se pudo leer la duración completa de la canción.');
   if(Number.isFinite(sourceDuration)&&sourceDuration>0&&recordingDuration<sourceDuration-2)throw new Error('El audio descargado está incompleto ('+Math.round(recordingDuration)+' s frente a '+Math.round(sourceDuration)+' s). No se generó un video recortado; vuelve a intentarlo.');
+  // Alinea las frases con el audio real antes de grabar; no usa tiempos repartidos artificialmente.
+  lyricTimeline=[];
+  if(lyricLines.length){
+   videoStage='sincronización de la letra con la voz';
+   downloadNotice.textContent='Analizando la voz para sincronizar cada frase… No cierres esta página.';
+   const audioBase64=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar el audio para sincronizar la letra.'));reader.readAsDataURL(audioBlob);
+   });
+   const alignResponse=await fetch(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})});
+   const alignData=await alignResponse.json().catch(()=>({}));
+   if(!alignResponse.ok||!Array.isArray(alignData.segments)||alignData.segments.length!==lyricLines.length){
+    throw new Error(alignData.error||'No se pudo sincronizar toda la letra con la voz. No se generó un video descoordinado; inténtalo nuevamente.');
+   }
+   lyricTimeline=alignData.segments;
+  }
 
   videoStage='grabación HD en el celular';
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
