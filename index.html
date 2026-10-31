@@ -434,6 +434,16 @@ downloadButton.addEventListener('click',async()=>{
    lyricTimeline=alignData.segments;
   }
 
+  // Gemini elige una dirección artística ligera a partir de la letra y la dedicatoria.
+  // Si la IA no responde, se conserva un estilo romántico predeterminado y el video continúa.
+  let visualDesign={theme:'romantic',accent:'#f6d78c',stickers:['heart','sparkle','star']};
+  try{
+   videoStage='diseño visual con Gemini';
+   downloadNotice.textContent='Gemini está preparando los detalles visuales de tu videoclip…';
+   const designResponse=await fetch(API_BASE+'/api/video/design',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lyrics:lyricLines.join('\n'),recipient:name||'',dedication:message||'',occasion:theme||'romantico'})});
+   const designData=await designResponse.json().catch(()=>({}));
+   if(designResponse.ok&&designData.ok&&designData.design)visualDesign=designData.design;
+  }catch(designError){console.warn('Diseño Gemini no disponible; se usará el estilo integrado:',designError?.message||designError);}
   videoStage='grabación HD en el celular';
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
@@ -553,6 +563,44 @@ downloadButton.addEventListener('click',async()=>{
     const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
     ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
     ctx.restore();
+   }
+   // Capa de acabado cinematográfico: luz ambiental, partículas y stickers animados.
+   const accent=visualDesign.accent||'#f6d78c';
+   const glowX=w*(.18+.64*(.5+.5*Math.sin(motionTime*.19)));
+   const glowY=h*(.16+.09*Math.sin(motionTime*.31));
+   const ambient=ctx.createRadialGradient(glowX,glowY,4,glowX,glowY,390);
+   ambient.addColorStop(0,accent+'30');ambient.addColorStop(1,'rgba(0,0,0,0)');
+   ctx.fillStyle=ambient;ctx.fillRect(0,0,w,h);
+   // Viñeta suave para dar profundidad sin tapar rostros ni fotografías.
+   const vignette=ctx.createRadialGradient(w/2,h*.48,260,w/2,h*.48,790);
+   vignette.addColorStop(0,'rgba(0,0,0,0)');vignette.addColorStop(1,'rgba(12,4,18,.38)');
+   ctx.fillStyle=vignette;ctx.fillRect(0,0,w,h);
+   const stickerTypes=Array.isArray(visualDesign.stickers)?visualDesign.stickers:['heart','sparkle','star'];
+   const drawSparkle=(x,y,size,alpha)=>{
+    ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.rotate(motionTime*.35);
+    ctx.shadowColor=accent;ctx.shadowBlur=18;ctx.strokeStyle=accent;ctx.fillStyle=accent;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,-size);ctx.quadraticCurveTo(size*.12,-size*.12,size,0);ctx.quadraticCurveTo(size*.12,size*.12,0,size);ctx.quadraticCurveTo(-size*.12,size*.12,-size,0);ctx.quadraticCurveTo(-size*.12,-size*.12,0,-size);ctx.fill();ctx.restore();
+   };
+   const drawHeart=(x,y,size,alpha)=>{
+    ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.scale(size/24,size/24);ctx.shadowColor='#ff8db5';ctx.shadowBlur=18;ctx.fillStyle='#ff9cbe';
+    ctx.beginPath();ctx.moveTo(0,20);ctx.bezierCurveTo(-28,2,-18,-14,0,-4);ctx.bezierCurveTo(18,-14,28,2,0,20);ctx.fill();ctx.restore();
+   };
+   for(let particle=0;particle<13;particle++){
+    const seed=particle*91.73+7;
+    const x=(seed*37.17%680)+20;
+    const y=((seed*19.31-motionTime*(12+particle%4)*8)%(h+80)+h+80)%(h+80)-40;
+    const pulse=.35+.45*(.5+.5*Math.sin(motionTime*2+particle));
+    if(particle%4===0)drawSparkle(x,y,4+(particle%3)*2,pulse);
+    else{ctx.save();ctx.globalAlpha=pulse*.72;ctx.fillStyle=accent;ctx.shadowColor=accent;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(x,y,1.5+(particle%3)*.7,0,Math.PI*2);ctx.fill();ctx.restore();}
+   }
+   for(let sticker=0;sticker<3;sticker++){
+    const type=stickerTypes[sticker%stickerTypes.length];
+    const x=sticker===0?88:sticker===1?630:360;
+    const y=180+sticker*125+Math.sin(motionTime*.8+sticker*2)*16;
+    const alpha=.34+.2*(.5+.5*Math.sin(motionTime*1.4+sticker));
+    if(type==='heart')drawHeart(x,y,22,alpha);
+    else if(type==='sparkle'||type==='star')drawSparkle(x,y,8+sticker*2,alpha);
+    else drawSparkle(x,y,7,alpha);
    }
    const lyricCount=lyricLines.length;
    const activeCue=lyricTimeline.find(cue=>motionTime>=cue.start&&motionTime<cue.end);
