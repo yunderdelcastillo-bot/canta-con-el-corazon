@@ -794,10 +794,30 @@ async function saveCustomerOrder(){
 }
 
 document.getElementById('orderForm').addEventListener('submit',async e=>{
- e.preventDefault();const btn=e.submitter; if(btn)btn.disabled=true;
- try{await saveCustomerOrder();window.open('https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false)),'_blank','noopener');}
- catch(err){alert(err.message+'\\nTus datos siguen en el formulario. Intenta de nuevo o envíalos por WhatsApp.');window.open('https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false)),'_blank','noopener');}
- finally{if(btn)btn.disabled=false;}
+ e.preventDefault();
+ const btn=e.submitter,status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
+ const wa=window.open('about:blank','_blank');
+ if(btn)btn.disabled=true;
+ try{
+  if(!orderValue('customerLyricsText')){
+   status.textContent='Preparando la letra de tu canción antes de registrar el pedido…';
+   const lyricBody={buyer:orderValue('buyer'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),voice:orderValue('voice'),customGenre:orderValue('customGenre'),phrase:orderValue('specialPhrase'),duration:orderValue('lyricDuration'),tone:orderValue('lyricTone')};
+   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lyricBody)});
+   const lyricData=await lyricResponse.json().catch(()=>({}));
+   if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo preparar la letra. Intenta nuevamente.');
+   document.getElementById('customerLyricsText').value=lyricData.lyrics||'';
+   result.classList.remove('hidden');
+  }
+  if(orderValue('customerLyricsText').length<40)throw new Error('La letra está incompleta. Revisa la letra antes de enviar el pedido.');
+  await saveCustomerOrder();
+  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
+  if(wa)wa.location.href=url;else window.location.href=url;
+  status.textContent='💗 Pedido registrado. WhatsApp está listo con tus datos y la letra. La canción se generará en privado para el administrador.';
+ }catch(err){
+  if(wa)wa.close();
+  status.textContent='No se pudo registrar el pedido: '+err.message+' Tus datos siguen en el formulario.';
+  alert(err.message+'\\nTus datos siguen en el formulario. Puedes corregirlos e intentar nuevamente.');
+ }finally{if(btn)btn.disabled=false;}
 });
 async function generateCustomerLyrics(){
  const btn=document.getElementById('generateCustomerLyrics'),status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
