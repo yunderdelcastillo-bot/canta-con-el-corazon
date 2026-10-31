@@ -446,8 +446,8 @@ app.get("/api/convert-video-status/:jobId",(req,res)=>{
 const lyricRateLimits=new Map();
 app.post("/api/lyrics/generate",async(req,res)=>{
  try{
-  const apiKey=String(process.env.OPENAI_API_KEY||"").trim();
-  if(!apiKey)return res.status(503).json({error:"La IA de letras aún no está conectada. El administrador debe configurar OPENAI_API_KEY en Render."});
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"La IA de letras aún no está conectada. El administrador debe configurar GEMINI_API_KEY en Render."});
   const body=req.body||{};
   const adminRequest=Boolean(req.headers.authorization);
   if(adminRequest){
@@ -479,17 +479,18 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "Emoción/tono: "+(data.tone||"Según la historia")+"\n"+
    "Indicaciones adicionales: "+(data.instruction||"Ninguna")+"\n"+
    "Si hay contradicciones o falta información, no inventes; escribe una letra prudente y fiel a los datos.";
-  const response=await fetch("https://api.openai.com/v1/chat/completions",{
-   method:"POST",headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json"},
-   body:JSON.stringify({model:String(process.env.OPENAI_MODEL||"gpt-4o-mini"),temperature:0.85,max_tokens:1800,messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}] }),
+  const model=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+   body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:userPrompt}]}],generationConfig:{temperature:0.85,maxOutputTokens:2200}}),
    signal:AbortSignal.timeout(60000)
   });
   const payload=await response.json().catch(()=>({}));
-  if(!response.ok){console.error("Lyrics AI provider error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"La IA alcanzó su límite temporal. Inténtalo más tarde.":"La IA no pudo generar la letra en este momento. Revisa la configuración del servicio."});}
-  const lyrics=String(payload?.choices?.[0]?.message?.content||"").trim();
-  if(!lyrics)return res.status(502).json({error:"La IA respondió sin una letra. Inténtalo nuevamente."});
-  res.set("Cache-Control","no-store").json({ok:true,lyrics,model:payload.model||process.env.OPENAI_MODEL||"gpt-4o-mini"});
- }catch(e){console.error("Lyrics generation:",e?.message||e);res.status(502).json({error:e?.name==="TimeoutError"?"La generación tardó demasiado. Inténtalo otra vez.":"No se pudo conectar con la IA de letras."});}
+  if(!response.ok){console.error("Gemini lyrics API error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"Gemini alcanzó el límite temporal o de cuota. Revisa el uso de tu API.":"Gemini no pudo generar la letra. Revisa la clave y el modelo configurado."});}
+  const lyrics=(payload?.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join("\n").trim();
+  if(!lyrics)return res.status(502).json({error:"Gemini respondió sin una letra. Inténtalo nuevamente."});
+  res.set("Cache-Control","no-store").json({ok:true,lyrics,model});
+ }catch(e){console.error("Gemini lyrics generation:",e?.message||e);res.status(502).json({error:e?.name==="TimeoutError"?"La generación tardó demasiado. Inténtalo otra vez.":"No se pudo conectar con Gemini."});}
 });
 
 /* Busca clips de fondo en Pixabay. Las respuestas se guardan 24 h según las reglas de la API. */
