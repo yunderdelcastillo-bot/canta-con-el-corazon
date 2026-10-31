@@ -765,6 +765,54 @@ app.post("/api/music/generate",async(req,res)=>{
  }
 });
 
+
+// Pedidos de clientes: registro separado de canciones. El cliente confirma el envío; el pago se verifica manualmente.
+const orderFields=["buyer","contact","recipient","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency","lyrics"];
+function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
+app.post("/api/orders",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado. Escríbenos por WhatsApp para continuar."});
+  const b=req.body||{};
+  const order={
+   buyer:cleanOrderText(b.buyer,120),contact:cleanOrderText(b.contact,40),recipient:cleanOrderText(b.recipient,120),
+   occasion:cleanOrderText(b.occasion,100),story:cleanOrderText(b.story,3500),style:cleanOrderText(b.style,120),
+   custom_genre:cleanOrderText(b.customGenre,180),voice:cleanOrderText(b.voice,80),special_phrase:cleanOrderText(b.specialPhrase,500),
+   lyric_duration:cleanOrderText(b.lyricDuration,80),lyric_tone:cleanOrderText(b.lyricTone,100),package_name:cleanOrderText(b.package,160),
+   urgency:cleanOrderText(b.urgency,160),lyrics:cleanOrderText(b.lyrics,12000),status:"nuevo"
+  };
+  if(!order.buyer||!order.contact||!order.recipient||!order.occasion||!order.story)return res.status(400).json({error:"Completa tu nombre, WhatsApp, destinatario, ocasión e historia."});
+  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
+  const now=Date.now(),bucket="order:"+ip,rec=assistantChatLimits.get(bucket)||{start:now,count:0};
+  if(now-rec.start>60*60*1000){rec.start=now;rec.count=0;}
+  if(rec.count>=8)return res.status(429).json({error:"Has enviado varias solicitudes. Continúa por WhatsApp para recibir ayuda."});
+  rec.count++;assistantChatLimits.set(bucket,rec);
+  const {data,error}=await admin().from("customer_orders").insert(order).select("id,created_at").single();
+  if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
+  res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at});
+ }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
+});
+app.get("/api/admin/orders",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const {data,error}=await admin().from("customer_orders").select("*").order("created_at",{ascending:false}).limit(200);
+  if(error)throw error;
+  res.set("Cache-Control","no-store").json({ok:true,orders:data||[]});
+ }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
+});
+app.patch("/api/admin/orders/:id",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de pedido no válido."});
+  const status=String(req.body?.status||"");
+  if(!["nuevo","contactado","pago_verificado","en_proceso","entregado","cancelado"].includes(status))return res.status(400).json({error:"Estado no válido."});
+  const {data,error}=await admin().from("customer_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id).select("id,status").single();
+  if(error)throw error;
+  res.set("Cache-Control","no-store").json({ok:true,order:data});
+ }catch(e){console.error("Update customer order:",e?.message||e);res.status(500).json({error:"No se pudo actualizar el pedido."});}
+});
+
 app.post("/api/lyrics/generate",async(req,res)=>{
  try{
   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
