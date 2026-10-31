@@ -1005,11 +1005,16 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    awaitingFinalConfirmation=ready||/¿Deseas agregar algo más/i.test(d.answer||'');
    if(ready&&!/¿Deseas agregar algo más/i.test(d.answer||''))add('assistant','Ya tengo los datos principales de tu canción y no te los volveré a pedir. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
   }catch(e){
-    add('assistant','La ayuda con IA no está disponible en este momento. Puedes continuar sin IA: completa tus datos en el formulario manual y nosotros prepararemos tu letra. No perderás tu pedido.');
-    const fallback=document.createElement('button');fallback.type='button';fallback.textContent='Continuar con formulario manual';fallback.className='btn';fallback.style.marginTop='8px';
-    fallback.addEventListener('click',()=>{panel.classList.remove('open');document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('buyer').focus({preventScroll:true});});
-    const wrap=document.createElement('div');wrap.className='cchAiMsg cchAiBot';wrap.appendChild(fallback);box.appendChild(wrap);box.scrollTop=box.scrollHeight;
-    autoStatus.textContent='Modo manual disponible. Completa el formulario y envía tu historia; nosotros prepararemos la letra.';
+    if(awaitingPackageSelection){
+     add('assistant','Tu elección sigue guardada. 💗 Tuvimos una demora momentánea al organizar los datos; no necesitas empezar de nuevo. Vuelve a enviar el número o nombre del paquete y continuaré desde aquí.');
+     autoStatus.textContent='Conservamos la conversación y tu elección. Reintenta el paquete en unos segundos.';
+    }else{
+     add('assistant','La conexión con la IA tuvo un problema temporal. Tu conversación sigue aquí y no se ha borrado. Puedes volver a intentarlo; si el servicio continúa sin responder, también puedes usar el formulario manual.');
+     const fallback=document.createElement('button');fallback.type='button';fallback.textContent='Continuar con formulario manual';fallback.className='btn';fallback.style.marginTop='8px';
+     fallback.addEventListener('click',()=>{panel.classList.remove('open');document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('buyer').focus({preventScroll:true});});
+     const wrap=document.createElement('div');wrap.className='cchAiMsg cchAiBot';wrap.appendChild(fallback);box.appendChild(wrap);box.scrollTop=box.scrollHeight;
+     autoStatus.textContent='La conversación se conserva. Puedes reintentar o continuar con el formulario manual.';
+    }
    }
   finally{send.disabled=false;send.textContent='Enviar';}
  }
