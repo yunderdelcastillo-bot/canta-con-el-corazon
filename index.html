@@ -904,6 +904,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
   document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
   const lyricBox=document.getElementById('customerLyricsText');if(lyricBox)lyricBox.scrollIntoView({behavior:'smooth',block:'center'});
   add('assistant','¡Tu canción ya está preparada! 💗 He completado el formulario con tus datos y elegido el paquete. Más abajo encontrarás la letra para revisarla o editarla. No volveré a preguntarte lo que ya me contaste.');
+  panel.classList.remove('open');
  }
  async function sendMessage(){
   const content=input.value.trim();if(!content)return;
