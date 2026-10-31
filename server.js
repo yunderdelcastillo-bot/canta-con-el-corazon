@@ -482,8 +482,8 @@ app.post("/api/lyrics/generate",async(req,res)=>{
   const model=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
    method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-   body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:userPrompt}]}],generationConfig:{temperature:0.85,maxOutputTokens:2200}}),
-   signal:AbortSignal.timeout(60000)
+   body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:userPrompt}]}],generationConfig:{thinkingConfig:{thinkingLevel:"low"},maxOutputTokens:2200}}),
+   signal:AbortSignal.timeout(85000)
   });
   const payload=await response.json().catch(()=>({}));
   if(!response.ok){console.error("Gemini lyrics API error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"Gemini alcanzó el límite temporal o de cuota. Revisa el uso de tu API.":"Gemini no pudo generar la letra. Revisa la clave y el modelo configurado."});}
