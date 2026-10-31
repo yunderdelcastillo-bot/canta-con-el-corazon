@@ -27,6 +27,14 @@
 <div class="row"><button class="btn" id="adminGenerateLyrics" type="button">✨ Generar letra</button><button class="btn alt" id="adminRegenerateLyrics" type="button">🔄 Generar otra versión</button></div>
 <div class="status" id="adminLyricsStatus" aria-live="polite">Completa los datos y genera una letra.</div>
 <label for="adminLyricsText">Letra generada (editable)</label><textarea id="adminLyricsText" rows="18" style="min-height:360px" placeholder="La letra aparecerá aquí…"></textarea>
+<div class="card" style="background:#fff8fb;border:1px solid #e9a5bd;margin-top:14px">
+ <h3 style="margin:0;color:#681b43">🎵 Generar audio con Lyria 3.5</h3>
+ <p class="muted">Usa la letra revisada para crear una canción completa. El MP3 llegará a este panel para que lo escuches. No se publica ni se envía al cliente automáticamente.</p>
+ <div class="row"><button class="btn" id="generateLyriaAudio" type="button">🎶 Generar canción completa</button></div>
+ <div class="status" id="lyriaAudioStatus" aria-live="polite">Primero genera y revisa la letra. Después podrás crear el audio.</div>
+ <audio id="lyriaAudioPreview" controls class="hidden"></audio>
+ <p class="muted">Al terminar, el MP3 quedará seleccionado en el editor de canción. Pulsa “Guardar canción” para conservarlo en tu biblioteca.</p>
+</div>
 <div class="row"><button class="btn alt" id="adminCopyLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="adminUseLyrics" type="button">Usar en el editor de canción</button><button class="btn" id="adminSendLyrics" type="button">💬 Enviar al cliente por WhatsApp</button></div>
 <p class="muted">La letra no se publica ni se envía automáticamente. Tú la revisas y decides qué hacer con ella.</p>
 </section>
@@ -90,6 +98,29 @@ async function adminGenerateLyrics(){
  finally{btn.disabled=false;$('adminRegenerateLyrics').disabled=false}
 }
 $('adminGenerateLyrics').onclick=adminGenerateLyrics;$('adminRegenerateLyrics').onclick=adminGenerateLyrics;
+
+$('generateLyriaAudio').onclick=async()=>{
+ const btn=$('generateLyriaAudio'),status=$('lyriaAudioStatus'),lyrics=aiVal('adminLyricsText');
+ if(lyrics.length<40){msg('lyriaAudioStatus','Primero genera una letra completa o pega una letra de al menos 40 caracteres.');return;}
+ btn.disabled=true;msg('lyriaAudioStatus','🎼 Enviando la letra a Lyria 3.5. La generación puede tardar unos minutos; no cierres el panel.');
+ try{
+  const token=await mediaAuth();
+  const response=await fetch(API_BASE+'/api/music/generate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({lyrics,style:aiVal('aiStyle'),voice:aiVal('aiVoice'),duration:aiVal('aiDuration'),custom:aiVal('aiCustomGenre')+' '+aiVal('aiInstructions')})});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||'No se pudo generar el audio.');
+  const binary=atob(data.audioBase64),bytes=new Uint8Array(binary.length);
+  for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+  file=new File([bytes],('cancion-'+(aiVal('aiRecipient')||'personalizada').toLowerCase().replace(/[^a-z0-9áéíóúñ-]+/gi,'-')+'.mp3'),{type:'audio/mpeg'});
+  const previewUrl=URL.createObjectURL(file);$('lyriaAudioPreview').src=previewUrl;$('lyriaAudioPreview').classList.remove('hidden');
+  $('preview').src=previewUrl;$('previewWrap').classList.remove('hidden');
+  msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB · Generado con Lyria 3.5');
+  $('lyrics').value=lyrics;$('recipient').value=aiVal('aiRecipient');$('title').value='Canción para '+aiVal('aiRecipient');$('dedication').value='Dedicatoria para '+aiVal('aiRecipient')+' · '+aiVal('aiOccasion');
+  $('theme').value=/cumple/i.test(aiVal('aiOccasion'))?'cumpleanos':/anivers/i.test(aiVal('aiOccasion'))?'aniversario':/serenata/i.test(aiVal('aiOccasion'))?'serenata':'romantico';
+  msg('lyriaAudioStatus','💗 ¡Audio generado! Escúchalo aquí. El MP3 está listo en el editor, pero todavía no está guardado. Revisa el resultado y pulsa “Guardar canción” cuando estés conforme.');
+  $('editor').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(e){msg('lyriaAudioStatus','No se pudo generar: '+e.message);}
+ finally{btn.disabled=false;}
+};
+
 $('adminCopyLyrics').onclick=async()=>{try{await navigator.clipboard.writeText(aiVal('adminLyricsText'));msg('adminLyricsStatus','¡Letra copiada!')}catch{ $('adminLyricsText').focus();$('adminLyricsText').select();msg('adminLyricsStatus','Selecciona y copia la letra.')}};
 $('adminUseLyrics').onclick=()=>{if(!aiVal('adminLyricsText')){msg('adminLyricsStatus','Primero genera una letra.');return}$('lyrics').value=aiVal('adminLyricsText');$('recipient').value=aiVal('aiRecipient');$('title').value='Canción para '+aiVal('aiRecipient');$('dedication').value='Dedicatoria para '+aiVal('aiRecipient')+' · '+aiVal('aiOccasion');$('theme').value=/cumple/i.test(aiVal('aiOccasion'))?'cumpleanos':/anivers/i.test(aiVal('aiOccasion'))?'aniversario':/serenata/i.test(aiVal('aiOccasion'))?'serenata':'romantico';msg('saveStatus','Letra y datos trasladados al editor. Completa la dedicatoria y selecciona el MP3 para guardar.');$('editor').scrollIntoView({behavior:'smooth'});};
 $('adminSendLyrics').onclick=()=>{const lyrics=aiVal('adminLyricsText');if(!lyrics){msg('adminLyricsStatus','Primero genera una letra.');return}const text='Hola, '+(aiVal('aiBuyer')||'te comparto')+'. 💗\nTe envío la letra personalizada para '+aiVal('aiRecipient')+'.\nOcasión: '+aiVal('aiOccasion')+'\nGénero: '+aiVal('aiStyle')+' · '+aiVal('aiVoice')+'\n\n'+lyrics+'\n\nRevísala y dime si deseas algún cambio. — Canta con el corazón';window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};
