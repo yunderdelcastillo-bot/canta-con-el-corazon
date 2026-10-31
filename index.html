@@ -956,26 +956,56 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  ];
  let manualMode=false,manualCurrentField='',manualIndex=0;
  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+ function editDistance(a,b){
+  const row=Array.from({length:b.length+1},(_,i)=>i);
+  for(let i=1;i<=a.length;i++){
+   let prev=row[0];row[0]=i;
+   for(let j=1;j<=b.length;j++){const old=row[j];row[j]=Math.min(row[j]+1,row[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old;}
+  }
+  return row[b.length];
+ }
+ function closestSelectOption(field,value,options){
+  const target=norm(value),aliases={
+   occasion:{cumple:['cumple','cumpleanos','aniversario de vida'],boda:['matrimonio','casamiento','boda'],amor:['declaracion','enamorar','romantica','serenata'],madre:['mama','madrecita'],padre:['papa','papito'],perdon:['reconciliar','disculpa'],graduacion:['graduar','logro','exito'],amistad:['amigo','amiga'],recuerdo:['homenaje','fallecido','despedida']},
+   style:{balada:['balada','romantica','lenta'],cumbia:['cumbia','peruana','sanjuanera'],ranchera:['ranchera','mexicana','mariachi'],salsa:['salsa'],regueton:['reggaeton','urbano','regueton'],huayno:['huayno'],pop:['pop'],rock:['rock']},
+   voice:{femenina:['mujer','mujeril','femenino'],masculina:['hombre','varon','masculino'],dueto:['dos voces','ambas voces','ambos'],igual:['cualquiera','indiferente','me da igual']},
+   lyricTone:{amor:['amor','romantica','enamorada'],ternura:['ternura','carino','dulce'],alegria:['alegre','feliz','fiesta'],nostalgia:['nostalgia','recuerdo','recordar'],perdon:['perdon','reconciliar'],gratitud:['gratitud','agradecer'],esperanza:['esperanza','superacion'],triste:['triste','pena','sentimental']},
+   package:{esencial:['esencial','audio','mp3','primero','uno','1'],detalle:['detalle','especial','video ilustrativo','segundo','dos','2'],completo:['completo','fotos reales','fotografias','tercero','tres','3']},
+   urgency:{normal:['normal','24','48','dos dias','habitual'],manana:['manana','dia siguiente'],hoy:['hoy','urgente'],express:['express','expres','30 minutos','media hora'],flexible:['flexible','coordinar','sin apuro','fecha']},
+   lyricDuration:{dos:['2','dos'],tres:['3','tres'],cuatro:['4','cuatro']}
+  };
+  let best=null,bestScore=0;
+  for(const opt of options){
+   const label=norm(opt.text||opt.value);if(!label)continue;
+   let score=0;
+   if(label===target)score=1;
+   else if(label.includes(target)||target.includes(label))score=Math.min(label.length,target.length)/Math.max(label.length,target.length)+0.25;
+   const words=target.split(/\\s+/).filter(w=>w.length>2);
+   const overlap=words.filter(w=>label.includes(w)).length;
+   if(words.length)score=Math.max(score,overlap/words.length*0.88);
+   const dist=editDistance(target,label);
+   score=Math.max(score,1-dist/Math.max(target.length,label.length,1));
+   const key=field==='package'?(label.includes('esencial')?'esencial':label.includes('detalle')?'detalle':label.includes('completo')?'completo':''):field==='urgency'?(label.includes('normal')?'normal':label.includes('mañana')?'manana':label.includes('hoy')?'hoy':label.includes('express')?'express':label.includes('flexible')?'flexible':''):field==='style'?(label.includes('balada')?'balada':label.includes('cumbia')?'cumbia':label.includes('ranchera')?'ranchera':label.includes('salsa')?'salsa':label.includes('reguet')?'regueton':label.includes('huayno')?'huayno':label.includes('pop')?'pop':label.includes('rock')?'rock':''):field==='voice'?(label.includes('femenina')?'femenina':label.includes('masculina')?'masculina':label.includes('dueto')?'dueto':label.includes('igual')?'igual':''):field==='occasion'?(label.includes('cumple')?'cumple':label.includes('madre')?'madre':label.includes('padre')?'padre':label.includes('aniversario')?'aniversario':label.includes('amistad')?'amistad':label.includes('perdon')?'perdon':label.includes('gradu')?'graduacion':''):'';
+   for(const [k,terms] of Object.entries(aliases[field]||{})){if(key===k&&terms.some(t=>target.includes(norm(t))))score=Math.max(score,0.94);}
+   if(score>bestScore){bestScore=score;best=opt;}
+  }
+  return bestScore>=0.48?best:null;
+ }
  function saveManualAnswer(field,answer){
-  const el=document.getElementById(field);if(!el)return;
-  let value=String(answer||'').trim();if(!value)return;
-  if(/^(ninguno|ninguna|no|no tengo|me da igual|indiferente)$/i.test(value)&&['customGenre','specialPhrase'].includes(field)){el.value='';cachedOrderData[field]='';return;}
+  const el=document.getElementById(field);if(!el)return true;
+  let value=String(answer||'').trim();if(!value)return false;
+  if(/^(ninguno|ninguna|no|no tengo|me da igual|indiferente)$/i.test(value)&&['customGenre','specialPhrase'].includes(field)){el.value='';cachedOrderData[field]='';return true;}
   if(el.tagName==='SELECT'){
-   const target=norm(value),options=[...el.options].filter(o=>o.value||o.text);
-   let opt=options.find(o=>norm(o.text)===target||norm(o.value)===target);
-   if(!opt)opt=options.find(o=>norm(o.text).includes(target)||target.includes(norm(o.text)));
-   if(!opt&&field==='lyricTone'){
-    const choices=[['amor','Amor profundo y romántico'],['ternura','Tierna y llena de cariño'],['alegria','Alegre, festiva y con energía'],['nostalgia','Nostálgica, para recordar momentos'],['perdon','De perdón y reconciliación'],['gratitud','De gratitud y reconocimiento'],['esperanza','De esperanza y nuevos comienzos']];
-    const found=choices.find(([k])=>target.includes(k));if(found)opt=options.find(o=>norm(o.text)===norm(found[1]));
+   const options=[...el.options].filter(o=>o.value||o.text);
+   const opt=closestSelectOption(field,value,options);
+   if(!opt){
+    add('assistant','No te preocupes 😊. No logré identificar esa opción. ¿Puedes escribirla de nuevo o elegir la más parecida a estas alternativas?\\n'+options.map((o,i)=>(i+1)+'. '+o.text).join('\\n'));
+    return false;
    }
-   if(!opt&&field==='package'){
-    const p=target.includes('completo')?'REGALO COMPLETO':target.includes('detalle')?'DETALLE ESPECIAL':target.includes('esencial')?'ESENCIAL':'';
-    if(p)opt=options.find(o=>norm(o.text).includes(norm(p)));
-   }
-   if(opt)el.value=opt.value||opt.text;
-   else el.value=value;
+   el.value=opt.value||opt.text;
   }else el.value=value;
   cachedOrderData[field]=el.value;
+  return true;
  }
  function nextManualField(){
   while(manualIndex<manualFlow.length){
