@@ -948,8 +948,10 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
    messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
-   try{await syncConversation();}catch(intakeError){console.warn('No se pudieron sincronizar los datos del formulario:',intakeError?.message||intakeError);autoStatus.textContent='Sigo reuniendo tus respuestas. No necesitas repetir los datos que ya compartiste.';}
-   awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
+   let collected=null;try{collected=await syncConversation();}catch(intakeError){console.warn('No se pudieron sincronizar los datos del formulario:',intakeError?.message||intakeError);autoStatus.textContent='Sigo reuniendo tus respuestas. No necesitas repetir los datos que ya compartiste.';}
+   const ready=Boolean(collected?.recipient&&collected?.occasion&&collected?.story&&collected?.style);
+   awaitingFinalConfirmation=ready||/¿Deseas agregar algo más/i.test(d.answer||'');
+   if(ready&&!/¿Deseas agregar algo más/i.test(d.answer||''))add('assistant','Ya tengo los datos principales de tu canción y no te los volveré a pedir. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
   }catch(e){
     add('assistant','La ayuda con IA no está disponible en este momento. Puedes continuar sin IA: completa tus datos en el formulario manual y nosotros prepararemos tu letra. No perderás tu pedido.');
     const fallback=document.createElement('button');fallback.type='button';fallback.textContent='Continuar con formulario manual';fallback.className='btn';fallback.style.marginTop='8px';
