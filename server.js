@@ -458,6 +458,56 @@ function tokenEditDistance(a,b){
  }
  return prev[b.length];
 }
+// Dirección artística breve con Gemini para decorar cada videoclip. Devuelve solo opciones permitidas.
+const videoDesignLimits=new Map();
+app.post("/api/video/design",async(req,res)=>{
+ try{
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"Gemini no está conectado."});
+  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
+  const now=Date.now(),record=videoDesignLimits.get(ip)||{start:now,count:0};
+  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  if(record.count>=20)return res.status(429).json({error:"Límite temporal de diseños visuales alcanzado."});
+  record.count++;videoDesignLimits.set(ip,record);
+  const body=req.body||{};
+  const lyrics=String(body.lyrics||"").slice(0,5000);
+  const recipient=String(body.recipient||"").slice(0,100);
+  const dedication=String(body.dedication||"").slice(0,300);
+  const occasion=String(body.occasion||"").slice(0,60);
+  const prompt="Actúa como director/a de arte de videoclips verticales de canciones personalizadas. A partir de la letra y dedicatoria, elige una decoración delicada, emotiva y elegante. Responde SOLO JSON válido con claves theme, accent, stickers. theme debe ser romantic, celebration, elegant, family o inspirational. accent debe ser uno de #f6d78c, #ffc1d6, #b9dcff, #d8b5ff, #c8f0d0. stickers debe ser un arreglo de 3 elementos elegidos solo entre heart, sparkle, star. Evita sobrecargar; la letra y los rostros deben seguir siendo protagonistas. No incluyas texto ni nombres en los stickers.\nOcasión: "+occasion+"\nDestinatario: "+recipient+"\nDedicatoria: "+dedication+"\nLetra:\n"+lyrics;
+  const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+  const candidates=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];
+  let payload=null,lastStatus=0;
+  for(const model of candidates){
+   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+    method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.35,maxOutputTokens:180}}),
+    signal:AbortSignal.timeout(12000)
+   });
+   const data=await response.json().catch(()=>({}));
+   if(response.ok){payload=data;break;}
+   lastStatus=response.status;
+   if(![404,429,500,502,503,504].includes(response.status))break;
+  }
+  const raw=(payload?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
+  if(!raw)return res.status(lastStatus===429?429:502).json({error:"Gemini no pudo proponer la decoración."});
+  const parsed=JSON.parse(raw.replace(/^```(?:json)?|\```$/g,"").trim());
+  const themes=new Set(["romantic","celebration","elegant","family","inspirational"]);
+  const colors=new Set(["#f6d78c","#ffc1d6","#b9dcff","#d8b5ff","#c8f0d0"]);
+  const stickers=new Set(["heart","sparkle","star"]);
+  const design={
+   theme:themes.has(parsed.theme)?parsed.theme:"romantic",
+   accent:colors.has(String(parsed.accent).toLowerCase())?String(parsed.accent).toLowerCase():"#f6d78c",
+   stickers:Array.isArray(parsed.stickers)?parsed.stickers.filter(x=>stickers.has(x)).slice(0,3):["heart","sparkle","star"]
+  };
+  while(design.stickers.length<3)design.stickers.push("sparkle");
+  res.set("Cache-Control","no-store").json({ok:true,design});
+ }catch(error){
+  console.error("Gemini video design:",error?.message||error);
+  res.status(502).json({error:"No se pudo preparar el diseño visual con Gemini."});
+ }
+});
+
 app.post("/api/lyrics/align",async(req,res)=>{
  let uploadedFileName="";
  try{
