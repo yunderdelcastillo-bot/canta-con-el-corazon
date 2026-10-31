@@ -86,6 +86,9 @@ async function loadMedia(){if(!db||!user)return;const box=$('mediaItems');box.te
 $('uploadMedia').onclick=async()=>{const f=$('mediaFile').files[0];if(!f){msg('mediaStatus','Selecciona primero un video o una imagen.');return}if(f.size>50*1024*1024){msg('mediaStatus','El archivo supera 50 MB.');return}$('uploadMedia').disabled=true;msg('mediaStatus','Subiendo archivo… no cierres el panel.');try{const token=await mediaAuth();const q=new URLSearchParams({category:$('mediaCategory').value});const r=await fetch(API_BASE+'/api/media?'+q,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':f.type},body:f});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo subir');$('mediaFile').value='';msg('mediaStatus','¡Archivo guardado en la biblioteca!');await loadMedia()}catch(e){msg('mediaStatus','Error: '+e.message)}finally{$('uploadMedia').disabled=false}};
 $('refreshMedia').onclick=loadMedia;
 const aiVal=id=>$(id).value.trim();
+let activeCustomerOrder=null;
+function themeForOccasion(value){const v=String(value||'').toLowerCase();if(/cumple/.test(v))return 'cumpleanos';if(/anivers|bodas/.test(v))return 'aniversario';if(/serenata/.test(v))return 'serenata';if(/homenaje|despedida/.test(v))return 'homenaje';if(/amistad/.test(v))return 'amistad';return 'romantico';}
+function selectByText(id,value){const el=$(id);if(!el||!value)return;const target=String(value).toLowerCase();const option=[...el.options].find(o=>o.text.trim().toLowerCase()===target||o.value.trim().toLowerCase()===target);if(option)el.value=option.value;}
 async function adminGenerateLyrics(){
  const btn=$('adminGenerateLyrics'),status=$('adminLyricsStatus');
  const body={buyer:aiVal('aiBuyer'),recipient:aiVal('aiRecipient'),occasion:aiVal('aiOccasion'),story:aiVal('aiStory'),style:aiVal('aiStyle'),voice:aiVal('aiVoice'),duration:aiVal('aiDuration'),phrase:aiVal('aiPhrase'),tone:aiVal('aiTone'),customGenre:aiVal('aiCustomGenre'),instruction:aiVal('aiInstructions')};
@@ -115,16 +118,21 @@ $('generateLyriaAudio').onclick=async()=>{
   const previewUrl=URL.createObjectURL(file);$('lyriaAudioPreview').src=previewUrl;$('lyriaAudioPreview').classList.remove('hidden');
   $('preview').src=previewUrl;$('previewWrap').classList.remove('hidden');
   msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB · Generado con Lyria 3.5');
-  $('lyrics').value=lyrics;$('recipient').value=aiVal('aiRecipient');$('title').value='Canción para '+aiVal('aiRecipient');$('dedication').value='Dedicatoria para '+aiVal('aiRecipient')+' · '+aiVal('aiOccasion');
-  $('theme').value=/cumple/i.test(aiVal('aiOccasion'))?'cumpleanos':/anivers/i.test(aiVal('aiOccasion'))?'aniversario':/serenata/i.test(aiVal('aiOccasion'))?'serenata':'romantico';
-  msg('lyriaAudioStatus','💗 ¡Audio generado! Escúchalo aquí. El MP3 está listo en el editor, pero todavía no está guardado. Revisa el resultado y pulsa “Guardar canción” cuando estés conforme.');
+  const recipient=aiVal('aiRecipient'),occasion=aiVal('aiOccasion'),story=aiVal('aiStory'),phrase=aiVal('aiPhrase');
+  $('lyrics').value=lyrics;
+  $('recipient').value=recipient;
+  $('title').value=(occasion?occasion+' - ':'')+'Canción para '+recipient;
+  $('dedication').value=[story,phrase?'Frase especial: '+phrase:''].filter(Boolean).join('\n\n');
+  $('theme').value=themeForOccasion(occasion);
+  $('fileInfo').textContent=file.name+' · '+(file.size/1048576).toFixed(2)+' MB · Generado con Lyria 3.5';
+  msg('lyriaAudioStatus','💗 ¡Audio generado! Los seis campos del editor ya están completos y el MP3 está seleccionado. Escúchalo y pulsa “Guardar canción” para crear el enlace de sorpresa.');
   $('editor').scrollIntoView({behavior:'smooth',block:'start'});
  }catch(e){msg('lyriaAudioStatus','No se pudo generar: '+e.message);}
  finally{btn.disabled=false;}
 };
 
 $('adminCopyLyrics').onclick=async()=>{try{await navigator.clipboard.writeText(aiVal('adminLyricsText'));msg('adminLyricsStatus','¡Letra copiada!')}catch{ $('adminLyricsText').focus();$('adminLyricsText').select();msg('adminLyricsStatus','Selecciona y copia la letra.')}};
-$('adminUseLyrics').onclick=()=>{if(!aiVal('adminLyricsText')){msg('adminLyricsStatus','Primero genera una letra.');return}$('lyrics').value=aiVal('adminLyricsText');$('recipient').value=aiVal('aiRecipient');$('title').value='Canción para '+aiVal('aiRecipient');$('dedication').value='Dedicatoria para '+aiVal('aiRecipient')+' · '+aiVal('aiOccasion');$('theme').value=/cumple/i.test(aiVal('aiOccasion'))?'cumpleanos':/anivers/i.test(aiVal('aiOccasion'))?'aniversario':/serenata/i.test(aiVal('aiOccasion'))?'serenata':'romantico';msg('saveStatus','Letra y datos trasladados al editor. Completa la dedicatoria y selecciona el MP3 para guardar.');$('editor').scrollIntoView({behavior:'smooth'});};
+$('adminUseLyrics').onclick=()=>{if(!aiVal('adminLyricsText')){msg('adminLyricsStatus','Primero genera una letra.');return}const recipient=aiVal('aiRecipient'),occasion=aiVal('aiOccasion');$('lyrics').value=aiVal('adminLyricsText');$('recipient').value=recipient;$('title').value=(occasion?occasion+' - ':'')+'Canción para '+recipient;$('dedication').value=[aiVal('aiStory'),aiVal('aiPhrase')?'Frase especial: '+aiVal('aiPhrase'):''].filter(Boolean).join('\n\n');$('theme').value=themeForOccasion(occasion);msg('saveStatus','Datos y letra trasladados al editor. Cuando generes el MP3, el archivo también quedará seleccionado automáticamente.');$('editor').scrollIntoView({behavior:'smooth'});};
 $('adminSendLyrics').onclick=()=>{const lyrics=aiVal('adminLyricsText');if(!lyrics){msg('adminLyricsStatus','Primero genera una letra.');return}const text='Hola, '+(aiVal('aiBuyer')||'te comparto')+'. 💗\nTe envío la letra personalizada para '+aiVal('aiRecipient')+'.\nOcasión: '+aiVal('aiOccasion')+'\nGénero: '+aiVal('aiStyle')+' · '+aiVal('aiVoice')+'\n\n'+lyrics+'\n\nRevísala y dime si deseas algún cambio. — Canta con el corazón';window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};
 
 $('login').onclick=async()=>{if(!db){msg('authStatus','Primero conecta Supabase.');return}let {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){msg('authStatus','Error de acceso: '+error.message);return}user=data.user;window.cchAdminGetToken=async()=>{const {data:{session}}=await db.auth.getSession();return session?.access_token||''};window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:true}}));msg('authStatus','Sesión iniciada: '+user.email);$('editor').classList.remove('hidden');$('library').classList.remove('hidden');$('mediaLibrary').classList.remove('hidden');$('lyricsStudio').classList.remove('hidden');$('customerOrders').classList.remove('hidden');await load();await loadMedia();await loadCustomerOrders()}
@@ -144,10 +152,11 @@ async function loadCustomerOrders(){
    const story=document.createElement('p');story.textContent='Historia: '+o.story;card.appendChild(story);
    const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;card.appendChild(detail);
    if(o.lyrics){const l=document.createElement('details');const sm=document.createElement('summary');sm.textContent='Ver letra aportada';const pre=document.createElement('p');pre.textContent=o.lyrics;l.append(sm,pre);card.appendChild(l);}
+   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent='🎵 Preparar canción con estos datos';prepare.onclick=()=>{activeCustomerOrder=o;$('aiBuyer').value=o.buyer||'';$('aiRecipient').value=o.recipient||'';selectByText('aiOccasion',o.occasion||'');selectByText('aiStyle',o.style||'');selectByText('aiVoice',o.voice||'');$('aiStory').value=o.story||'';$('aiPhrase').value=o.special_phrase||'';$('aiCustomGenre').value=o.custom_genre||'';selectByText('aiTone',o.lyric_tone||'Según la historia');const duration=String(o.lyric_duration||'3 minutos');selectByText('aiDuration',duration);if(o.lyrics)$('adminLyricsText').value=o.lyrics;msg('adminLyricsStatus','Pedido cargado. Revisa los datos y genera la letra personalizada.');$('lyricsStudio').scrollIntoView({behavior:'smooth',block:'start'});};
    const sel=document.createElement('select');[['nuevo','Nuevo'],['contactado','Contactado'],['pago_verificado','Pago verificado'],['en_proceso','En proceso'],['entregado','Entregado'],['cancelado','Cancelado']].forEach(([v,t])=>{const op=document.createElement('option');op.value=v;op.textContent=t;sel.appendChild(op)});sel.value=o.status;
    const save=document.createElement('button');save.className='btn';save.textContent='Guardar estado';save.onclick=async()=>{save.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/orders/'+o.id,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status:sel.value})});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo guardar');save.textContent='Guardado';}catch(e){alert(e.message);save.disabled=false}};
    const wa=document.createElement('a');wa.className='btn alt';wa.href='https://wa.me/51'+o.contact.replace(/\\D/g,'')+'?text='+encodeURIComponent('Hola '+o.buyer+', te escribimos de Canta con el corazón por tu pedido para '+o.recipient+'.');wa.target='_blank';wa.rel='noopener';wa.textContent='WhatsApp';
-   card.append(sel,save,wa);box.appendChild(card);
+   card.append(prepare,sel,save,wa);box.appendChild(card);
   });
  }catch(e){box.textContent=e.message;}
 }
