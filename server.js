@@ -828,7 +828,8 @@ app.post("/api/assistant/intake",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,data});
  }catch(e){console.error("Assistant intake:",e?.message||e);res.status(502).json({error:"No se pudieron pasar los datos al formulario."});}
 });
-\napp.post("/api/lyrics/generate",async(req,res)=>{
+
+app.post("/api/lyrics/generate",async(req,res)=>{
  try{
   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"La IA de letras aún no está conectada. El administrador debe configurar GEMINI_API_KEY en Render."});
