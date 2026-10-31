@@ -442,6 +442,56 @@ app.get("/api/convert-video-status/:jobId",(req,res)=>{
  res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
 });
 
+// Generador de letras originales mediante proveedor compatible con OpenAI.
+const lyricRateLimits=new Map();
+app.post("/api/lyrics/generate",async(req,res)=>{
+ try{
+  const apiKey=String(process.env.OPENAI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"La IA de letras aún no está conectada. El administrador debe configurar OPENAI_API_KEY en Render."});
+  const body=req.body||{};
+  const adminRequest=Boolean(req.headers.authorization);
+  if(adminRequest){
+   const user=await mediaUser(req);
+   if(!user)return res.status(401).json({error:"Tu sesión de administrador expiró. Inicia sesión nuevamente."});
+  }
+  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
+  const bucket=(adminRequest?"admin:":"client:")+ip;
+  const now=Date.now(),windowMs=60*60*1000;
+  const record=lyricRateLimits.get(bucket)||{start:now,count:0};
+  if(now-record.start>windowMs){record.start=now;record.count=0;}
+  const limit=adminRequest?30:8;
+  if(record.count>=limit)return res.status(429).json({error:"Alcanzaste el límite temporal de generación. Inténtalo más tarde."});
+  const fields=["buyer","recipient","occasion","story","style","voice","customGenre","phrase","duration","tone","instruction"];
+  const data={};for(const key of fields)data[key]=String(body[key]||"").trim().slice(0,key==="story"?3500:500);
+  if(!data.recipient||!data.occasion||!data.story||!data.style)return res.status(400).json({error:"Completa el nombre de la persona, la ocasión, la historia y el género musical."});
+  record.count++;lyricRateLimits.set(bucket,record);
+  const systemPrompt="Eres compositor/a profesional de canciones personalizadas en español latino. Escribe letras completamente originales, emotivas, cantables y coherentes. No imites ni nombres artistas, no copies letras existentes ni pidas imitar voces. Usa exclusivamente los hechos proporcionados; no inventes parentescos, fechas, lugares ni sucesos. Conserva exactamente los nombres y frases importantes. Adapta vocabulario, ritmo, métrica y rimas al género solicitado. Evita clichés y repeticiones vacías. Devuelve solamente la letra final, sin explicaciones, sin markdown y sin instrucciones técnicas. Estructura con encabezados breves entre corchetes: [Intro], [Verso 1], [Verso 2], [Coro], [Puente], [Coro final] y [Outro], según convenga. Haz un coro memorable y natural. Longitud orientativa: 2:30 a 3:30 salvo indicación distinta.";
+  const userPrompt="Crea una letra personalizada con estos datos:\n"+
+   "Quién la solicita: "+(data.buyer||"No indicado")+"\n"+
+   "Para quién: "+data.recipient+"\n"+
+   "Ocasión: "+data.occasion+"\n"+
+   "Historia y recuerdos: "+data.story+"\n"+
+   "Género musical: "+data.style+"\n"+
+   "Estilo adicional: "+(data.customGenre||"No indicado")+"\n"+
+   "Voz: "+(data.voice||"No indicada")+"\n"+
+   "Frase que debe incluirse: "+(data.phrase||"Ninguna")+"\n"+
+   "Duración aproximada: "+(data.duration||"3 minutos")+"\n"+
+   "Emoción/tono: "+(data.tone||"Según la historia")+"\n"+
+   "Indicaciones adicionales: "+(data.instruction||"Ninguna")+"\n"+
+   "Si hay contradicciones o falta información, no inventes; escribe una letra prudente y fiel a los datos.";
+  const response=await fetch("https://api.openai.com/v1/chat/completions",{
+   method:"POST",headers:{"Authorization":"Bearer "+apiKey,"Content-Type":"application/json"},
+   body:JSON.stringify({model:String(process.env.OPENAI_MODEL||"gpt-4o-mini"),temperature:0.85,max_tokens:1800,messages:[{role:"system",content:systemPrompt},{role:"user",content:userPrompt}] }),
+   signal:AbortSignal.timeout(60000)
+  });
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok){console.error("Lyrics AI provider error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"La IA alcanzó su límite temporal. Inténtalo más tarde.":"La IA no pudo generar la letra en este momento. Revisa la configuración del servicio."});}
+  const lyrics=String(payload?.choices?.[0]?.message?.content||"").trim();
+  if(!lyrics)return res.status(502).json({error:"La IA respondió sin una letra. Inténtalo nuevamente."});
+  res.set("Cache-Control","no-store").json({ok:true,lyrics,model:payload.model||process.env.OPENAI_MODEL||"gpt-4o-mini"});
+ }catch(e){console.error("Lyrics generation:",e?.message||e);res.status(502).json({error:e?.name==="TimeoutError"?"La generación tardó demasiado. Inténtalo otra vez.":"No se pudo conectar con la IA de letras."});}
+});
+
 /* Busca clips de fondo en Pixabay. Las respuestas se guardan 24 h según las reglas de la API. */
 const pixabayVideoCache=new Map();
 app.get("/api/pixabay/videos",async(req,res)=>{
