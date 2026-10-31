@@ -136,6 +136,19 @@ if(lyricText){
  if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}
 }
 const API_BASE='https://canta-corazon-private-api.onrender.com';
+async function fetchWithSafeRetry(url,options={},attempts=2){
+ let lastError;
+ for(let attempt=0;attempt<attempts;attempt++){
+  try{
+   const response=await fetch(url,options);
+   if(response.ok||![408,425,429,500,502,503,504].includes(response.status)||attempt===attempts-1)return response;
+   lastError=new Error('El servicio respondió '+response.status);
+  }catch(error){lastError=error;if(attempt===attempts-1)throw error;}
+  await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
+ }
+ throw lastError||new Error('No se pudo completar la solicitud.');
+}
+
 const sharedVideoUrl=params.get('video')||'';
 if(sharedVideoUrl){
  const preview=document.createElement('section');preview.id='generatedVideoPreview';
@@ -426,7 +439,10 @@ downloadButton.addEventListener('click',async()=>{
    const audioBase64=await new Promise((resolve,reject)=>{
     const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar el audio para sincronizar la letra.'));reader.readAsDataURL(audioBlob);
    });
-   const alignResponse=await fetch(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})});
+   // Limpia líneas vacías o separadores antes de pedir la alineación a Gemini.
+   lyricLines=lyricLines.map(line=>String(line||'').replace(/[\\u200B-\\u200D\\uFEFF]/g,'').trim()).filter(line=>line.length>2);
+   if(!lyricLines.length)throw new Error('No se encontraron frases válidas en la letra para sincronizar.');
+   const alignResponse=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})},2);
    const alignData=await alignResponse.json().catch(()=>({}));
    if(!alignResponse.ok||!Array.isArray(alignData.segments)||alignData.segments.length!==lyricLines.length){
     throw new Error(alignData.error||'No se pudo sincronizar toda la letra con la voz. No se generó un video descoordinado; inténtalo nuevamente.');
@@ -440,7 +456,7 @@ downloadButton.addEventListener('click',async()=>{
   try{
    videoStage='diseño visual con Gemini';
    downloadNotice.textContent='Gemini está preparando los detalles visuales de tu videoclip…';
-   const designResponse=await fetch(API_BASE+'/api/video/design',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lyrics:lyricLines.join('\n'),recipient:name||'',dedication:message||'',occasion:theme||'romantico'})});
+   const designResponse=await fetchWithSafeRetry(API_BASE+'/api/video/design',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lyrics:lyricLines.join('\n'),recipient:name||'',dedication:message||'',occasion:theme||'romantico'})});
    const designData=await designResponse.json().catch(()=>({}));
    if(designResponse.ok&&designData.ok&&designData.design)visualDesign=designData.design;
   }catch(designError){console.warn('Diseño Gemini no disponible; se usará el estilo integrado:',designError?.message||designError);}
@@ -675,7 +691,7 @@ downloadButton.addEventListener('click',async()=>{
   while(Date.now()-conversionStarted<15*60*1000){
    downloadNotice.textContent='Convirtiendo el video a MP4 en segundo plano… No cierres esta página.';
    await new Promise(resolve=>setTimeout(resolve,4000));
-   const statusResponse=await fetch(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'});
+   const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'},3);
    if(!statusResponse.ok){let detail='No se pudo consultar el estado de la conversión.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
    const statusData=await statusResponse.json();
    if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
@@ -751,7 +767,16 @@ downloadButton.addEventListener('click',async()=>{
   downloadNotice.textContent=window.lastVideoShareLink?'¡Video creado! Ya puedes compartir el enlace sorpresa por WhatsApp o descargar el MP4.':'¡Video creado y listo para descargar!'+shareUploadWarning;
   videoNotice.textContent=window.lastVideoShareLink?'Video vertical listo en MP4. También se creó un enlace privado de sorpresa para compartir.':'Video vertical listo en MP4. Puedes revisarlo y descargarlo desde aquí.';
   preview.scrollIntoView({behavior:'smooth',block:'center'});
- }catch(err){console.error('Canta con el corazón video error at stage:',videoStage,err);downloadNotice.textContent='Falló esta etapa: '+videoStage+'. Detalle: '+(err.message||'error desconocido')+'. Tu MP3 sigue seguro. Envíanos una captura de este mensaje.'}finally{downloadButton.disabled=false}
+ }catch(err){
+  console.error('Canta con el corazón video error at stage:',videoStage,err);
+  let friendly='No se pudo completar esta etapa. Tu MP3 sigue seguro.';
+  try{
+   const diagnosis=await fetchWithSafeRetry(API_BASE+'/api/support/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stage:videoStage,error:String(err?.message||'Error desconocido').slice(0,500)})},2);
+   const data=await diagnosis.json().catch(()=>({}));
+   if(diagnosis.ok&&data.message)friendly=data.message;
+  }catch(diagnosisError){console.warn('No se pudo consultar el diagnóstico Gemini:',diagnosisError?.message||diagnosisError);}
+  downloadNotice.textContent='Falló esta etapa: '+videoStage+'. '+friendly+' Tu MP3 sigue seguro. Si vuelve a ocurrir, envíanos una captura.';
+ }finally{downloadButton.disabled=false}
 });
 function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
 document.getElementById('shareGift').addEventListener('click',async()=>{const shareUrl=window.lastVideoShareLink;if(!shareUrl){downloadNotice.textContent='Primero crea el video MP4 y espera a que termine de subirse. Después podrás compartir el enlace del regalo.';return;}const shareText='🎁 Te prepararon una sorpresa musical de Canta con el corazón. Abre este enlace para descubrir tu regalo:';try{if(navigator.share){await navigator.share({title:'Tu regalo de Canta con el corazón',text:shareText,url:shareUrl});}else{window.location.href='https://wa.me/?text='+encodeURIComponent(shareText+' '+shareUrl);}}catch(err){if(err&&err.name==='AbortError')return;window.location.href='https://wa.me/?text='+encodeURIComponent(shareText+' '+shareUrl);}});
