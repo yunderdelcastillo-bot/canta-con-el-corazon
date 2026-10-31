@@ -787,7 +787,21 @@ function buildCustomerOrderMessage(includeLyrics){
  const text='Hola, quiero pedir una canción personalizada de Canta con el corazón.\nMi nombre: '+orderValue('buyer')+'\nMi WhatsApp: '+orderValue('contact')+'\nPara: '+orderValue('recipient')+'\nOcasión: '+orderValue('occasion')+'\nHistoria/dedicatoria: '+orderValue('story')+'\nGénero elegido: '+orderValue('style')+'\nGénero o estilo adicional: '+(orderValue('customGenre')||'No indicó')+'\nTipo de voz: '+orderValue('voice')+'\nFrase especial: '+(orderValue('specialPhrase')||'No indicó')+'\nDuración: '+orderValue('lyricDuration')+'\nEmoción: '+orderValue('lyricTone')+'\nPaquete: '+orderValue('package')+'\nPlazo solicitado: '+orderValue('urgency')+(orderValue('urgency').includes('30 minutos')?'\nAdicional express: S/5 (sujeto a confirmación)':'')+(includeLyrics?'\n\nLETRA GENERADA PARA REVISIÓN:\n'+orderValue('customerLyricsText'):'');
  return text;
 }
-document.getElementById('orderForm').addEventListener('submit',e=>{e.preventDefault();const owner='51977974730';window.open('https://wa.me/'+owner+'?text='+encodeURIComponent(buildCustomerOrderMessage(false)),'_blank','noopener')});
+
+async function saveCustomerOrder(){
+ const payload={buyer:orderValue('buyer'),contact:orderValue('contact'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),customGenre:orderValue('customGenre'),voice:orderValue('voice'),specialPhrase:orderValue('specialPhrase'),lyricDuration:orderValue('lyricDuration'),lyricTone:orderValue('lyricTone'),package:orderValue('package'),urgency:orderValue('urgency'),lyrics:orderValue('customerLyricsText')};
+ const response=await fetchWithSafeRetry(API_BASE+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},1);
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
+ return result;
+}
+
+document.getElementById('orderForm').addEventListener('submit',async e=>{
+ e.preventDefault();const btn=e.submitter; if(btn)btn.disabled=true;
+ try{await saveCustomerOrder();window.open('https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false)),'_blank','noopener');}
+ catch(err){alert(err.message+'\\nTus datos siguen en el formulario. Intenta de nuevo o envíalos por WhatsApp.');window.open('https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false)),'_blank','noopener');}
+ finally{if(btn)btn.disabled=false;}
+});
 async function generateCustomerLyrics(){
  const btn=document.getElementById('generateCustomerLyrics'),status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
  const body={buyer:orderValue('buyer'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),voice:orderValue('voice'),customGenre:orderValue('customGenre'),phrase:orderValue('specialPhrase'),duration:orderValue('lyricDuration'),tone:orderValue('lyricTone')};
