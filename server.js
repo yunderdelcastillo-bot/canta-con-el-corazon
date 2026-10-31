@@ -664,7 +664,7 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
  if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
  const model="openai/gpt-oss-20b";
  let lastError;
- for(let attempt=0;attempt<3;attempt++){
+ for(let attempt=0;attempt<4;attempt++){
   try{
    const response=await fetch("https://api.groq.com/openai/v1/chat/completions",{
     method:"POST",
@@ -674,14 +674,18 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
    });
    const payload=await response.json().catch(()=>({}));
    if(!response.ok){
-    const error=Object.assign(new Error(payload?.error?.message||"Groq no pudo completar la solicitud."),{status:response.status});
-    if(![408,429,500,502,503,504].includes(response.status)||attempt===2){
-     console.error("Groq request failed:",response.status,payload?.error?.message||"");
+    const detail=String(payload?.error?.message||"Groq no pudo completar la solicitud.");
+    const error=Object.assign(new Error(detail),{status:response.status});
+    if(![408,429,500,502,503,504].includes(response.status)||attempt===3){
+     console.error("Groq request failed:",response.status,detail);
      throw error;
     }
     lastError=error;
+    const match=detail.match(/try again in\\s+([0-9.]+)s/i);
     const retryAfter=Number(response.headers.get("retry-after")||0);
-    await new Promise(resolve=>setTimeout(resolve,Math.min(5000,Math.max(900,retryAfter*1000,900*(attempt+1)))));
+    const waitMs=Math.min(12000,Math.max(1200,retryAfter*1000,(Number(match?.[1]||0)*1000)+500,1200*(attempt+1)));
+    console.warn("Groq temporary limit; retrying after",waitMs,"ms");
+    await new Promise(resolve=>setTimeout(resolve,waitMs));
     continue;
    }
    const content=String(payload?.choices?.[0]?.message?.content||"").trim();
@@ -690,7 +694,7 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
   }catch(error){
    lastError=error;
    if(error?.status&&!([408,429,500,502,503,504].includes(error.status)))throw error;
-   if(attempt===2)throw error;
+   if(attempt===3)throw error;
    await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
   }
  }
@@ -713,7 +717,7 @@ app.post("/api/assistant/chat",async(req,res)=>{
   if(now-record.start>60*60*1000){record.start=now;record.count=0;}
   const limit=mode==="admin"?60:25;
   if(record.count>=limit)return res.status(429).json({error:"Alcanzaste el límite temporal del asistente. Inténtalo más tarde."});
-  const history=Array.isArray(body.messages)?body.messages.slice(-30).map(m=>({role:m?.role==="assistant"?"assistant":"user",content:String(m?.content||"").slice(0,1600)})).filter(m=>m.content):[];
+  const history=Array.isArray(body.messages)?body.messages.slice(-12).map(m=>({role:m?.role==="assistant"?"assistant":"user",content:String(m?.content||"").slice(0,900)})).filter(m=>m.content):[];
   if(!history.some(m=>m.role==="user"))return res.status(400).json({error:"Escribe una consulta para el asistente."});
   record.count++;assistantChatLimits.set(bucket,record);
   let adminContext="";
@@ -917,9 +921,9 @@ app.post("/api/assistant/intake",async(req,res)=>{
  try{
   if(!process.env.GROQ_API_KEY)return res.status(503).json({error:"El asistente IA no está disponible."});
   const messages=Array.isArray(req.body?.messages)?req.body.messages.slice(-30):[];
-  const customerMessages=messages.filter(m=>m?.role==="user"&&String(m?.content||"").trim());
+  const customerMessages=messages.filter(m=>m?.role==="user"&&String(m?.content||"").trim()).slice(-15);
   if(!customerMessages.length)return res.status(400).json({error:"No hay respuestas del cliente para revisar."});
-  const transcript=customerMessages.map(m=>"Cliente: "+String(m.content||"").slice(0,1800)).join("\n");
+  const transcript=customerMessages.map(m=>"Cliente: "+String(m.content||"").slice(0,900)).join("\n");
   const prompt="Extrae los datos del CLIENTE para un pedido de Canta con el corazón. IMPORTANTE: analiza exclusivamente los mensajes del cliente incluidos abajo. Ignora por completo preguntas, ejemplos, opciones y sugerencias del asistente: nunca los conviertas en elecciones del cliente. Un dato solo se considera confirmado si el cliente lo expresó. Si el cliente corrige un dato, conserva su respuesta más reciente. Devuelve SOLO JSON válido con estas claves exactas: buyer, contact, recipient, occasion, story, style, customGenre, voice, specialPhrase, lyricDuration, lyricTone, package, urgency. Conserva la elección exacta del paquete: ESENCIAL — Solo audio — S/20; DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25; REGALO COMPLETO — Canción + video con fotos reales — desde S/30. Si el cliente dice audio solamente, asigna ESENCIAL; si pide video con imágenes ilustrativas y sin fotos reales, asigna DETALLE ESPECIAL; si aporta o quiere incluir fotos reales, asigna REGALO COMPLETO. No infieras fotos reales si no las menciona. Usa cadenas vacías para datos no mencionados. No inventes. story debe resumir solo recuerdos/hechos expresados. Si el cliente no dio un dato, déjalo vacío.\n\n"+transcript;
   const extractionMessages=[{role:"system",content:"Eres un extractor de datos preciso. Devuelve únicamente un objeto JSON válido, sin markdown ni texto adicional. Incluye todas las claves solicitadas como cadenas. No inventes información."},{role:"user",content:prompt}];
   let result;
