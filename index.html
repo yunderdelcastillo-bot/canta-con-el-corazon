@@ -856,27 +856,39 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
 <section id="cchAiPanel" aria-label="Asistente para pedidos">
  <div id="cchAiHead"><span>💗 Asistente Canta con el corazón</span><button id="cchAiClose" type="button" style="background:none;color:white;border:0;font-size:22px">×</button></div>
  <div id="cchAiMessages"><div class="cchAiMsg cchAiBot">¡Hola! 💗 Te ayudaré a preparar tu pedido. Cuéntame: ¿para quién es la canción y qué ocasión quieres celebrar?</div></div>
- <div id="cchAiControls"><input id="cchAiInput" placeholder="Escribe tu respuesta…" maxlength="1200"><button id="cchAiSend" type="button">Enviar</button><button id="cchAiTransfer" type="button">Pasar mis datos al formulario</button><p style="font-size:11px;margin:7px 0 0;color:#755b69">Revisa y completa los datos antes de enviar tu solicitud. El pago se verifica manualmente.</p></div>
+ <div id="cchAiControls"><input id="cchAiInput" placeholder="Escribe tu respuesta…" maxlength="1200"><button id="cchAiSend" type="button">Enviar</button><p id="cchAiAutoStatus" style="font-size:12px;margin:8px 0 0;color:#755b69">La IA recopila tus datos y completa el formulario automáticamente. No necesitas llenarlo.</p><p style="font-size:11px;margin:7px 0 0;color:#755b69">Revisa y completa los datos antes de enviar tu solicitud. El pago se verifica manualmente.</p></div>
 </section>
 <script>
 (function(){
  const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 Te ayudaré a preparar tu pedido. Cuéntame: ¿para quién es la canción y qué ocasión quieres celebrar?'}];
- const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend'),transfer=document.getElementById('cchAiTransfer');
+ const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend');
+ const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
+ function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
+ async function syncConversation(){autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';try{
+   const intake=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});const extracted=await intake.json();if(!intake.ok)throw new Error(extracted.error||'No se pudieron organizar los datos.');
+   const data=extracted.data||{};fillForm(data);
+   const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
+   if(!ready){autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';return;}
+   const signature=JSON.stringify([data.recipient,data.occasion,data.story,data.style,data.voice,data.customGenre,data.specialPhrase,data.lyricDuration,data.lyricTone]);
+   if(signature!==lastLyricsSignature){
+    autoStatus.textContent='Ya tengo los datos principales. La IA está escribiendo tu letra personalizada…';
+    const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyer:data.buyer,recipient:data.recipient,occasion:data.occasion,story:data.story,style:data.style,voice:data.voice,customGenre:data.customGenre,phrase:data.specialPhrase,duration:data.lyricDuration,tone:data.lyricTone})});
+    const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo crear la letra.');
+    document.getElementById('customerLyricsText').value=lyricData.lyrics;lastLyricsSignature=signature;
+    autoStatus.textContent='¡Listo! La IA completó tus datos y preparó la letra. Revisa el formulario y envía tu pedido cuando estés conforme.';
+    document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
+   }else{autoStatus.textContent='Tus datos y tu letra ya están completados automáticamente.';}
+  }catch(e){autoStatus.textContent='Sigo aquí para ayudarte. '+e.message;}
+ }
  async function sendMessage(){const content=input.value.trim();if(!content)return;messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
-  try{const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);}
-  catch(e){add('assistant',e.message+' Puedes continuar por WhatsApp o completar el formulario.');}
+  try{const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);await syncConversation();}
+  catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
   finally{send.disabled=false;send.textContent='Enviar';}
  }
  send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
- transfer.onclick=async()=>{transfer.disabled=true;transfer.textContent='Organizando tus datos…';
-  try{const r=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudieron pasar los datos.');
-   const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};
-   Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=d.data?.[k];if(!el||!v)return;const opt=[...el.options||[]].find(o=>o.text.trim().toLowerCase()===v.trim().toLowerCase()||o.value.trim().toLowerCase()===v.trim().toLowerCase());if(el.tagName==='SELECT'){if(opt)el.value=opt.value;}else el.value=v;});
-   document.getElementById('order').scrollIntoView({behavior:'smooth'});panel.classList.remove('open');alert('¡Listo! Pasamos los datos que la IA pudo identificar. Revisa el formulario, completa lo que falte y envía tu solicitud.');
-  }catch(e){alert(e.message);}finally{transfer.disabled=false;transfer.textContent='Pasar mis datos al formulario';}
- };
+
 })();
 </script>
 \n</body></html>
