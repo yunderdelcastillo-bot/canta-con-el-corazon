@@ -115,7 +115,7 @@ $('generateLyriaAudio').onclick=async()=>{
   const binary=atob(data.audioBase64),bytes=new Uint8Array(binary.length);
   for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
   file=new File([bytes],('cancion-'+(aiVal('aiRecipient')||'personalizada').toLowerCase().replace(/[^a-z0-9áéíóúñ-]+/gi,'-')+'.mp3'),{type:'audio/mpeg'});
-  const previewUrl=URL.createObjectURL(file);$('lyriaAudioPreview').src=previewUrl;$('lyriaAudioPreview').classList.remove('hidden');
+  if(activeCustomerOrder?.id){const saveOrderAudio=await fetch(API_BASE+'/api/admin/orders/'+activeCustomerOrder.id+'/audio',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify({audioBase64:data.audioBase64})});const savedAudio=await saveOrderAudio.json();if(!saveOrderAudio.ok)throw new Error(savedAudio.error||'No se pudo vincular el audio al pedido.');}const previewUrl=URL.createObjectURL(file);$('lyriaAudioPreview').src=previewUrl;$('lyriaAudioPreview').classList.remove('hidden');
   $('preview').src=previewUrl;$('previewWrap').classList.remove('hidden');
   msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB · Generado con Lyria 3.5');
   const recipient=aiVal('aiRecipient'),occasion=aiVal('aiOccasion'),story=aiVal('aiStory'),phrase=aiVal('aiPhrase');
