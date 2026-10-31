@@ -785,8 +785,8 @@ function buildCustomerOrderMessage(includeLyrics){
  return text;
 }
 
-async function saveCustomerOrder(){
- const payload={buyer:orderValue('buyer'),contact:orderValue('contact'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),customGenre:orderValue('customGenre'),voice:orderValue('voice'),specialPhrase:orderValue('specialPhrase'),lyricDuration:orderValue('lyricDuration'),lyricTone:orderValue('lyricTone'),package:orderValue('package'),urgency:orderValue('urgency'),lyrics:orderValue('customerLyricsText')};
+async function saveCustomerOrder(includeLyrics=true){
+ const payload={buyer:orderValue('buyer'),contact:orderValue('contact'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),customGenre:orderValue('customGenre'),voice:orderValue('voice'),specialPhrase:orderValue('specialPhrase'),lyricDuration:orderValue('lyricDuration'),lyricTone:orderValue('lyricTone'),package:orderValue('package'),urgency:orderValue('urgency'),lyrics:includeLyrics?orderValue('customerLyricsText'):''};
  const response=await fetchWithSafeRetry(API_BASE+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},1);
  const result=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
@@ -795,28 +795,16 @@ async function saveCustomerOrder(){
 
 document.getElementById('orderForm').addEventListener('submit',async e=>{
  e.preventDefault();
- const btn=e.submitter,status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
- const wa=window.open('about:blank','_blank');
+ const btn=e.submitter,wa=window.open('about:blank','_blank');
  if(btn)btn.disabled=true;
  try{
-  if(!orderValue('customerLyricsText')){
-   status.textContent='Preparando la letra de tu canción antes de registrar el pedido…';
-   const lyricBody={buyer:orderValue('buyer'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),voice:orderValue('voice'),customGenre:orderValue('customGenre'),phrase:orderValue('specialPhrase'),duration:orderValue('lyricDuration'),tone:orderValue('lyricTone')};
-   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(lyricBody)});
-   const lyricData=await lyricResponse.json().catch(()=>({}));
-   if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo preparar la letra. Intenta nuevamente.');
-   document.getElementById('customerLyricsText').value=lyricData.lyrics||'';
-   result.classList.remove('hidden');
-  }
-  if(orderValue('customerLyricsText').length<40)throw new Error('La letra está incompleta. Revisa la letra antes de enviar el pedido.');
-  await saveCustomerOrder();
-  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
+  await saveCustomerOrder(false);
+  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false));
   if(wa)wa.location.href=url;else window.location.href=url;
-  status.textContent='💗 Pedido registrado. WhatsApp está listo con tus datos y la letra. La canción se generará en privado para el administrador.';
+  document.getElementById('customerLyricsStatus').textContent='💗 Tu solicitud quedó registrada. Se enviarán tus datos e historia por WhatsApp; Canta con el corazón preparará la letra manualmente.';
  }catch(err){
   if(wa)wa.close();
-  status.textContent='No se pudo registrar el pedido: '+err.message+' Tus datos siguen en el formulario.';
-  alert(err.message+'\\nTus datos siguen en el formulario. Puedes corregirlos e intentar nuevamente.');
+  alert('No se pudo registrar el pedido: '+err.message+'\\nTus datos siguen en el formulario. Intenta nuevamente.');
  }finally{if(btn)btn.disabled=false;}
 });
 async function generateCustomerLyrics(){
@@ -962,7 +950,13 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
    autoStatus.textContent='Voy reuniendo los detalles de tu canción. Al elegir el paquete organizaré todos tus datos de una sola vez.';
    awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
-  }catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
+  }catch(e){
+    add('assistant','La ayuda con IA no está disponible en este momento. Puedes continuar sin IA: completa tus datos en el formulario manual y nosotros prepararemos tu letra. No perderás tu pedido.');
+    const fallback=document.createElement('button');fallback.type='button';fallback.textContent='Continuar con formulario manual';fallback.className='btn';fallback.style.marginTop='8px';
+    fallback.addEventListener('click',()=>{panel.classList.remove('open');document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('buyer').focus({preventScroll:true});});
+    const wrap=document.createElement('div');wrap.className='cchAiMsg cchAiBot';wrap.appendChild(fallback);box.appendChild(wrap);box.scrollTop=box.scrollHeight;
+    autoStatus.textContent='Modo manual disponible. Completa el formulario y envía tu historia; nosotros prepararemos la letra.';
+   }
   finally{send.disabled=false;send.textContent='Enviar';}
  }
  send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
