@@ -479,12 +479,31 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "Emoción/tono: "+(data.tone||"Según la historia")+"\n"+
    "Indicaciones adicionales: "+(data.instruction||"Ninguna")+"\n"+
    "Si hay contradicciones o falta información, no inventes; escribe una letra prudente y fiel a los datos.";
-  const model=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
-  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-   body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:userPrompt}]}],generationConfig:{thinkingConfig:{thinkingLevel:"low"},maxOutputTokens:2200}}),
-   signal:AbortSignal.timeout(85000)
-  });
+  const preferredModel=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+  const modelCandidates=[...new Set([preferredModel,"gemini-3.7-flash","gemini-3.6-flash"])];
+  let response=null,payload={},model=preferredModel,lastTransientStatus=0;
+  for(const candidate of modelCandidates){
+   try{
+    const candidateResponse=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(candidate)+":generateContent",{
+     method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+     body:JSON.stringify({systemInstruction:{parts:[{text:systemPrompt}]},contents:[{role:"user",parts:[{text:userPrompt}]}],generationConfig:{thinkingConfig:{thinkingLevel:"low"},maxOutputTokens:2200}}),
+     signal:AbortSignal.timeout(22000)
+    });
+    const candidatePayload=await candidateResponse.json().catch(()=>({}));
+    if(candidateResponse.ok){response=candidateResponse;payload=candidatePayload;model=candidate;break;}
+    const transient=[429,500,502,503,504].includes(candidateResponse.status);
+    console.error("Gemini model attempt failed:",candidate,candidateResponse.status,candidatePayload?.error?.message||"");
+    if(!transient){response=candidateResponse;payload=candidatePayload;model=candidate;break;}
+    lastTransientStatus=candidateResponse.status;
+   }catch(attemptError){
+    console.error("Gemini model attempt timed out:",candidate,attemptError?.message||attemptError);
+    lastTransientStatus=504;
+   }
+  }
+  if(!response){
+   const overloaded=lastTransientStatus===429||lastTransientStatus===503;
+   return res.status(overloaded?503:504).json({error:overloaded?"Gemini está recibiendo muchas solicitudes. El sistema probó modelos alternativos; espera un minuto y vuelve a intentarlo.":"La conexión con Gemini está tardando demasiado. Inténtalo nuevamente en un momento."});
+  }
   const payload=await response.json().catch(()=>({}));
   if(!response.ok){console.error("Gemini lyrics API error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"Gemini alcanzó el límite temporal o de cuota. Revisa el uso de tu API.":"Gemini no pudo generar la letra. Revisa la clave y el modelo configurado."});}
   const lyrics=(payload?.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join("\n").trim();
