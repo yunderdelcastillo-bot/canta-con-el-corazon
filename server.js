@@ -813,7 +813,22 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
  }catch(e){console.error("Update customer order:",e?.message||e);res.status(500).json({error:"No se pudo actualizar el pedido."});}
 });
 
-app.post("/api/lyrics/generate",async(req,res)=>{
+
+app.post("/api/assistant/intake",async(req,res)=>{
+ try{
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();if(!apiKey)return res.status(503).json({error:"El asistente IA no está disponible."});
+  const messages=Array.isArray(req.body?.messages)?req.body.messages.slice(-18):[];
+  if(!messages.length)return res.status(400).json({error:"No hay conversación para revisar."});
+  const transcript=messages.map(m=>(m.role==="assistant"?"Asistente: ":"Cliente: ")+String(m.content||"").slice(0,1800)).join("\\n");
+  const prompt="Extrae los datos de este diálogo para un pedido de canción personalizada. Devuelve SOLO JSON válido con estas claves exactas: buyer, contact, recipient, occasion, story, style, customGenre, voice, specialPhrase, lyricDuration, lyricTone, package, urgency. Usa cadenas vacías para datos no mencionados. No inventes. story debe resumir solo recuerdos/hechos expresados. Si el diálogo no contiene un dato, déjalo vacío.\n\n"+transcript;
+  const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();const models=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];let parsed=null,last=0;
+  for(const model of models){const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",maxOutputTokens:900,temperature:0}}),signal:AbortSignal.timeout(18000)});const d=await r.json().catch(()=>({}));if(r.ok){const raw=(d?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim().replace(/^\u0060\u0060\u0060json/i,"").replace(/\u0060\u0060\u0060$/,"");try{parsed=JSON.parse(raw);break}catch{}}last=r.status;}
+  if(!parsed)return res.status(last===429?429:502).json({error:"No se pudieron organizar los datos. Puedes completar el formulario manualmente."});
+  const allowed=["buyer","contact","recipient","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency"];const data={};for(const k of allowed)data[k]=cleanOrderText(parsed[k],k==="story"?3500:500);
+  res.set("Cache-Control","no-store").json({ok:true,data});
+ }catch(e){console.error("Assistant intake:",e?.message||e);res.status(502).json({error:"No se pudieron pasar los datos al formulario."});}
+});
+\napp.post("/api/lyrics/generate",async(req,res)=>{
  try{
   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"La IA de letras aún no está conectada. El administrador debe configurar GEMINI_API_KEY en Render."});
