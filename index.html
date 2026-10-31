@@ -827,10 +827,10 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
  if(!orderValue('customerLyricsText')){status.textContent='Primero genera tu letra personalizada.';return;}
  const wa=window.open('about:blank','_blank');button.disabled=true;status.textContent='Registrando tu pedido y enviándolo por WhatsApp…';
  try{
-  const saved=await saveCustomerOrder();
+  if(!autoSavedOrderId){const saved=await saveCustomerOrder();autoSavedOrderId=saved.orderId||'';}
   const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
   if(wa)wa.location.href=url;else window.location.href=url;
-  status.textContent='💗 ¡Pedido registrado y enviado! La canción se está generando automáticamente. El audio solo estará disponible en tu panel privado; el cliente no podrá escucharlo ni descargarlo desde esta página.';
+  status.textContent='💗 ¡Pedido registrado y enviado! La canción se está generando automáticamente. El audio estará disponible en el panel privado para revisión antes de la entrega.';
  }catch(error){if(wa)wa.close();status.textContent='No se pudo registrar el pedido: '+error.message+'. Tus datos siguen en el formulario.';}
  finally{button.disabled=false;}
 });
@@ -878,7 +878,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
 (function(){
  const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 Bienvenido/a a Canta con el corazón. Creamos canciones personalizadas para expresar lo que sientes y sorprender a alguien especial. 🎶\n\nTe ayudaré a elegir el tipo de regalo, contarme tu historia y escoger la música y la voz. No necesitas llenar el formulario: conversaré contigo y completaré tus datos automáticamente. Al final, prepararé la letra de tu canción para que puedas revisarla. 💝\n\nPara comenzar, ¿cómo te llamas y para quién será la canción?'}];
  const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend');
- const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let awaitingFinalConfirmation=false;let awaitingPackageSelection=false;
+ const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let autoSavedOrderId='';let awaitingFinalConfirmation=false;let awaitingPackageSelection=false;
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
@@ -916,10 +916,18 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo crear la letra.');
    document.getElementById('customerLyricsText').value=lyricData.lyrics;lastLyricsSignature=signature;
   }
-  autoStatus.textContent='💗 ¡Listo! El formulario está completo y tu letra personalizada aparece debajo para que puedas revisarla y editarla.';
+  autoStatus.textContent='La letra está lista. Estoy registrando tu pedido y enviando la canción a generación automática…';
+  try{
+   const saved=await saveCustomerOrder(true);
+   autoSavedOrderId=saved.orderId||'';
+   autoStatus.textContent='💗 ¡Pedido registrado! Tu canción en audio se está generando automáticamente. No necesitas pulsar otro botón; el equipo verificará el pago y revisará el resultado antes de entregarlo.';
+   add('assistant','¡Listo! 💗 Completé el formulario, preparé tu letra y registré tu pedido. La generación del audio comenzó automáticamente; no necesitas entrar al panel ni pulsar otro botón. Te contactaremos para confirmar el pago y la entrega.');
+  }catch(saveError){
+   autoStatus.textContent='La letra está lista, pero no pude registrar el pedido automáticamente: '+saveError.message+'. Tus datos y la letra siguen en el formulario para que puedas enviarlos.';
+   add('assistant','Tu letra está preparada, pero no pude registrar el pedido automáticamente. Tus datos siguen en el formulario y puedes enviarlo por WhatsApp cuando quieras.');
+  }
   document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
   const lyricBox=document.getElementById('customerLyricsText');if(lyricBox)lyricBox.scrollIntoView({behavior:'smooth',block:'center'});
-  add('assistant','¡Tu canción ya está preparada! 💗 He completado el formulario con tus datos y elegido el paquete. Más abajo encontrarás la letra para revisarla o editarla. No volveré a preguntarte lo que ya me contaste.');
   panel.classList.remove('open');
  }
  async function sendMessage(){
