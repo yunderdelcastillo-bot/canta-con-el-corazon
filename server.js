@@ -504,8 +504,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    const overloaded=lastTransientStatus===429||lastTransientStatus===503;
    return res.status(overloaded?503:504).json({error:overloaded?"Gemini está recibiendo muchas solicitudes. El sistema probó modelos alternativos; espera un minuto y vuelve a intentarlo.":"La conexión con Gemini está tardando demasiado. Inténtalo nuevamente en un momento."});
   }
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok){console.error("Gemini lyrics API error:",response.status,payload?.error?.message||"");return res.status(response.status===429?429:502).json({error:response.status===429?"Gemini alcanzó el límite temporal o de cuota. Revisa el uso de tu API.":"Gemini no pudo generar la letra. Revisa la clave y el modelo configurado."});}
+  if(!response.ok){return res.status(502).json({error:"Gemini no pudo generar la letra. Revisa la clave y el modelo configurado."});}
   const lyrics=(payload?.candidates?.[0]?.content?.parts||[]).map(part=>part.text||"").join("\n").trim();
   if(!lyrics)return res.status(502).json({error:"Gemini respondió sin una letra. Inténtalo nuevamente."});
   res.set("Cache-Control","no-store").json({ok:true,lyrics,model});
