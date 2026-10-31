@@ -659,6 +659,47 @@ app.post("/api/lyrics/align",async(req,res)=>{
 const lyricRateLimits=new Map();
 // Asistente Gemini para clientes y administración. Solo conversación: no ejecuta pagos ni modifica pedidos.
 const assistantChatLimits=new Map();
+async function geminiCompletion(messages,{json=false,maxTokens=1200,temperature=0.55}={}) {
+ const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+ if(!apiKey)throw Object.assign(new Error("Gemini no está configurado para el respaldo del asistente."),{status:503});
+ const systemText=messages.filter(m=>m?.role==="system").map(m=>String(m.content||"")).join("\n\n").slice(0,18000);
+ const contents=messages.filter(m=>m?.role!=="system").map(m=>({
+  role:m?.role==="assistant"?"model":"user",
+  parts:[{text:String(m?.content||"").slice(0,9000)}]
+ })).filter(m=>m.parts[0].text);
+ const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+ const candidates=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];
+ let lastError=null;
+ for(const model of candidates){
+  try{
+   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+    method:"POST",
+    headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({
+     ...(systemText?{systemInstruction:{parts:[{text:systemText}]}}:{}),
+     contents,
+     generationConfig:{temperature,maxOutputTokens:maxTokens,...(json?{responseMimeType:"application/json"}:{})}
+    }),
+    signal:AbortSignal.timeout(45000)
+   });
+   const payload=await response.json().catch(()=>({}));
+   if(!response.ok){
+    const detail=String(payload?.error?.message||"Gemini no pudo completar la solicitud.");
+    lastError=Object.assign(new Error(detail),{status:response.status});
+    if([404,429,500,502,503,504].includes(response.status))continue;
+    throw lastError;
+   }
+   const content=(payload?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
+   if(!content)throw Object.assign(new Error("Gemini respondió sin contenido."),{status:502});
+   return {content,model:"gemini/"+model};
+  }catch(error){
+   lastError=error;
+   if(error?.status&&!([404,408,429,500,502,503,504].includes(error.status)))throw error;
+  }
+ }
+ throw lastError||Object.assign(new Error("Gemini no respondió después de varios intentos."),{status:502});
+}
+
 async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.55}={}) {
  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
  if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
@@ -675,6 +716,10 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
    const payload=await response.json().catch(()=>({}));
    if(!response.ok){
     const detail=String(payload?.error?.message||"Groq no pudo completar la solicitud.");
+    if(response.status===429&&process.env.GEMINI_API_KEY){
+     console.warn("Groq rate limit reached; switching this request to Gemini backup.");
+     return await geminiCompletion(messages,{json,maxTokens,temperature});
+    }
     if(response.status===400&&/tool choice is none|model called a tool/i.test(detail)&&model!=="llama-3.3-70b-versatile"){
      console.warn("Groq primary model returned an incompatible tool-call response; switching to conversation fallback model.");
      model="llama-3.3-70b-versatile";
@@ -708,7 +753,7 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
 
 app.post("/api/assistant/chat",async(req,res)=>{
  try{
-  if(!process.env.GROQ_API_KEY)return res.status(503).json({error:"El asistente IA no está disponible en este momento."});
+  if(!process.env.GROQ_API_KEY&&!process.env.GEMINI_API_KEY)return res.status(503).json({error:"El asistente IA no está disponible en este momento."});
   const body=req.body||{};
   const mode=body.mode==="admin"?"admin":"customer";
   let user=null;
@@ -924,7 +969,7 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
 
 app.post("/api/assistant/intake",async(req,res)=>{
  try{
-  if(!process.env.GROQ_API_KEY)return res.status(503).json({error:"El asistente IA no está disponible."});
+  if(!process.env.GROQ_API_KEY&&!process.env.GEMINI_API_KEY)return res.status(503).json({error:"El asistente IA no está disponible."});
   const messages=Array.isArray(req.body?.messages)?req.body.messages.slice(-30):[];
   const customerMessages=messages.filter(m=>m?.role==="user"&&String(m?.content||"").trim()).slice(-15);
   if(!customerMessages.length)return res.status(400).json({error:"No hay respuestas del cliente para revisar."});
@@ -956,7 +1001,7 @@ app.post("/api/assistant/intake",async(req,res)=>{
 
 app.post("/api/lyrics/generate",async(req,res)=>{
  try{
-  if(!process.env.GROQ_API_KEY)return res.status(503).json({error:"La IA de letras aún no está conectada. Configura GROQ_API_KEY en Render."});
+  if(!process.env.GROQ_API_KEY&&!process.env.GEMINI_API_KEY)return res.status(503).json({error:"La IA de letras aún no está conectada. Configura un proveedor de IA en Render."});
   const body=req.body||{};
   const adminRequest=Boolean(req.headers.authorization);
   if(adminRequest){
