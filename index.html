@@ -602,30 +602,32 @@ downloadButton.addEventListener('click',async()=>{
     else if(type==='sparkle'||type==='star')drawSparkle(x,y,8+sticker*2,alpha);
     else drawSparkle(x,y,7,alpha);
    }
-   const lyricCount=lyricLines.length;
    const activeCue=lyricTimeline.find(cue=>motionTime>=cue.start&&motionTime<cue.end);
    let idx=activeCue?activeCue.index:-1;
-   // Durante una pausa entre frases, conserva la última frase hasta su tiempo final.
+   // En pausas vocales se conserva la última frase solo durante un instante breve.
    if(idx<0&&lyricTimeline.length){
     const previous=lyricTimeline.filter(cue=>motionTime>=cue.end).slice(-1)[0];
-    if(previous&&motionTime-previous.end<1.1)idx=previous.index;
+    if(previous&&motionTime-previous.end<0.45)idx=previous.index;
    }
-   const lyric=idx>=0?lyricLines[idx]:'♪ Una canción hecha para ti ♪';
-   const cue=idx>=0?lyricTimeline[idx]:null;
-   const lyricProgress=cue?Math.max(0,Math.min(1,(motionTime-cue.start)/Math.max(.1,cue.end-cue.start))):0;
-   // Contraste y resplandor visibles: la frase activa queda iluminada sobre una banda oscura.
-   ctx.save();ctx.font='bold 30px Georgia,serif';ctx.textAlign='center';
-   const lyricY=1040;
-   ctx.shadowColor='rgba(246,215,140,.72)';ctx.shadowBlur=18;
-   ctx.fillStyle='rgba(12,5,15,.76)';
-   ctx.beginPath();ctx.roundRect(42,lyricY-66,636,120,20);ctx.fill();
-   ctx.shadowBlur=0;ctx.strokeStyle='#f6d78c';ctx.lineWidth=3;ctx.stroke();
-   ctx.shadowColor='#ffd66e';ctx.shadowBlur=24;
-   ctx.fillStyle='#fff7d6';
-   wrapText(ctx,lyric,w/2,lyricY-8,600,38);
-   ctx.shadowBlur=0;ctx.fillStyle='#f2b7d1';
-   ctx.fillRect(74,lyricY+37,588*lyricProgress,4);
-   ctx.restore();
+   // No mostrar frases de relleno: cuando no hay letra cantada, dejar limpia la imagen.
+   if(idx>=0){
+    const lyric=lyricLines[idx];
+    const cue=lyricTimeline[idx];
+    const lyricProgress=cue?Math.max(0,Math.min(1,(motionTime-cue.start)/Math.max(.1,cue.end-cue.start))):0;
+    // Contraste y resplandor visibles: la frase activa queda iluminada sobre una banda oscura.
+    ctx.save();ctx.font='bold 30px Georgia,serif';ctx.textAlign='center';
+    const lyricY=1040;
+    ctx.shadowColor='rgba(246,215,140,.72)';ctx.shadowBlur=18;
+    ctx.fillStyle='rgba(12,5,15,.76)';
+    ctx.beginPath();ctx.roundRect(42,lyricY-66,636,120,20);ctx.fill();
+    ctx.shadowBlur=0;ctx.strokeStyle='#f6d78c';ctx.lineWidth=3;ctx.stroke();
+    ctx.shadowColor='#ffd66e';ctx.shadowBlur=24;
+    ctx.fillStyle='#fff7d6';
+    wrapText(ctx,lyric,w/2,lyricY-8,600,38);
+    ctx.shadowBlur=0;ctx.fillStyle='#f2b7d1';
+    ctx.fillRect(74,lyricY+37,588*lyricProgress,4);
+    ctx.restore();
+   }
    ctx.restore();
    }
    if(recorder.state==='recording')requestAnimationFrame(draw)
