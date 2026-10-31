@@ -695,7 +695,7 @@ app.post("/api/assistant/chat",async(req,res)=>{
   if(now-record.start>60*60*1000){record.start=now;record.count=0;}
   const limit=mode==="admin"?60:25;
   if(record.count>=limit)return res.status(429).json({error:"Alcanzaste el límite temporal del asistente. Inténtalo más tarde."});
-  const history=Array.isArray(body.messages)?body.messages.slice(-10).map(m=>({role:m?.role==="assistant"?"assistant":"user",content:String(m?.content||"").slice(0,1600)})).filter(m=>m.content):[];
+  const history=Array.isArray(body.messages)?body.messages.slice(-30).map(m=>({role:m?.role==="assistant"?"assistant":"user",content:String(m?.content||"").slice(0,1600)})).filter(m=>m.content):[];
   if(!history.some(m=>m.role==="user"))return res.status(400).json({error:"Escribe una consulta para el asistente."});
   record.count++;assistantChatLimits.set(bucket,record);
   let adminContext="";
