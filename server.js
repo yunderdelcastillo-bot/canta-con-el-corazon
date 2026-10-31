@@ -527,7 +527,7 @@ app.post("/api/lyrics/align",async(req,res)=>{
    if(!expected.length)throw new Error("Una línea de la letra está vacía.");
    let best=null;
    const minLength=Math.max(1,Math.floor(expected.length*.65));
-   const maxLength=Math.min(expected.length+Math.max(3,Math.ceil(expected.length*.4),words.length-cursor),expected.length+Math.max(3,Math.ceil(expected.length*.4)));
+   const maxLength=Math.min(words.length-cursor,expected.length+Math.max(3,Math.ceil(expected.length*.4)));
    for(let from=cursor;from<words.length;from++){
     for(let size=minLength;size<=maxLength&&from+size<=words.length;size++){
      const heard=words.slice(from,from+size).map(w=>w.normalized);
@@ -550,7 +550,7 @@ app.post("/api/lyrics/align",async(req,res)=>{
  }finally{
   if(uploadedFileName){
    const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(uploadedFileName)+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
+   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(uploadedFileName.replace(/^files\\//,""))+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
   }
  }
 });
