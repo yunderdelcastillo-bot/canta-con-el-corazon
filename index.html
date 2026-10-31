@@ -102,7 +102,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
   <textarea id="customerLyricsText" rows="16" style="min-height:300px"></textarea>
   <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
-  <button class="btn" id="sendCustomerLyrics" type="button">💬 Enviar pedido y letra por WhatsApp</button>
+  <button class="btn" id="sendCustomerLyrics" type="button" title="Registra el pedido, inicia la generación privada del audio en segundo plano y abre WhatsApp">💬 Enviar pedido y letra por WhatsApp</button>
  </div>
 </div>
 <label for="package">Paquete que deseas</label><select id="package"><option>ESENCIAL — Solo audio — S/20</option><option>DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25</option><option>REGALO COMPLETO — Canción + video con fotos reales — desde S/30</option><option>Quiero que me orienten</option></select>
@@ -830,7 +830,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   if(!autoSavedOrderId){const saved=await saveCustomerOrder();autoSavedOrderId=saved.orderId||'';}
   const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
   if(wa)wa.location.href=url;else window.location.href=url;
-  status.textContent='💗 ¡Pedido registrado y enviado! La canción se está generando automáticamente. El audio estará disponible en el panel privado para revisión antes de la entrega.';
+  status.textContent='💗 ¡Tu pedido quedó registrado! Te contactaremos por WhatsApp para coordinar la confirmación y la entrega.';
  }catch(error){if(wa)wa.close();status.textContent='No se pudo registrar el pedido: '+error.message+'. Tus datos siguen en el formulario.';}
  finally{button.disabled=false;}
 });
@@ -920,8 +920,8 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   try{
    const saved=await saveCustomerOrder(true);
    autoSavedOrderId=saved.orderId||'';
-   autoStatus.textContent='💗 ¡Pedido registrado! Tu canción en audio se está generando automáticamente. No necesitas pulsar otro botón; el equipo verificará el pago y revisará el resultado antes de entregarlo.';
-   add('assistant','¡Listo! 💗 Completé el formulario, preparé tu letra y registré tu pedido. La generación del audio comenzó automáticamente; no necesitas entrar al panel ni pulsar otro botón. Te contactaremos para confirmar el pago y la entrega.');
+   autoStatus.textContent='💗 ¡Pedido registrado! Te contactaremos para coordinar la confirmación y la entrega.';
+   add('assistant','¡Listo! 💗 Completé tu formulario, preparé la letra y registré tu pedido. Te contactaremos por WhatsApp para coordinar la confirmación y la entrega.');
   }catch(saveError){
    autoStatus.textContent='La letra está lista, pero no pude registrar el pedido automáticamente: '+saveError.message+'. Tus datos y la letra siguen en el formulario para que puedas enviarlos.';
    add('assistant','Tu letra está preparada, pero no pude registrar el pedido automáticamente. Tus datos siguen en el formulario y puedes enviarlo por WhatsApp cuando quieras.');
