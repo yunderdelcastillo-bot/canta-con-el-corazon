@@ -772,6 +772,34 @@ app.post("/api/music/generate",async(req,res)=>{
 // Pedidos de clientes: registro separado de canciones. El cliente confirma el envío; el pago se verifica manualmente.
 const orderFields=["buyer","contact","recipient","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency","lyrics"];
 function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
+const orderAudioRateLimits=new Map();
+const orderAudioJobs=new Set();
+async function generateOrderAudio(orderId,order){
+ const jobKey=String(orderId);if(orderAudioJobs.has(jobKey))return;
+ orderAudioJobs.add(jobKey);
+ try{
+  if(!ready())throw new Error("Supabase no está configurado.");
+  if(!process.env.GEMINI_API_KEY)throw new Error("Falta GEMINI_API_KEY.");
+  const lyrics=String(order.lyrics||"").trim();if(lyrics.length<40)throw new Error("La letra no tiene suficientes caracteres.");
+  const now=Date.now(),record=orderAudioRateLimits.get("all")||{start:now,count:0};
+  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  if(record.count>=5)throw new Error("Límite horario de generación automática alcanzado.");
+  record.count++;orderAudioRateLimits.set("all",record);
+  const prompt="Produce una canción completa en español latino, de aproximadamente "+String(order.lyric_duration||"3 minutos").slice(0,40)+". Género: "+String(order.style||"Balada romántica").slice(0,120)+". Interpretación vocal: "+String(order.voice||"Voz femenina").slice(0,80)+". "+(order.custom_genre?"Dirección musical adicional: "+String(order.custom_genre).slice(0,180)+". ":"")+"Dedicatoria para "+String(order.recipient||"").slice(0,120)+", ocasión: "+String(order.occasion||"").slice(0,100)+". Conserva nombres propios y hechos, no inventes detalles ni imites la voz de artistas. Crea una melodía original con arreglo profesional y una canción terminada.\n\nLyrics:\n"+lyrics.slice(0,12000);
+  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":String(process.env.GEMINI_API_KEY).trim(),"Content-Type":"application/json"},body:JSON.stringify({model:"lyria-3.5",input:prompt}),signal:AbortSignal.timeout(240000)});
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error("Lyria respondió HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,300));
+  let audioBase64="";
+  for(const step of payload.steps||[])if(step.type==="model_output")for(const block of step.content||[])if(block.type==="audio"&&block.data)audioBase64=String(block.data);
+  if(!audioBase64&&payload.output_audio?.data)audioBase64=String(payload.output_audio.data);
+  if(!audioBase64)throw new Error("Lyria no devolvió un archivo de audio reconocible.");
+  const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
+  const {error}=await admin().storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(error)throw error;
+  console.log("Automatic customer song generated:",jobKey,buffer.length);
+ }catch(e){console.error("Automatic customer song failed:",jobKey,e?.message||e);}
+ finally{orderAudioJobs.delete(jobKey);}
+}
 app.post("/api/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado. Escríbenos por WhatsApp para continuar."});
@@ -791,6 +819,7 @@ app.post("/api/orders",async(req,res)=>{
   rec.count++;assistantChatLimits.set(bucket,rec);
   const {data,error}=await admin().from("customer_orders").insert(order).select("id,created_at").single();
   if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
+  if(order.lyrics&&order.lyrics.length>=40)setImmediate(()=>{generateOrderAudio(data.id,order);});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
@@ -798,10 +827,31 @@ app.get("/api/admin/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
-  const {data,error}=await admin().from("customer_orders").select("*").order("created_at",{ascending:false}).limit(200);
+  const db=admin();
+  const {data,error}=await db.from("customer_orders").select("*").order("created_at",{ascending:false}).limit(200);
   if(error)throw error;
-  res.set("Cache-Control","no-store").json({ok:true,orders:data||[]});
+  const {data:audioFiles,error:audioError}=await db.storage.from("songs-audio").list("orders",{limit:1000});
+  if(audioError)throw audioError;
+  const audioNames=new Set((audioFiles||[]).map(file=>file.name));
+  const orders=(data||[]).map(order=>({...order,audio_ready:audioNames.has(order.id+".mp3")}));
+  res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
+});
+app.get("/api/admin/orders/:id/audio",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión nuevamente en el panel administrador."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const path="orders/"+id+".mp3";
+  const {data:files,error:listError}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
+  if(listError)throw listError;
+  if(!(files||[]).some(file=>file.name===id+".mp3"))return res.status(404).json({error:"La canción aún se está generando o no pudo completarse."});
+  const {data,error}=await db.storage.from("songs-audio").createSignedUrl(path,600);
+  if(error||!data?.signedUrl)throw error||new Error("No se pudo crear el enlace privado.");
+  res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
+ }catch(e){console.error("Admin customer audio:",e?.message||e);res.status(500).json({error:"No se pudo abrir el audio privado."});}
 });
 app.patch("/api/admin/orders/:id",async(req,res)=>{
  try{
