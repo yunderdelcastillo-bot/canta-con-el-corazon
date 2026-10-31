@@ -928,7 +928,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   Object.keys(data).forEach(k=>{if(String(data[k]||'').trim())cachedOrderData[k]=data[k];});
   fillForm(cachedOrderData);return cachedOrderData;
  }
- function isReady(data){return Boolean(data?.buyer&&data?.recipient&&data?.occasion&&data?.story&&data?.style);}
+ function isReady(data){return Boolean(data?.buyer&&data?.contact&&data?.recipient&&data?.occasion&&data?.story&&data?.style);}
  async function transferToForm(){
   conversationTransferred=true;
   try{await extractConversation();}catch(e){console.warn('Se conservan los datos aunque falle la extracción:',e?.message||e);fillForm(cachedOrderData);}
@@ -946,16 +946,15 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    if(finalQuestionAsked){finalQuestionAsked=false;await transferToForm();return;}
    const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
-   messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
+   messages.push({role:'assistant',content:d.answer});
    let collected=cachedOrderData;
    try{collected=await extractConversation();}catch(e){console.warn('Extracción temporal pendiente:',e?.message||e);}
    if(isReady(collected)){
-    if(!/¿Deseas agregar algo más a tu canción o a la dedicatoria\?/i.test(String(d.answer||''))){
-     add('assistant','Ya tengo tus datos principales y no volveré a preguntártelos. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
-    }
+    if(!/¿Deseas agregar algo más a tu canción o a la dedicatoria\?/i.test(String(d.answer||''))){add('assistant','Ya tengo tus datos principales y no volveré a preguntártelos. ¿Deseas agregar algo más a tu canción o a la dedicatoria?');}
+    else{add('assistant',d.answer);}
     finalQuestionAsked=true;
     autoStatus.textContent='Ya reuní tus datos principales. Solo espero saber si deseas agregar algún detalle más.';
-   }else{autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';}
+   }else{add('assistant',d.answer);autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';}
   }catch(e){
    add('assistant','La conexión con la IA tuvo un problema temporal. 💗 Tus respuestas siguen en esta conversación; vuelve a intentarlo y no tendrás que empezar de nuevo.');
    autoStatus.textContent='La conversación se conserva. Puedes volver a enviar tu último mensaje.';
