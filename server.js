@@ -789,12 +789,12 @@ async function generateOrderAudio(orderId,order){
   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":String(process.env.GEMINI_API_KEY).trim(),"Content-Type":"application/json"},body:JSON.stringify({model:"lyria-3.5",input:prompt}),signal:AbortSignal.timeout(240000)});
   const payload=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error("Lyria respondió HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,300));
-  let audioBase64="";
-  for(const step of payload.steps||[])if(step.type==="model_output")for(const block of step.content||[])if(block.type==="audio"&&block.data)audioBase64=String(block.data);
-  if(!audioBase64&&payload.output_audio?.data)audioBase64=String(payload.output_audio.data);
+  let audioBase64="",audioMime="audio/mpeg";
+  for(const step of payload.steps||[])if(step.type==="model_output")for(const block of step.content||[])if(block.type==="audio"&&block.data){audioBase64=String(block.data);audioMime=String(block.mime_type||"audio/mpeg");}
+  if(!audioBase64&&payload.output_audio?.data){audioBase64=String(payload.output_audio.data);audioMime=String(payload.output_audio.mime_type||"audio/mpeg");}
   if(!audioBase64)throw new Error("Lyria no devolvió un archivo de audio reconocible.");
   const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
-  const {error}=await admin().storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+  const {error}=await admin().storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
   if(error)throw error;
   console.log("Automatic customer song generated:",jobKey,buffer.length);
  }catch(e){console.error("Automatic customer song failed:",jobKey,e?.message||e);}
