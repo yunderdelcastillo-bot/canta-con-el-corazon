@@ -129,7 +129,11 @@ document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 let lyricLines=[];
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
-if(lyricText){lyricLines=lyricText.split('|').map(s=>s.trim()).filter(Boolean);if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}}
+if(lyricText){
+ const cleanLyrics=lyricText.replace(/\\[(?:verso|coro|puente|intro|outro|pre[- ]?coro)[^\\]]*\\]/gi,'|').replace(/\\r/g,'');
+ lyricLines=cleanLyrics.split(/[|\\n]+/).flatMap(part=>part.split(/(?<=[.!?])\\s+/)).map(part=>part.replace(/^[-•\\s]+|[-•\\s]+$/g,'').trim()).filter(part=>part.length>2);
+ if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}
+}
 const API_BASE='https://canta-corazon-private-api.onrender.com';
 const sharedVideoUrl=params.get('video')||'';
 if(sharedVideoUrl){
@@ -523,23 +527,28 @@ downloadButton.addEventListener('click',async()=>{
    ctx.restore();
    const shade=ctx.createLinearGradient(0,440,0,h);shade.addColorStop(0,'rgba(24,10,24,.02)');shade.addColorStop(.48,'rgba(24,10,24,.20)');shade.addColorStop(1,'rgba(14,7,18,.68)');ctx.fillStyle=shade;ctx.fillRect(0,420,w,h-420);
    ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 24px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,90);
-   ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
-   const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
-   ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
+   // La dedicatoria solo acompaña la introducción y desaparece para dejar protagonismo a la letra.
+   const introAlpha=Math.max(0,Math.min(1,(6.5-motionTime)/1.4));
+   if(introAlpha>0){
+    ctx.save();ctx.globalAlpha=introAlpha;
+    ctx.fillStyle='rgba(12,5,15,.34)';ctx.fillRect(45,650,630,270);
+    ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
+    const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
+    ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
+    ctx.restore();
+   }
    const lyricCount=lyricLines.length;
-   const idx=lyricCount&&audioEl.duration?Math.min(lyricCount-1,Math.floor(audioEl.currentTime/audioEl.duration*lyricCount)):-1;
+   const idx=lyricCount&&audioEl.duration?Math.min(lyricCount-1,Math.floor(Math.max(0,motionTime-2)/Math.max(.1,audioEl.duration-2)*lyricCount)):-1;
    const lyric=idx>=0?lyricLines[idx]:'♪ Una canción hecha para ti ♪';
-   // Resalta la línea activa mientras avanza la canción (tiempo repartido entre líneas).
-   ctx.font='bold 30px Georgia,serif';
-   const lyricWidth=Math.min(640,Math.max(250,ctx.measureText(lyric).width+54));
-   const lyricY=1010;
-   ctx.save();
-   ctx.shadowColor='rgba(246,215,140,.65)';ctx.shadowBlur=18;
-   ctx.fillStyle='rgba(246,215,140,.16)';
-   const pillX=(w-lyricWidth)/2;ctx.beginPath();ctx.roundRect(pillX,lyricY-42,lyricWidth,58,18);ctx.fill();
-   ctx.shadowBlur=0;ctx.strokeStyle='#f6d78c';ctx.lineWidth=2;ctx.stroke();
-   ctx.fillStyle='#fff0b8';ctx.textAlign='center';
-   wrapText(ctx,lyric,w/2,lyricY,Math.min(600,lyricWidth-30),38);
+   // Cada frase aparece por separado y cambia de color con brillo al avanzar la canción.
+   ctx.save();ctx.font='bold 30px Georgia,serif';ctx.textAlign='center';
+   const lyricY=1040;
+   ctx.shadowColor='rgba(246,215,140,.85)';ctx.shadowBlur=22;
+   ctx.fillStyle='rgba(246,215,140,.24)';
+   ctx.beginPath();ctx.roundRect(48,lyricY-62,624,112,18);ctx.fill();
+   ctx.shadowBlur=0;ctx.strokeStyle='#f6d78c';ctx.lineWidth=3;ctx.stroke();
+   ctx.fillStyle='#ffe08a';
+   wrapText(ctx,lyric,w/2,lyricY-8,600,38);
    ctx.restore();
    ctx.restore();
    }
