@@ -866,29 +866,77 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
- async function syncConversation(generateNow=false){autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';try{
-   const intake=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});const extracted=await intake.json();if(!intake.ok)throw new Error(extracted.error||'No se pudieron organizar los datos.');
-   const data=extracted.data||{};fillForm(data);
-   const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
-   if(!ready){autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';return;}
-   if(!generateNow){autoStatus.textContent='Ya reuní los datos principales. Puedes añadir un último detalle si lo deseas.';return;}
-   const signature=JSON.stringify([data.recipient,data.occasion,data.story,data.style,data.voice,data.customGenre,data.specialPhrase,data.lyricDuration,data.lyricTone]);
-   if(signature!==lastLyricsSignature){
-    autoStatus.textContent='Ya tengo los datos principales. La IA está escribiendo tu letra personalizada…';
-    const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyer:data.buyer,recipient:data.recipient,occasion:data.occasion,story:data.story,style:data.style,voice:data.voice,customGenre:data.customGenre,phrase:data.specialPhrase,duration:data.lyricDuration,tone:data.lyricTone})});
-    const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo crear la letra.');
-    document.getElementById('customerLyricsText').value=lyricData.lyrics;lastLyricsSignature=signature;
-    autoStatus.textContent='¡Listo! La IA completó tus datos y preparó la letra. Revisa el formulario y envía tu pedido cuando estés conforme.';
-    document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
-   }else{autoStatus.textContent='Tus datos y tu letra ya están completados automáticamente.';}
-  }catch(e){autoStatus.textContent='Sigo aquí para ayudarte. '+e.message;}
+ async function extractConversation(){
+  const intake=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});
+  const extracted=await intake.json();if(!intake.ok)throw new Error(extracted.error||'No se pudieron organizar los datos.');
+  const data=extracted.data||{};fillForm(data);return data;
  }
- async function sendMessage(){const content=input.value.trim();if(!content)return;messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
+ async function syncConversation(){
+  autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';
   try{
-   if(awaitingFinalConfirmation){awaitingFinalConfirmation=false;await syncConversation(true);return;}
-   const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);await syncConversation(false);awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
+   const data=await extractConversation();
+   const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
+   autoStatus.textContent=ready?'Ya reuní tus datos. Al terminar de elegir el paquete, completaré el formulario y prepararé tu letra.':'Voy completando tus datos automáticamente mientras conversamos.';
+   return data;
+  }catch(e){autoStatus.textContent='Sigo aquí para ayudarte. '+e.message;throw e;}
+ }
+ function packageChoice(text,data){
+  const t=String(text||'').toLowerCase();
+  if(/\b(esencial|solo audio|audio solamente|solo mp3|opci[oó]n\s*1|paquete\s*1|primer[oa])\b/.test(t))return 'ESENCIAL — Solo audio — S/20';
+  if(/\b(detalle especial|video con dedicatoria|im[aá]genes ilustrativas|opci[oó]n\s*2|paquete\s*2|segund[oa])\b/.test(t))return 'DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25';
+  if(/\b(regalo completo|fotos reales|fotograf[ií]as reales|opci[oó]n\s*3|paquete\s*3|tercer[oa])\b/.test(t))return 'REGALO COMPLETO — Canción + video con fotos reales — desde S/30';
+  const v=String(data?.package||'').toLowerCase();
+  if(v.includes('esencial'))return 'ESENCIAL — Solo audio — S/20';
+  if(v.includes('detalle especial'))return 'DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25';
+  if(v.includes('regalo completo'))return 'REGALO COMPLETO — Canción + video con fotos reales — desde S/30';
+  return '';
+ }
+ async function prepareLyrics(data,chosenPackage){
+  const complete={...data,package:chosenPackage};fillForm(complete);
+  autoStatus.textContent='¡Perfecto! Estoy completando el formulario y escribiendo tu canción…';
+  const signature=JSON.stringify([complete.buyer,complete.contact,complete.recipient,complete.occasion,complete.story,complete.style,complete.voice,complete.customGenre,complete.specialPhrase,complete.lyricDuration,complete.lyricTone,chosenPackage]);
+  if(signature!==lastLyricsSignature){
+   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({buyer:complete.buyer,recipient:complete.recipient,occasion:complete.occasion,story:complete.story,style:complete.style,voice:complete.voice,customGenre:complete.customGenre,phrase:complete.specialPhrase,duration:complete.lyricDuration,tone:complete.lyricTone})});
+   const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo crear la letra.');
+   document.getElementById('customerLyricsText').value=lyricData.lyrics;lastLyricsSignature=signature;
   }
-  catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
+  autoStatus.textContent='💗 ¡Listo! El formulario está completo y tu letra personalizada aparece debajo para que puedas revisarla y editarla.';
+  document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
+  const lyricBox=document.getElementById('customerLyricsText');if(lyricBox)lyricBox.scrollIntoView({behavior:'smooth',block:'center'});
+  add('assistant','¡Tu canción ya está preparada! 💗 He completado el formulario con tus datos y elegido el paquete. Más abajo encontrarás la letra para revisarla o editarla. No volveré a preguntarte lo que ya me contaste.');
+ }
+ async function sendMessage(){
+  const content=input.value.trim();if(!content)return;
+  messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
+  try{
+   if(awaitingFinalConfirmation){
+    awaitingFinalConfirmation=false;
+    const data=await syncConversation();
+    const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
+    if(!ready){add('assistant','Me falta algún dato importante para preparar tu canción. Completemos solo lo que falta, sin repetir lo que ya me contaste.');return;}
+    awaitingPackageSelection=true;
+    add('assistant','¡Gracias! 💗 Ahora elige cómo quieres entregar tu regalo musical:\n\n1. ESENCIAL — Solo canción en audio MP3: S/20.\n2. DETALLE ESPECIAL — Canción + video con dedicatoria e imágenes ilustrativas (sin fotos reales): S/25.\n3. REGALO COMPLETO — Canción + video con tus fotografías reales: desde S/30; el precio final se confirma según el trabajo.\n\n¿Cuál de los tres paquetes deseas?');
+    autoStatus.textContent='Tus datos están recopilados. Solo falta elegir el paquete para completar el formulario y generar la letra.';
+    return;
+   }
+   if(awaitingPackageSelection){
+    const data=await extractConversation();
+    const chosen=packageChoice(content,data);
+    if(!chosen){
+     add('assistant','Para continuar, elige uno de estos paquetes: ESENCIAL (S/20), DETALLE ESPECIAL (S/25) o REGALO COMPLETO (desde S/30). Puedes escribir el nombre o el número 1, 2 o 3.');
+     return;
+    }
+    awaitingPackageSelection=false;
+    data.package=chosen;
+    await prepareLyrics(data,chosen);
+    return;
+   }
+   const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
+   messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
+   await syncConversation();
+   awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
+  }catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
   finally{send.disabled=false;send.textContent='Enviar';}
  }
  send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
