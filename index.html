@@ -862,7 +862,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
 (function(){
  const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 Bienvenido/a a Canta con el corazón. Creamos canciones personalizadas para expresar lo que sientes y sorprender a alguien especial. 🎶\n\nTe ayudaré a elegir el tipo de regalo, contarme tu historia y escoger la música y la voz. No necesitas llenar el formulario: conversaré contigo y completaré tus datos automáticamente. Al final, prepararé la letra de tu canción para que puedas revisarla. 💝\n\nPara comenzar, ¿cómo te llamas y para quién será la canción?'}];
  const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend');
- const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let awaitingFinalConfirmation=false;
+ const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let awaitingFinalConfirmation=false;let awaitingPackageSelection=false;
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
@@ -882,9 +882,9 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
  }
  function packageChoice(text,data){
   const t=String(text||'').toLowerCase();
-  if(/\b(esencial|solo audio|audio solamente|solo mp3|opci[oó]n\s*1|paquete\s*1|primer[oa])\b/.test(t))return 'ESENCIAL — Solo audio — S/20';
-  if(/\b(detalle especial|video con dedicatoria|im[aá]genes ilustrativas|opci[oó]n\s*2|paquete\s*2|segund[oa])\b/.test(t))return 'DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25';
-  if(/\b(regalo completo|fotos reales|fotograf[ií]as reales|opci[oó]n\s*3|paquete\s*3|tercer[oa])\b/.test(t))return 'REGALO COMPLETO — Canción + video con fotos reales — desde S/30';
+  if(/^\s*1\s*$/.test(t)||/\b(esencial|solo audio|audio solamente|solo mp3|opci[oó]n\s*1|paquete\s*1|primer[oa])\b/.test(t))return 'ESENCIAL — Solo audio — S/20';
+  if(/^\s*2\s*$/.test(t)||/\b(detalle especial|video con dedicatoria|im[aá]genes ilustrativas|opci[oó]n\s*2|paquete\s*2|segund[oa])\b/.test(t))return 'DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25';
+  if(/^\s*3\s*$/.test(t)||/\b(regalo completo|fotos reales|fotograf[ií]as reales|opci[oó]n\s*3|paquete\s*3|tercer[oa])\b/.test(t))return 'REGALO COMPLETO — Canción + video con fotos reales — desde S/30';
   const v=String(data?.package||'').toLowerCase();
   if(v.includes('esencial'))return 'ESENCIAL — Solo audio — S/20';
   if(v.includes('detalle especial'))return 'DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25';
