@@ -843,4 +843,40 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
 
 
 
-</body></html>
+
+<style>
+#cchAiOpen{position:fixed;right:16px;bottom:18px;z-index:9998;border:0;border-radius:28px;padding:14px 18px;background:#f6d78c;color:#3b1028;font-weight:800;box-shadow:0 6px 25px #0005}
+#cchAiPanel{position:fixed;z-index:9999;right:12px;bottom:78px;width:min(390px,calc(100vw - 24px));height:min(600px,calc(100dvh - 110px));background:#fff7f2;color:#351b2b;border:1px solid #e9a5bd;border-radius:20px;box-shadow:0 12px 40px #0006;display:none;flex-direction:column;overflow:hidden}
+#cchAiPanel.open{display:flex}#cchAiHead{padding:14px;background:#3b1028;color:white;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+#cchAiMessages{padding:12px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:9px}
+.cchAiMsg{padding:10px 12px;border-radius:14px;max-width:90%;white-space:pre-wrap;line-height:1.4;font-size:14px}.cchAiBot{background:#f2e2e9;align-self:flex-start}.cchAiUser{background:#3b1028;color:white;align-self:flex-end}
+#cchAiControls{padding:10px;border-top:1px solid #ead8e1}#cchAiInput{width:100%;padding:11px;border:1px solid #d9c4ce;border-radius:10px;font:inherit}#cchAiSend,#cchAiTransfer{border:0;border-radius:10px;padding:11px;background:#681b43;color:white;font-weight:700;margin-top:8px;width:100%}#cchAiTransfer{background:#93622a}
+</style>
+<button id="cchAiOpen" type="button">✨ ¿Te ayudo con tu canción?</button>
+<section id="cchAiPanel" aria-label="Asistente para pedidos">
+ <div id="cchAiHead"><span>💗 Asistente Canta con el corazón</span><button id="cchAiClose" type="button" style="background:none;color:white;border:0;font-size:22px">×</button></div>
+ <div id="cchAiMessages"><div class="cchAiMsg cchAiBot">¡Hola! 💗 Te ayudaré a preparar tu pedido. Cuéntame: ¿para quién es la canción y qué ocasión quieres celebrar?</div></div>
+ <div id="cchAiControls"><input id="cchAiInput" placeholder="Escribe tu respuesta…" maxlength="1200"><button id="cchAiSend" type="button">Enviar</button><button id="cchAiTransfer" type="button">Pasar mis datos al formulario</button><p style="font-size:11px;margin:7px 0 0;color:#755b69">Revisa y completa los datos antes de enviar tu solicitud. El pago se verifica manualmente.</p></div>
+</section>
+<script>
+(function(){
+ const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 Te ayudaré a preparar tu pedido. Cuéntame: ¿para quién es la canción y qué ocasión quieres celebrar?'}];
+ const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend'),transfer=document.getElementById('cchAiTransfer');
+ const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
+ document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
+ async function sendMessage(){const content=input.value.trim();if(!content)return;messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
+  try{const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);}
+  catch(e){add('assistant',e.message+' Puedes continuar por WhatsApp o completar el formulario.');}
+  finally{send.disabled=false;send.textContent='Enviar';}
+ }
+ send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
+ transfer.onclick=async()=>{transfer.disabled=true;transfer.textContent='Organizando tus datos…';
+  try{const r=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudieron pasar los datos.');
+   const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};
+   Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=d.data?.[k];if(!el||!v)return;const opt=[...el.options||[]].find(o=>o.text.trim().toLowerCase()===v.trim().toLowerCase()||o.value.trim().toLowerCase()===v.trim().toLowerCase());if(el.tagName==='SELECT'){if(opt)el.value=opt.value;}else el.value=v;});
+   document.getElementById('order').scrollIntoView({behavior:'smooth'});panel.classList.remove('open');alert('¡Listo! Pasamos los datos que la IA pudo identificar. Revisa el formulario, completa lo que falte y envía tu solicitud.');
+  }catch(e){alert(e.message);}finally{transfer.disabled=false;transfer.textContent='Pasar mis datos al formulario';}
+ };
+})();
+</script>
+\n</body></html>
