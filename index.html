@@ -951,8 +951,8 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   {field:'lyricDuration',prompt:'¿Qué duración aproximada deseas para la canción: 2, 3 o 4 minutos?'},
   {field:'lyricTone',prompt:'¿Qué emoción quieres transmitir: amor profundo, ternura, alegría, nostalgia, perdón, gratitud, esperanza u otra?'},
   {field:'specialPhrase',prompt:'¿Hay una frase especial, apodo o recuerdo que quieras incluir? Si no, responde «ninguna».'},
-  {field:'package',prompt:'Te explico los paquetes antes de elegir:\n\n1. ESENCIAL — S/20: canción personalizada en MP3.\n2. DETALLE ESPECIAL — S/25: canción + video con dedicatoria e imágenes ilustrativas relacionadas con la letra; no incluye fotos reales.\n3. REGALO COMPLETO — desde S/30: canción + video con fotografías reales que tú nos envías. El precio final se confirma según el trabajo.\n\n¿Cuál de los tres paquetes deseas?'},
-  {field:'urgency',prompt:'¿Cuándo necesitas recibir tu regalo?\n\n• Entrega habitual: 24–48 horas, previa confirmación.\n• Mañana o hoy: sujeto a disponibilidad y confirmación.\n• Express: 30 minutos, con S/5 adicionales al precio del paquete. Por ejemplo, Esencial S/25 o Detalle Especial S/30. Regalo Completo desde S/35. El servicio express no está confirmado hasta que la administradora lo autorice.\n• También puedes indicar una fecha flexible.\n\n¿Qué plazo prefieres?'}
+  {field:'package',prompt:'¡Ahora elige el paquete para tu regalo! 💗\n\n1. ESENCIAL — S/20: tu canción personalizada en MP3.\n2. DETALLE ESPECIAL — S/25: tu canción + un video con dedicatoria e imágenes ilustrativas relacionadas con la letra. No incluye fotografías reales.\n3. REGALO COMPLETO — desde S/30: tu canción + video elaborado con fotografías reales que tú nos enviarás. El precio final depende del trabajo y te lo confirmaremos antes del pago.\n\nPuedes responder ESENCIAL, DETALLE ESPECIAL o REGALO COMPLETO. ¿Cuál eliges?'},
+  {field:'urgency',prompt:'¡Perfecto! Ahora elige cuándo necesitas tu canción. ⏰\n\n1. ENTREGA NORMAL: 24–48 horas, previa confirmación. Sin recargo.\n2. MAÑANA: podemos coordinarla, sujeta a disponibilidad y confirmación.\n3. HOY: sujeta a disponibilidad y confirmación de la administradora.\n4. EXPRESS: entrega en 30 minutos con S/5 adicionales al precio de cualquier paquete. Totales: ESENCIAL S/25; DETALLE ESPECIAL S/30; REGALO COMPLETO desde S/35. Debemos confirmar disponibilidad antes de aceptar el servicio.\n5. FECHA FLEXIBLE: indícanos qué día te conviene y lo coordinamos.\n\n¿Cuál alternativa eliges? Puedes responder normal, mañana, hoy, express o fecha flexible.'}
  ];
  let manualMode=false,manualCurrentField='',manualIndex=0;
  const norm=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
@@ -999,7 +999,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  function beginManualFallback(){
   manualMode=true;
   // Vaciar valores predeterminados para que el modo manual pregunte expresamente estos datos.
-  ['occasion','style','voice','lyricTone'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['occasion','style','voice','lyricTone','package','urgency'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   add('assistant','La IA está temporalmente sin disponibilidad. 💗 No te preocupes: continuaré contigo en modo manual, paso a paso. Te preguntaré todos los datos del pedido y también te explicaré los paquetes, precios, entrega, servicio express y forma de pago. No necesitas reiniciar la conversación.');
   manualIndex=0;askManualNext();
  }
