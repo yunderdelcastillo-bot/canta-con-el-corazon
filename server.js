@@ -663,20 +663,38 @@ async function groqCompletion(messages,{json=false,maxTokens=1200,temperature=0.
  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
  if(!apiKey)throw Object.assign(new Error("Falta GROQ_API_KEY en Render."),{status:503});
  const model="openai/gpt-oss-20b";
- const response=await fetch("https://api.groq.com/openai/v1/chat/completions",{
-  method:"POST",
-  headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
-  body:JSON.stringify({model,messages,temperature,max_completion_tokens:maxTokens,...(json?{response_format:{type:"json_object"}}:{})}),
-  signal:AbortSignal.timeout(30000)
- });
- const payload=await response.json().catch(()=>({}));
- if(!response.ok){
-  console.error("Groq request failed:",response.status,payload?.error?.message||"");
-  throw Object.assign(new Error(payload?.error?.message||"Groq no pudo completar la solicitud."),{status:response.status});
+ let lastError;
+ for(let attempt=0;attempt<3;attempt++){
+  try{
+   const response=await fetch("https://api.groq.com/openai/v1/chat/completions",{
+    method:"POST",
+    headers:{Authorization:"Bearer "+apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({model,messages,temperature,max_completion_tokens:maxTokens,...(json?{response_format:{type:"json_object"}}:{})}),
+    signal:AbortSignal.timeout(30000)
+   });
+   const payload=await response.json().catch(()=>({}));
+   if(!response.ok){
+    const error=Object.assign(new Error(payload?.error?.message||"Groq no pudo completar la solicitud."),{status:response.status});
+    if(![408,429,500,502,503,504].includes(response.status)||attempt===2){
+     console.error("Groq request failed:",response.status,payload?.error?.message||"");
+     throw error;
+    }
+    lastError=error;
+    const retryAfter=Number(response.headers.get("retry-after")||0);
+    await new Promise(resolve=>setTimeout(resolve,Math.min(5000,Math.max(900,retryAfter*1000,900*(attempt+1)))));
+    continue;
+   }
+   const content=String(payload?.choices?.[0]?.message?.content||"").trim();
+   if(!content)throw Object.assign(new Error("Groq respondió sin contenido."),{status:502});
+   return {content,model:payload.model||model};
+  }catch(error){
+   lastError=error;
+   if(error?.status&&!([408,429,500,502,503,504].includes(error.status)))throw error;
+   if(attempt===2)throw error;
+   await new Promise(resolve=>setTimeout(resolve,900*(attempt+1)));
+  }
  }
- const content=String(payload?.choices?.[0]?.message?.content||"").trim();
- if(!content)throw Object.assign(new Error("Groq respondió sin contenido."),{status:502});
- return {content,model:payload.model||model};
+ throw lastError||Object.assign(new Error("Groq no respondió después de varios intentos."),{status:502});
 }
 
 app.post("/api/assistant/chat",async(req,res)=>{
