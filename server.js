@@ -853,6 +853,21 @@ app.get("/api/admin/orders/:id/audio",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
  }catch(e){console.error("Admin customer audio:",e?.message||e);res.status(500).json({error:"No se pudo abrir el audio privado."});}
 });
+app.post("/api/admin/orders/:id/audio",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const audioBase64=String(req.body?.audioBase64||"").replace(/^data:audio\/[^;]+;base64,/i,"");
+  if(!audioBase64||audioBase64.length>35*1024*1024)return res.status(400).json({error:"El audio está vacío o supera el límite permitido."});
+  const db=admin();const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
+  const {error}=await db.storage.from("songs-audio").upload("orders/"+id+".mp3",buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(error)throw error;
+  res.set("Cache-Control","no-store").json({ok:true,audio_ready:true});
+ }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el audio en el pedido."});}
+});
 app.patch("/api/admin/orders/:id",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
