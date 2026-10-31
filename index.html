@@ -830,14 +830,14 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
  try{
   if(!autoSavedOrderId){const saved=await saveCustomerOrder();autoSavedOrderId=saved.orderId||'';}
   if(!autoSavedOrderId)throw new Error('No se recibió el número del pedido.');
-  status.textContent='🎵 Estamos generando tu audio en segundo plano. Puedes esperar; no necesitas hacer nada más.';
+  status.textContent='🎵 Estamos preparando tu sorpresa. Espera nuestro mensaje por WhatsApp; no necesitas hacer nada más.';
   const deadline=Date.now()+270000;
   while(Date.now()<deadline){
    await new Promise(resolve=>setTimeout(resolve,5000));
    const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(autoSavedOrderId)+'/audio-status',{cache:'no-store'});
    const data=await check.json().catch(()=>({}));
    if(!check.ok)throw new Error(data.error||'No se pudo consultar el estado del audio.');
-   if(data.status==='ready'){status.textContent='💗 ¡Tu canción ya está lista y guardada de forma privada!';return;}
+   if(data.status==='ready'){status.textContent='💗 💗 ¡Tu sorpresa está en camino! Espera nuestro mensaje por WhatsApp.';return;}
    if(data.status==='failed'){status.textContent='No se pudo generar el audio automáticamente. Puedes enviarnos tu pedido por WhatsApp para prepararlo manualmente.';fallback.classList.remove('hidden');return;}
   }
   status.textContent='La generación está tardando más de lo esperado. Puedes enviarnos tu pedido por WhatsApp para continuar manualmente.';
