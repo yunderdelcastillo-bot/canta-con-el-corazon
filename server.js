@@ -442,17 +442,31 @@ app.get("/api/convert-video-status/:jobId",(req,res)=>{
  res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
 });
 
-// Sincronización de letra con voz: Gemini analiza el MP3 y devuelve tiempos por frase.
+// Sincronización real: Gemini 3.5 Transcribe entrega marcas de tiempo por palabra.
 const lyricAlignLimits=new Map();
+function normalizeAlignWord(value){
+ return String(value||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^\\p{L}\\p{N}]/gu,"");
+}
+function tokenEditDistance(a,b){
+ const prev=Array.from({length:b.length+1},(_,i)=>i);
+ for(let i=1;i<=a.length;i++){
+  let diagonal=prev[0];prev[0]=i;
+  for(let j=1;j<=b.length;j++){
+   const above=prev[j],cost=a[i-1]===b[j-1]?0:1;
+   prev[j]=Math.min(prev[j]+1,prev[j-1]+1,diagonal+cost);diagonal=above;
+  }
+ }
+ return prev[b.length];
+}
 app.post("/api/lyrics/align",async(req,res)=>{
+ let uploadedFileName="";
  try{
   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"La sincronización IA no está conectada en el servidor."});
-  const body=req.body||{};
-  const audioBase64=String(body.audioBase64||"");
-  const lyrics=Array.isArray(body.lyrics)?body.lyrics.map(x=>String(x||"").trim()).filter(Boolean):[];
+  const body=req.body||{},audioBase64=String(body.audioBase64||"");
+  const lyrics=Array.isArray(body.lyrics)?body.lyrics.map(x=>String(x||"").trim()):[];
   const duration=Number(body.duration);
-  if(!audioBase64||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||!Number.isFinite(duration)||duration<5||duration>900){
+  if(!audioBase64||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800){
    return res.status(400).json({error:"El audio, la letra o la duración no son válidos. El MP3 debe pesar menos de 18 MB."});
   }
   const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
@@ -462,41 +476,83 @@ app.post("/api/lyrics/align",async(req,res)=>{
   record.count++;lyricAlignLimits.set(ip,record);
   const audio=Buffer.from(audioBase64,"base64");
   if(!audio.length||audio.length>18*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 18 MB para sincronización."});
-  const lyricList=lyrics.map((line,index)=>({index,text:line}));
-  const prompt="Escucha el audio adjunto completo y alinea estas frases exactas de la letra con la voz cantada. Devuelve para CADA frase su instante real de inicio (cuando comienza a cantarse) y fin (cuando termina de cantarse), en segundos desde el inicio del archivo. No distribuyas los tiempos proporcionalmente, no inventes ni fuerces una frase dentro de una pausa instrumental. Sigue el orden de la letra. Si una frase se repite, asigna cada aparición a la línea correspondiente en orden. Los tiempos deben estar dentro de la duración indicada ("+duration.toFixed(2)+" segundos). Devuelve exclusivamente JSON válido con esta forma: {\"segments\":[{\"index\":0,\"start\":1.2,\"end\":4.8},...]}. Debe haber exactamente "+lyrics.length+" segmentos, uno por cada índice, sin omitir líneas. Mantén los tiempos cronológicos y no superpongas frases. Letra numerada: "+JSON.stringify(lyricList);
-  const candidates=[String(process.env.GEMINI_ALIGN_MODEL||"gemini-2.5-flash").trim(),"gemini-2.5-flash","gemini-2.0-flash"];
-  let result=null,lastStatus=0;
-  for(const model of [...new Set(candidates)]){
-   try{
-    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-     method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-     body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:"audio/mpeg",data:audio.toString("base64")}}]}],generationConfig:{responseMimeType:"application/json",temperature:0,maxOutputTokens:5000}}),
-     signal:AbortSignal.timeout(90000)
-    });
-    const payload=await response.json().catch(()=>({}));
-    if(response.ok){result=payload;break;}
-    lastStatus=response.status;console.error("Gemini audio alignment failed:",model,response.status,payload?.error?.message||"");
-    if(![429,500,502,503,504].includes(response.status))break;
-   }catch(error){lastStatus=504;console.error("Gemini audio alignment timeout:",model,error?.message||error);}
-  }
-  if(!result)return res.status(lastStatus===429||lastStatus===503?503:502).json({error:"Gemini no pudo analizar el audio ahora. No se generará un video con la letra adelantada; vuelve a intentarlo."});
-  const raw=(result?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
-  let parsed;
-  try{parsed=JSON.parse(raw.replace(/^\uFEFF/,"").replace(/^\s*```(?:json)?/i,"").replace(/```\s*$/,"").trim());}
-  catch{console.error("Gemini alignment returned invalid JSON:",raw.slice(0,500));return res.status(502).json({error:"La IA no devolvió una sincronización válida. Inténtalo nuevamente."});}
-  const supplied=Array.isArray(parsed.segments)?parsed.segments:[];
-  const byIndex=new Map(supplied.map(s=>[Number(s.index),s]));
-  const segments=[];
-  for(let i=0;i<lyrics.length;i++){
-   const s=byIndex.get(i),start=Number(s?.start),end=Number(s?.end);
-   if(!Number.isFinite(start)||!Number.isFinite(end)||start<0||end<=start||end>duration+0.5||end-start>18){
-    return res.status(502).json({error:"La IA no pudo ubicar con fiabilidad todas las frases de la letra. Vuelve a intentarlo."});
+
+  // Files API: Google recomienda subir los audios de varios segundos antes de transcribirlos.
+  const uploadStart=await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files?key="+encodeURIComponent(apiKey),{
+   method:"POST",headers:{
+    "X-Goog-Upload-Protocol":"resumable","X-Goog-Upload-Command":"start",
+    "X-Goog-Upload-Header-Content-Length":String(audio.length),
+    "X-Goog-Upload-Header-Content-Type":"audio/mpeg","Content-Type":"application/json"
+   },body:JSON.stringify({file:{display_name:"cch-lyric-align-"+crypto.randomUUID()}}),
+   signal:AbortSignal.timeout(30000)
+  });
+  if(!uploadStart.ok)throw new Error("Google no aceptó el archivo de audio ("+uploadStart.status+").");
+  const uploadUrl=uploadStart.headers.get("x-goog-upload-url");
+  if(!uploadUrl)throw new Error("Google no devolvió la dirección de carga del audio.");
+  const uploaded=await fetch(uploadUrl,{
+   method:"POST",headers:{"X-Goog-Upload-Offset":"0","X-Goog-Upload-Command":"upload, finalize","Content-Length":String(audio.length),"Content-Type":"audio/mpeg"},
+   body:audio,signal:AbortSignal.timeout(90000)
+  });
+  const uploadedPayload=await uploaded.json().catch(()=>({}));
+  if(!uploaded.ok||!uploadedPayload?.file?.uri)throw new Error("No se pudo subir el MP3 al servicio de transcripción.");
+  const fileUri=uploadedPayload.file.uri;
+  uploadedFileName=String(uploadedPayload.file.name||"");
+
+  const transcriptionResponse=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
+   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+   body:JSON.stringify({
+    model:"gemini-3.5-transcribe",
+    input:[{type:"audio",uri:fileUri,mime_type:"audio/mpeg"}],
+    generation_config:{transcription_config:{language_codes:["es-419"],mode:{type:"verbatim",timestamp_granularities:["word"]}}}
+   }),signal:AbortSignal.timeout(120000)
+  });
+  const interaction=await transcriptionResponse.json().catch(()=>({}));
+  if(!transcriptionResponse.ok)throw new Error("Gemini Transcribe no pudo analizar la voz ("+transcriptionResponse.status+").");
+  const words=[];
+  for(const step of interaction.steps||[]){
+   for(const content of step.content||[]){
+    for(const annotation of content.annotations||[]){
+     if(annotation.type!=="word_info")continue;
+     const text=String(annotation.text||"").trim(),startSeconds=parseFloat(String(annotation.start_offset||"")),endSeconds=parseFloat(String(annotation.end_offset||""));
+     const normalized=normalizeAlignWord(text);
+     if(normalized&&Number.isFinite(startSeconds)&&Number.isFinite(endSeconds)&&endSeconds>startSeconds)words.push({text,normalized,start:startSeconds,end:endSeconds});
+    }
    }
-   if(i&&start<segments[i-1].end-0.15)return res.status(502).json({error:"La IA devolvió tiempos fuera de orden. Vuelve a sincronizar la canción."});
-   segments.push({index:i,start:Math.max(0,start),end:Math.min(duration,end)});
   }
-  res.set("Cache-Control","no-store").json({ok:true,segments,model:String(process.env.GEMINI_ALIGN_MODEL||"gemini-2.5-flash")});
- }catch(error){console.error("Lyric alignment route:",error?.message||error);res.status(502).json({error:"No se pudo completar el análisis de voz. Inténtalo nuevamente."});}
+  if(!words.length)throw new Error("Gemini no devolvió marcas de tiempo por palabra para este audio.");
+
+  const segments=[];let cursor=0;
+  for(let lineIndex=0;lineIndex<lyrics.length;lineIndex++){
+   const expected=lyrics[lineIndex].split(/\\s+/).map(normalizeAlignWord).filter(Boolean);
+   if(!expected.length)throw new Error("Una línea de la letra está vacía.");
+   let best=null;
+   const minLength=Math.max(1,Math.floor(expected.length*.65));
+   const maxLength=Math.min(expected.length+Math.max(3,Math.ceil(expected.length*.4),words.length-cursor),expected.length+Math.max(3,Math.ceil(expected.length*.4)));
+   for(let from=cursor;from<words.length;from++){
+    for(let size=minLength;size<=maxLength&&from+size<=words.length;size++){
+     const heard=words.slice(from,from+size).map(w=>w.normalized);
+     const score=tokenEditDistance(expected,heard)/Math.max(expected.length,heard.length);
+     if(!best||score<best.score-0.0001||(Math.abs(score-best.score)<0.0001&&from<best.from))best={from,size,score};
+     if(best&&best.score===0&&from>best.from)break;
+    }
+    if(best&&best.score===0)break;
+   }
+   if(!best||best.score>0.48)throw new Error("No se pudo reconocer con suficiente precisión la frase "+(lineIndex+1)+": "+lyrics[lineIndex]);
+   const first=words[best.from],last=words[best.from+best.size-1];
+   segments.push({index:lineIndex,start:Math.max(0,first.start),end:Math.min(duration,last.end)});
+   cursor=best.from+best.size;
+  }
+  res.set("Cache-Control","no-store").json({ok:true,segments,model:"gemini-3.5-transcribe",timing:"word-level"});
+ }catch(error){
+  console.error("Lyric alignment route:",error?.message||error);
+  const message=String(error?.message||"");
+  res.status(502).json({error:message.startsWith("No se pudo reconocer")||message.startsWith("Una línea")?message:"No se pudo completar la transcripción con marcas de tiempo. No se generará un video desincronizado; inténtalo nuevamente."});
+ }finally{
+  if(uploadedFileName){
+   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(uploadedFileName)+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
+  }
+ }
 });
 
 // Generador de letras originales mediante proveedor compatible con OpenAI.
