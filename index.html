@@ -104,6 +104,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
   <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
   <button class="btn" id="sendCustomerLyrics" type="button">🎵 Generar audio en segundo plano</button>
   <button class="btn alt hidden" id="sendCustomerLyricsWhatsApp" type="button">💬 Enviar pedido y letra por WhatsApp</button>
+   <button class="btn hidden" id="notifyAdminAudioReady" type="button">✅ Avisarnos por WhatsApp: canción generada</button>
  </div>
 </div>
 <label for="package">Paquete que deseas</label><select id="package"><option>ESENCIAL — Solo audio — S/20</option><option>DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25</option><option>REGALO COMPLETO — Canción + video con fotos reales — desde S/30</option><option>Quiero que me orienten</option></select>
@@ -837,7 +838,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(autoSavedOrderId)+'/audio-status',{cache:'no-store'});
    const data=await check.json().catch(()=>({}));
    if(!check.ok)throw new Error(data.error||'No se pudo consultar el estado del audio.');
-   if(data.status==='ready'){status.textContent='💗 💗 ¡Tu sorpresa está en camino! Espera nuestro mensaje por WhatsApp.';return;}
+   if(data.status==='ready'){status.textContent='💗 ¡Tu canción se generó correctamente y ya está guardada! Pulsa el botón para avisarnos. Revisaremos tu pedido y el audio desde nuestra plataforma antes de coordinar la entrega.';document.getElementById('notifyAdminAudioReady').classList.remove('hidden');return;}
    if(data.status==='failed'){status.textContent='No se pudo generar el audio automáticamente. Puedes enviarnos tu pedido por WhatsApp para prepararlo manualmente.';fallback.classList.remove('hidden');return;}
   }
   status.textContent='La generación está tardando más de lo esperado. Puedes enviarnos tu pedido por WhatsApp para continuar manualmente.';
@@ -847,6 +848,21 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   fallback.classList.remove('hidden');
  }finally{button.disabled=false;}
 });
+document.getElementById('notifyAdminAudioReady').addEventListener('click',()=>{
+  if(!autoSavedOrderId){alert('No encontramos el número de tu pedido. Escríbenos por WhatsApp para ayudarte.');return;}
+  const message=[
+   '💗 ¡Hola! Mi canción personalizada ya se generó correctamente.',
+   '📋 Pedido: '+autoSavedOrderId,
+   '👤 Cliente: '+orderValue('buyer'),
+   '🎁 Para: '+orderValue('recipient'),
+   '📦 Paquete: '+orderValue('package'),
+   '🎵 Estado: audio generado y listo para revisión en la plataforma.',
+   'Por favor, revisen mi pedido. ¡Gracias!'
+  ].join('\\n');
+  const url='https://wa.me/51977974730?text='+encodeURIComponent(message);
+  const wa=window.open(url,'_blank');
+  if(!wa)window.location.href=url;
+ });
 document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',()=>{
  const wa=window.open('about:blank','_blank');
  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
