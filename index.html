@@ -912,9 +912,6 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
   try{
    if(awaitingFinalConfirmation){
     awaitingFinalConfirmation=false;
-    const data=await syncConversation();
-    const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
-    if(!ready){add('assistant','Me falta algún dato importante para preparar tu canción. Completemos solo lo que falta, sin repetir lo que ya me contaste.');return;}
     awaitingPackageSelection=true;
     add('assistant','¡Gracias! 💗 Ahora elige cómo quieres entregar tu regalo musical:\n\n1. ESENCIAL — Solo canción en audio MP3: S/20.\n2. DETALLE ESPECIAL — Canción + video con dedicatoria e imágenes ilustrativas (sin fotos reales): S/25.\n3. REGALO COMPLETO — Canción + video con tus fotografías reales: desde S/30; el precio final se confirma según el trabajo.\n\n¿Cuál de los tres paquetes deseas?');
     autoStatus.textContent='Tus datos están recopilados. Solo falta elegir el paquete para completar el formulario y generar la letra.';
@@ -935,7 +932,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
    const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');
    messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);
-   await syncConversation();
+   autoStatus.textContent='Voy reuniendo los detalles de tu canción. Al elegir el paquete organizaré todos tus datos de una sola vez.';
    awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
   }catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
   finally{send.disabled=false;send.textContent='Enviar';}
