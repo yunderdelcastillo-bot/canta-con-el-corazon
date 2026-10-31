@@ -774,9 +774,10 @@ const orderFields=["buyer","contact","recipient","occasion","story","style","cus
 function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
 const orderAudioRateLimits=new Map();
 const orderAudioJobs=new Set();
+const orderAudioStatus=new Map();
 async function generateOrderAudio(orderId,order){
  const jobKey=String(orderId);if(orderAudioJobs.has(jobKey))return;
- orderAudioJobs.add(jobKey);
+ orderAudioJobs.add(jobKey);orderAudioStatus.set(jobKey,{status:"processing",updatedAt:Date.now()});
  try{
   if(!ready())throw new Error("Supabase no está configurado.");
   if(!process.env.GEMINI_API_KEY)throw new Error("Falta GEMINI_API_KEY.");
@@ -796,8 +797,9 @@ async function generateOrderAudio(orderId,order){
   const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
   const {error}=await admin().storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
   if(error)throw error;
+  orderAudioStatus.set(jobKey,{status:"ready",updatedAt:Date.now()});
   console.log("Automatic customer song generated:",jobKey,buffer.length);
- }catch(e){console.error("Automatic customer song failed:",jobKey,e?.message||e);}
+ }catch(e){orderAudioStatus.set(jobKey,{status:"failed",updatedAt:Date.now(),reason:String(e?.message||e).slice(0,300)});console.error("Automatic customer song failed:",jobKey,e?.message||e);}
  finally{orderAudioJobs.delete(jobKey);}
 }
 app.post("/api/orders",async(req,res)=>{
@@ -822,6 +824,17 @@ app.post("/api/orders",async(req,res)=>{
   if(order.lyrics&&order.lyrics.length>=40)setImmediate(()=>{generateOrderAudio(data.id,order);});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
+});
+app.get("/api/orders/:id/audio-status",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const {data:files,error}=await admin().storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
+  if(error)throw error;
+  if((files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,status:"ready"});
+  const state=orderAudioStatus.get(id);
+  return res.set("Cache-Control","no-store").json({ok:true,status:state?.status||"processing"});
+ }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo consultar el estado del audio."});}
 });
 app.get("/api/admin/orders",async(req,res)=>{
  try{
