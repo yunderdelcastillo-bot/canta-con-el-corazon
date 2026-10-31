@@ -862,15 +862,16 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
 (function(){
  const panel=document.getElementById('cchAiPanel'),messages=[{role:'assistant',content:'¡Hola! 💗 ¡Bienvenido/a a Canta con el corazón! Somos un servicio de regalos musicales personalizados: convertimos tu historia, tus recuerdos y tus sentimientos en una canción única para sorprender a alguien especial. 🎶\n\nAsí funciona, paso a paso:\n1. Nos cuentas para quién es el regalo, qué ocasión celebras y los recuerdos o sentimientos que quieres incluir.\n2. Elegimos juntos el paquete: ESENCIAL (canción personalizada S/20); DETALLE ESPECIAL (canción + portada + dedicatoria especial S/25); o REGALO COMPLETO (canción + fotovideo desde S/30, precio final según el trabajo).\n3. Escogemos el género musical, la voz (femenina, masculina o dueto), duración aproximada y emoción. Puedes añadir una frase especial.\n4. La IA organiza tus respuestas y completa el formulario automáticamente; también prepara una letra original para revisión.\n5. Coordinamos el pedido y confirmamos por WhatsApp el precio final y el plazo. La entrega habitual es de 24–48 horas, sujeta a confirmación. Si necesitas el servicio express de 30 minutos, tiene un adicional de S/5 y depende de disponibilidad.\n6. Puedes pagar mediante el QR de Yape que aparece en la página. El pago se verifica manualmente; no se confirma automáticamente.\n7. Una vez coordinado y verificado el pago, la administradora prepara y revisa el audio y, según el paquete, la portada o el fotovideo. Finalmente recibirás tu regalo musical para compartirlo. 💝\n\nEstoy aquí para explicarte los paquetes, ayudarte a elegir y recoger tus datos sin que tengas que llenar el formulario a mano. Para empezar, ¿cómo te llamas y para quién te gustaría crear esta canción?'}];
  const box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend');
- const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';
+ const autoStatus=document.getElementById('cchAiAutoStatus');let lastLyricsSignature='';let awaitingFinalConfirmation=false;
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
  document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});}
- async function syncConversation(){autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';try{
+ async function syncConversation(generateNow=false){autoStatus.textContent='La IA está organizando tus respuestas y completando el formulario…';try{
    const intake=await fetch(API_BASE+'/api/assistant/intake',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({messages})});const extracted=await intake.json();if(!intake.ok)throw new Error(extracted.error||'No se pudieron organizar los datos.');
    const data=extracted.data||{};fillForm(data);
    const ready=Boolean(data.recipient&&data.occasion&&data.story&&data.style);
    if(!ready){autoStatus.textContent='Voy completando tus datos automáticamente mientras conversamos.';return;}
+   if(!generateNow){autoStatus.textContent='Ya reuní los datos principales. Puedes añadir un último detalle si lo deseas.';return;}
    const signature=JSON.stringify([data.recipient,data.occasion,data.story,data.style,data.voice,data.customGenre,data.specialPhrase,data.lyricDuration,data.lyricTone]);
    if(signature!==lastLyricsSignature){
     autoStatus.textContent='Ya tengo los datos principales. La IA está escribiendo tu letra personalizada…';
@@ -883,7 +884,10 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!
   }catch(e){autoStatus.textContent='Sigo aquí para ayudarte. '+e.message;}
  }
  async function sendMessage(){const content=input.value.trim();if(!content)return;messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
-  try{const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);await syncConversation();}
+  try{
+   if(awaitingFinalConfirmation){awaitingFinalConfirmation=false;await syncConversation(true);return;}
+   const r=await fetch(API_BASE+'/api/assistant/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'customer',messages})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo responder.');messages.push({role:'assistant',content:d.answer});add('assistant',d.answer);await syncConversation(false);awaitingFinalConfirmation=/¿Deseas agregar algo más/i.test(d.answer||'');
+  }
   catch(e){add('assistant',e.message+' Puedes volver a intentarlo.');}
   finally{send.disabled=false;send.textContent='Enviar';}
  }
