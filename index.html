@@ -814,7 +814,18 @@ async function generateCustomerLyrics(){
 document.getElementById('generateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('regenerateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
-document.getElementById('sendCustomerLyrics').addEventListener('click',()=>{if(!orderValue('customerLyricsText'))return;window.open('https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true)),'_blank','noopener')});
+document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>{
+ const button=document.getElementById('sendCustomerLyrics'),status=document.getElementById('customerLyricsStatus');
+ if(!orderValue('customerLyricsText')){status.textContent='Primero genera tu letra personalizada.';return;}
+ const wa=window.open('about:blank','_blank');button.disabled=true;status.textContent='Registrando tu pedido y enviándolo por WhatsApp…';
+ try{
+  const saved=await saveCustomerOrder();
+  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(true));
+  if(wa)wa.location.href=url;else window.location.href=url;
+  status.textContent='💗 ¡Pedido registrado y enviado! La canción se está generando automáticamente. El audio solo estará disponible en tu panel privado; el cliente no podrá escucharlo ni descargarlo desde esta página.';
+ }catch(error){if(wa)wa.close();status.textContent='No se pudo registrar el pedido: '+error.message+'. Tus datos siguen en el formulario.';}
+ finally{button.disabled=false;}
+});
 </script>
 <script>
 (function(){
