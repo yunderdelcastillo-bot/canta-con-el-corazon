@@ -1023,7 +1023,13 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    return;
   }
   manualCurrentField=next.field;
-  add('assistant',next.prompt);
+  let prompt=next.prompt;
+  const fieldEl=document.getElementById(next.field);
+  if(fieldEl&&fieldEl.tagName==='SELECT'){
+   const choices=[...fieldEl.options].filter(o=>String(o.text||'').trim()&&!(o.value===''&&/elige una opción|elige un género|elige el tipo|elige la duración|elige la emoción/i.test(o.text)));
+   if(choices.length)prompt+='\\n\\n**Opciones disponibles en el formulario:**\\n'+choices.map((o,i)=>(i+1)+'. '+o.text).join('\\n')+'\\n\\nPuedes escribir la opción o su número.';
+  }
+  add('assistant',prompt);
   autoStatus.textContent='Modo manual activo: estoy recopilando todos los datos del pedido, los paquetes y el plazo de entrega.';
  }
  function beginManualFallback(){
