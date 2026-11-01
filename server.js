@@ -303,6 +303,15 @@ app.post("/api/songs",async(req,res)=>{
   if(!["esencial","detalle","completo"].includes(packageKey)||!Number.isFinite(packagePrice)||packagePrice<20||packagePrice>10000)return res.status(400).json({error:"Paquete o precio no válido."});
   if(!title||!recipient||!dedication)return res.status(400).json({error:"Completa título, destinatario y dedicatoria."});
   const db=admin();
+  const orderId=String(body.orderId||"");
+  let paidOrderPayment=null;
+  if(orderId){
+   if(!/^[0-9a-f-]{36}$/i.test(orderId))return res.status(400).json({error:"Pedido vinculado no válido."});
+   const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,amount,package_name,payment_status").eq("order_id",orderId).maybeSingle();
+   if(paymentError||!payment)return res.status(404).json({error:"No se encontró el pago del pedido vinculado."});
+   if(payment.payment_status!=="approved")return res.status(409).json({error:"El comprobante del pedido aún no está aprobado."});
+   paidOrderPayment=payment;
+  }  const db=admin();
   const {data:old,error:oldError}=await db.from("songs").select("id,owner_id,audio_path").eq("id",id).maybeSingle();
   if(oldError)return res.status(500).json({error:"No se pudo comprobar la canción en la base de datos: "+oldError.message});
   if(old&&old.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para editar esta canción."});
@@ -330,7 +339,17 @@ app.post("/api/songs",async(req,res)=>{
    const {error:grantSyncError}=await db.from("song_package_permissions").upsert({song_id:id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:enabled,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
    if(grantSyncError)return res.status(500).json({error:"La canción se guardó, pero no se pudieron actualizar los permisos: "+grantSyncError.message});
   }
-  res.set("Cache-Control","no-store").json({ok:true,song:row});
+  if(paidOrderPayment){
+   const paidAmount=Number(paidOrderPayment.amount||20);
+   const paidPackage=paidAmount>=30?"completo":paidAmount>=25?"detalle":"esencial";
+   const canVideo=paidPackage==="detalle"||paidPackage==="completo";
+   const {error:linkError}=await db.from("payment_submissions").update({song_id:id,updated_at:new Date().toISOString()}).eq("order_id",orderId);
+   if(linkError)throw linkError;
+   const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:id,owner_id:user.id,package_key:paidPackage,package_price:paidAmount,can_mp3:true,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
+   if(permissionError)throw permissionError;
+   row.package_key=paidPackage;row.package_price=paidAmount;row.order_id=orderId;
+  }
+  res.set("Cache-Control","no-store").json({ok:true,song:row,benefitsActivated:!!paidOrderPayment});
  }catch(e){console.error("Error saving song:",e?.message||e);res.status(500).json({error:"Error interno al guardar la canción."});}
 });
 
@@ -995,6 +1014,28 @@ app.post("/api/orders",async(req,res)=>{
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
+async function analyzeYapeVoucher(buffer,mime,expectedAmount){
+ const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+ if(!apiKey)return {status:"manual",reason:"No está configurada la IA de revisión."};
+ const prompt="Analiza esta captura o PDF de un comprobante Yape. Extrae únicamente datos que sean claramente visibles. Devuelve SOLO JSON válido con: is_payment_receipt (boolean), amount (number o null), operation_id (string o null), transaction_date (string o null), payment_app (string o null), confidence (number entre 0 y 1), notes (string). No inventes ni completes datos borrosos. No confundas saldo, número telefónico, hora ni fecha con el código de operación. Si no es claramente un comprobante de transferencia/pago Yape, is_payment_receipt=false. Importe esperado: S/"+Number(expectedAmount).toFixed(2)+".";
+ const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey),{
+  method:"POST",headers:{"Content-Type":"application/json"},
+  body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:mime,data:buffer.toString("base64")}}]}],generationConfig:{temperature:0,responseMimeType:"application/json"}}),
+  signal:AbortSignal.timeout(45000)
+ });
+ const payload=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error("IA de comprobantes HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,240));
+ const raw=(payload.candidates||[]).flatMap(c=>c.content?.parts||[]).map(p=>p.text||"").join("").trim();
+ let parsed;try{parsed=JSON.parse(raw.replace(/^```(?:json)?/i,"").replace(/```$/,"").trim());}catch{throw new Error("La IA no devolvió datos válidos del comprobante.");}
+ const amount=Number(parsed.amount);
+ const operationId=String(parsed.operation_id||"").trim().replace(/\s+/g,"").slice(0,80);
+ const confidence=Number(parsed.confidence||0);
+ const isReceipt=parsed.is_payment_receipt===true&&/yape/i.test(String(parsed.payment_app||"yape"))&&Number.isFinite(amount);
+ if(!isReceipt)return {status:"rejected",reason:"La captura no parece ser un comprobante Yape legible.",confidence};
+ if(Math.abs(amount-Number(expectedAmount))>0.009)return {status:"rejected",reason:"El importe visible no coincide con el total del pedido.",amount,operationId,confidence};
+ if(!operationId||confidence<0.82)return {status:"manual",reason:"No se pudo leer con suficiente seguridad el código de operación.",amount,operationId,confidence};
+ return {status:"approved",reason:"Comprobante legible; importe y código de operación extraídos.",amount,operationId,confidence};
+}
 app.post("/api/orders/:id/voucher",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El sistema de pagos no está configurado."});
@@ -1007,7 +1048,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(!raw||raw.length>11*1024*1024)return res.status(413).json({error:"El comprobante está vacío o supera 8 MB."});
   const buffer=Buffer.from(raw,"base64");if(!buffer.length||buffer.length>8*1024*1024)return res.status(413).json({error:"El comprobante supera 8 MB."});
   const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
-  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status,amount,provider_payment_id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
   if(paymentError||!payment)return res.status(403).json({error:"No se pudo validar el acceso a este pedido."});
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
@@ -1015,13 +1056,36 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
    const {error:createError}=await db.storage.createBucket("payment-vouchers",{public:false,fileSizeLimit:"8MB",allowedMimeTypes:[...allowed.keys()]});
    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
   }
+  const fileHash=crypto.createHash("sha256").update(buffer).digest("hex");
+  const {data:duplicate,error:duplicateError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id","sha256:"+fileHash).maybeSingle();
+  if(duplicateError)throw duplicateError;
+  if(duplicate&&duplicate.order_id!==id)return res.status(409).json({error:"Este mismo comprobante ya fue enviado en otro pedido."});
   const path=id+"/"+Date.now()+"-"+crypto.randomBytes(5).toString("hex")+"."+allowed.get(mime);
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",updated_at:new Date().toISOString()}).eq("id",payment.id);
+  let review={status:"manual",reason:"La IA no pudo revisar automáticamente el comprobante."};
+  try{review=await analyzeYapeVoucher(buffer,mime,payment.amount);}catch(reviewError){console.warn("Automatic Yape voucher review unavailable:",reviewError?.message||reviewError);}
+  const operationKey=review.operationId?"yape:"+review.operationId:"sha256:"+fileHash;
+  if(review.status==="approved"){
+   const {data:used,error:usedError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id",operationKey).maybeSingle();
+   if(usedError)throw usedError;
+   if(used&&used.order_id!==id){
+    await db.storage.from("payment-vouchers").remove([path]);
+    return res.status(409).json({error:"El código de operación de este comprobante ya fue utilizado."});
+   }
+  }
+  const nextStatus=review.status==="approved"?"approved":review.status==="rejected"?"rejected":"voucher_submitted";
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:nextStatus,provider_payment_id:operationKey,updated_at:new Date().toISOString(),...(nextStatus==="approved"?{reviewed_at:new Date().toISOString()}: {})}).eq("id",payment.id);
   if(updateError)throw updateError;
-  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo comprobante recibido",body:"Has recibido un nuevo comprobante de pago. Requiere revisión."});
-  res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",message:"Comprobante recibido. Se revisará antes de activar los beneficios."});
+  if(nextStatus==="approved"){
+   const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);
+   if(orderError)throw orderError;
+   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:"Voucher revisado automáticamente",body:"La IA leyó el comprobante y el importe coincide. El permiso de la canción se activará al guardar/vincular el MP3 del pedido."});
+   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:"Comprobante aceptado",body:"Tu comprobante fue procesado automáticamente. Tu canción se habilitará cuando esté lista."});
+  }else{
+   await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:nextStatus==="rejected"?"Comprobante no válido":"Comprobante requiere revisión",body:review.reason||"Revisa el comprobante desde el panel privado."});
+  }
+  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="approved"?"✅ Comprobante leído y aceptado automáticamente. El MP3 se habilitará al guardar la canción; el video dependerá del paquete.":nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
