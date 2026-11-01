@@ -359,10 +359,11 @@ app.post("/api/grants",async(req,res)=>{
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para cambiar los beneficios de esta canción."});
-  const packageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial";
+  const packagePrice=Number(song.package_price)||20;
+  // El precio registrado protege contra una etiqueta de paquete equivocada en canciones antiguas.
+  const packageKey=packagePrice===20?"esencial":packagePrice===25?"detalle":packagePrice>=30?"completo":(["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial");
   const canMp3=enabled;
   const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
-  const packagePrice=Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]);
   const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:canMp3,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
   if(permissionError){console.error("Package permission save failed:",permissionError.message);return res.status(500).json({error:"No se pudo cambiar el permiso: "+permissionError.message});}
   res.set("Cache-Control","no-store").json({ok:true,songId:song.id,enabled,packageKey,packagePrice,canMp3,canVideo});
