@@ -13,7 +13,7 @@ const execFileAsync=promisify(execFile);
 const app=express();
 app.use(express.json({limit:"40mb"}));
 const allowed=[...new Set(["https://canta-con-el-corazon.onrender.com",...(process.env.ALLOWED_ORIGINS||"").split(",").map(s=>s.trim()).filter(Boolean)])];
-const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);console.error("CORS blocked origin:",origin);cb(new Error("Origin not allowed: "+origin));},methods:["GET","POST","PUT","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization"],maxAge:86400};
+const corsOptions={origin(origin,cb){if(!origin||allowed.includes(origin))return cb(null,true);console.error("CORS blocked origin:",origin);cb(new Error("Origin not allowed: "+origin));},methods:["GET","POST","PUT","PATCH","DELETE","OPTIONS"],allowedHeaders:["Content-Type","Authorization"],maxAge:86400};
 app.use(cors(corsOptions));
 app.options(/.*/,cors(corsOptions));
 const port=process.env.PORT||10000;
@@ -990,6 +990,7 @@ app.post("/api/orders",async(req,res)=>{
    if(paymentError)throw paymentError;
    paymentReady=true;
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
+  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido recibido",body:"Tienes un nuevo pedido en Canta con el corazón."});
   if(order.lyrics&&order.lyrics.length>=40)setImmediate(()=>{generateOrderAudio(data.id,order);});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
@@ -1019,6 +1020,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(uploadError)throw uploadError;
   const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",updated_at:new Date().toISOString()}).eq("id",payment.id);
   if(updateError)throw updateError;
+  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo comprobante recibido",body:"Has recibido un nuevo comprobante de pago. Requiere revisión."});
   res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",message:"Comprobante recibido. Se revisará antes de activar los beneficios."});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
@@ -1034,6 +1036,91 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   return res.set("Cache-Control","no-store").json({ok:true,status:state?.status||"processing"});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo consultar el estado del audio."});}
 });
+
+async function customerPaymentAccess(db,id,token){
+ if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return false;
+ const hash=crypto.createHash("sha256").update(token).digest("hex");
+ const {data,error}=await db.from("payment_submissions").select("id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
+ return !error&&!!data;
+}
+async function createSystemNotification(db,values){
+ try{const {error}=await db.from("system_notifications").insert(values);if(error)console.warn("Notification not stored (run messaging migration):",error.message);}
+ catch(e){console.warn("Notification unavailable:",e?.message||e);}
+}
+app.post("/api/orders/:id/messages",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio no está disponible."});
+  const db=admin(),id=String(req.params.id||""),token=String(req.body?.accessToken||""),message=cleanOrderText(req.body?.message,1200);
+  if(!message)return res.status(400).json({error:"Escribe un mensaje antes de enviarlo."});
+  if(!(await customerPaymentAccess(db,id,token)))return res.status(403).json({error:"No se pudo validar el acceso seguro a este pedido."});
+  const {data,error}=await db.from("order_messages").insert({order_id:id,sender_role:"customer",message}).select("id,order_id,sender_role,message,created_at").single();
+  if(error)throw error;
+  await createSystemNotification(db,{order_id:id,event_type:"new_message",audience:"admin",title:"Nuevo mensaje de cliente",body:"Tienes un nuevo mensaje de un cliente."});
+  res.set("Cache-Control","no-store").status(201).json({ok:true,message:data});
+ }catch(e){console.error("Customer order message:",e?.message||e);res.status(500).json({error:"No se pudo enviar el mensaje."});}
+});
+app.get("/api/orders/:id/messages",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio no está disponible."});
+  const db=admin(),id=String(req.params.id||""),token=String(req.query.accessToken||"");
+  if(!(await customerPaymentAccess(db,id,token)))return res.status(403).json({error:"No se pudo validar el acceso seguro a este pedido."});
+  const {data,error}=await db.from("order_messages").select("id,sender_role,message,created_at").eq("order_id",id).order("created_at",{ascending:true}).limit(100);
+  if(error)throw error;
+  await db.from("order_messages").update({read_at:new Date().toISOString()}).eq("order_id",id).eq("sender_role","admin").is("read_at",null);
+  res.set("Cache-Control","no-store").json({ok:true,messages:data||[]});
+ }catch(e){console.error("Customer order messages:",e?.message||e);res.status(500).json({error:"No se pudo cargar la conversación."});}
+});
+app.get("/api/admin/orders/:id/messages",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();const {data,error}=await db.from("order_messages").select("id,sender_role,message,created_at,read_at").eq("order_id",id).order("created_at",{ascending:true}).limit(100);
+  if(error)throw error;
+  await db.from("order_messages").update({read_at:new Date().toISOString()}).eq("order_id",id).eq("sender_role","customer").is("read_at",null);
+  res.set("Cache-Control","no-store").json({ok:true,messages:data||[]});
+ }catch(e){console.error("Admin order messages:",e?.message||e);res.status(500).json({error:"No se pudo cargar la conversación."});}
+});
+app.post("/api/admin/orders/:id/messages",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||""),message=cleanOrderText(req.body?.message,1200);
+  if(!/^[0-9a-f-]{36}$/i.test(id)||!message)return res.status(400).json({error:"Pedido o mensaje no válido."});
+  const db=admin();const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data,error}=await db.from("order_messages").insert({order_id:id,sender_role:"admin",message}).select("id,order_id,sender_role,message,created_at").single();
+  if(error)throw error;
+  await createSystemNotification(db,{order_id:id,event_type:"new_message",audience:"customer",title:"Respuesta de Canta con el corazón",body:"Tienes una nueva respuesta sobre tu pedido."});
+  res.status(201).json({ok:true,message:data});
+ }catch(e){console.error("Admin send message:",e?.message||e);res.status(500).json({error:"No se pudo enviar la respuesta."});}
+});
+app.get("/api/admin/notifications",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const {data,error}=await admin().from("system_notifications").select("id,order_id,event_type,title,body,is_read,created_at").eq("audience","admin").order("created_at",{ascending:false}).limit(40);
+  if(error)throw error;res.set("Cache-Control","no-store").json({ok:true,notifications:data||[]});
+ }catch(e){console.error("Admin notifications:",e?.message||e);res.status(500).json({error:"No se pudieron cargar las notificaciones."});}
+});
+app.patch("/api/admin/notifications/:id/read",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const {error}=await admin().from("system_notifications").update({is_read:true}).eq("id",String(req.params.id||"")).eq("audience","admin");
+  if(error)throw error;res.json({ok:true});
+ }catch(e){console.error("Read notification:",e?.message||e);res.status(500).json({error:"No se pudo actualizar la notificación."});}
+});
+app.get("/api/admin/integrations/status",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const culqi=["CULQI_SECRET_KEY","CULQI_PUBLIC_KEY","CULQI_WEBHOOK_SECRET"],wa=["WHATSAPP_ACCESS_TOKEN","WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_BUSINESS_ACCOUNT_ID","WHATSAPP_TEMPLATE_NAME"];
+  const configured=keys=>keys.every(k=>Boolean(process.env[k]));
+  res.set("Cache-Control","no-store").json({ok:true,culqi:{status:configured(culqi)?"ready":"pending_configuration",configured:configured(culqi)},whatsapp:{status:configured(wa)?"ready":"pending_configuration",configured:configured(wa)}});
+ }catch(e){res.status(500).json({error:"No se pudo consultar la configuración."});}
+});
+
 app.get("/api/admin/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
@@ -1105,7 +1192,7 @@ app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
   }
   const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString(),...(songId?{song_id:songId}:{})}).eq("id",payment.id);
   if(updateError)throw updateError;
-  if(status==="approved"){const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);if(orderError)throw orderError;}
+  if(status==="approved"){const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);if(orderError)throw orderError;await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:"Pago confirmado",body:"El pago de tu pedido ha sido confirmado."});}
   res.set("Cache-Control","no-store").json({ok:true,status,benefitsActivated,message:benefitsActivated?"Pago confirmado y beneficios activados en la canción vinculada.":status==="approved"?"Pago confirmado. Vincula la canción del cliente para activar sus beneficios.":"Comprobante rechazado."});
  }catch(e){console.error("Payment review:",e?.message||e);res.status(500).json({error:"No se pudo guardar la revisión del pago."});}
 });
