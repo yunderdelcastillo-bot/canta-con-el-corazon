@@ -235,8 +235,8 @@ app.get("/api/audio",async(req,res)=>{
   let grantAuthorized=false;
   if(grant){
    const grantHash=crypto.createHash("sha256").update(grant).digest("hex");
-   const {data:g}=await db.from("download_grants").select("id,song_id,expires_at").eq("token_hash",grantHash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
-   grantAuthorized=!!g;
+   const {data:g}=await db.from("download_grants").select("id,song_id,expires_at,can_mp3").eq("token_hash",grantHash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
+   grantAuthorized=!!g?.can_mp3;
   }
   if(!grantAuthorized){
    if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
@@ -263,10 +263,10 @@ app.get("/api/verify-grant",async(req,res)=>{
   if(!token||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({valid:false});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",path).maybeSingle();
-  if(!song)return res.status(404).json({valid:false});
+  if(!song)return res.status(404).json({valid:false,canMp3:false,canVideo:false});
   const hash=crypto.createHash("sha256").update(token).digest("hex");
-  const {data:g}=await db.from("download_grants").select("id").eq("token_hash",hash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
-  res.set("Cache-Control","no-store").json({valid:!!g});
+  const {data:g}=await db.from("download_grants").select("id,can_mp3,can_video,package_key,package_price").eq("token_hash",hash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
+  res.set("Cache-Control","no-store").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null});
  }catch(e){res.status(500).json({valid:false});}
 });
 
@@ -282,6 +282,9 @@ app.post("/api/songs",async(req,res)=>{
   const id=String(body.id||"");
   if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de canción no válido."});
   const title=String(body.title||"").trim(),recipient=String(body.recipient||"").trim(),dedication=String(body.dedication||"").trim();
+  const packageKey=String(body.packageKey||"esencial");
+  const packagePrice=Number(body.packagePrice||({esencial:20,detalle:25,completo:30}[packageKey]));
+  if(!["esencial","detalle","completo"].includes(packageKey)||!Number.isFinite(packagePrice)||packagePrice<20||packagePrice>10000)return res.status(400).json({error:"Paquete o precio no válido."});
   if(!title||!recipient||!dedication)return res.status(400).json({error:"Completa título, destinatario y dedicatoria."});
   const db=admin();
   const {data:old,error:oldError}=await db.from("songs").select("id,owner_id,audio_path").eq("id",id).maybeSingle();
@@ -299,7 +302,7 @@ app.post("/api/songs",async(req,res)=>{
    audio_path=path;
   }
   if(!audio_path)return res.status(400).json({error:"Selecciona un MP3 antes de guardar."});
-  const row={id,title,recipient,dedication,lyrics:String(body.lyrics||""),theme:String(body.theme||"romantico"),audio_path,audio_url:null,owner_id:user.id,published:true,updated_at:new Date().toISOString()};
+  const row={id,title,recipient,dedication,lyrics:String(body.lyrics||""),theme:String(body.theme||"romantico"),audio_path,audio_url:null,owner_id:user.id,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
   const {error:saveError}=await db.from("songs").upsert(row);
   if(saveError)return res.status(500).json({error:"El archivo se subió, pero la base de datos rechazó la canción: "+saveError.message});
   res.set("Cache-Control","no-store").json({ok:true,song:row});
@@ -316,14 +319,16 @@ app.post("/api/grants",async(req,res)=>{
   if(authError||!user)return res.status(401).json({error:"Sesión no válida."});
   const songId=String(req.body.songId||"");
   const db=admin();
-  const {data:song,error}=await db.from("songs").select("id,owner_id").eq("id",songId).maybeSingle();
+  const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para autorizar esta canción."});
   const token=crypto.randomBytes(32).toString("base64url");
   const token_hash=crypto.createHash("sha256").update(token).digest("hex");
   const expires_at=new Date(Date.now()+7*24*60*60*1000).toISOString();
-  const {error:insertError}=await db.from("download_grants").insert({song_id:song.id,token_hash,created_by:user.id,expires_at});
+  const packageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial";
+  const canMp3=true,canVideo=packageKey==="detalle"||packageKey==="completo";
+  const {error:insertError}=await db.from("download_grants").insert({song_id:song.id,token_hash,created_by:user.id,expires_at,package_key:packageKey,package_price:Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]),can_mp3:canMp3,can_video:canVideo});
   if(insertError){console.error("download_grants insert failed:",insertError.message,insertError.code);return res.status(500).json({error:"No se pudo guardar la autorización: "+insertError.message+" ("+(insertError.code||"sin código") + "). Ejecuta supabase-download-grants.sql en Supabase SQL Editor."});}
-  res.set("Cache-Control","no-store").json({token,expiresAt:expires_at});
+  res.set("Cache-Control","no-store").json({token,expiresAt:expires_at,packageKey,packagePrice:Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]),canMp3,canVideo});
  }catch(e){res.status(500).json({error:"Error interno al autorizar la descarga."});}
 });
 
@@ -345,8 +350,8 @@ app.post("/api/share-video",async(req,res)=>{
   }
   if(!allowedDownload&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
    const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
-   const {data:grant}=await db.from("download_grants").select("id").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
-   allowedDownload=!!grant;
+   const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
+   allowedDownload=!!grant?.can_video;
   }
   if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
   const chunks=[];let total=0;const maxBytes=30*1024*1024;
@@ -386,8 +391,8 @@ app.post("/api/convert-video",async(req,res)=>{
   }
   if(!allowedDownload&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
    const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
-   const {data:grant}=await db.from("download_grants").select("id").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
-   allowedDownload=!!grant;
+   const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
+   allowedDownload=!!grant?.can_video;
   }
   if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
   const chunks=[];let total=0;const maxBytes=45*1024*1024;
