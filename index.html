@@ -961,7 +961,7 @@ document.getElementById('orderForm').addEventListener('submit',async e=>{
  try{
   const savedOrder=await saveCustomerOrder(false);
   if(savedOrder.paymentReady&&savedOrder.paymentAccessToken){
-   window.cchPaymentContext={orderId:savedOrder.orderId,accessToken:savedOrder.paymentAccessToken};
+   window.cchPaymentContext={orderId:savedOrder.orderId,accessToken:savedOrder.paymentAccessToken};mountCustomerOrderChat();
    document.getElementById('orderPaymentUpload').classList.remove('hidden');
    document.getElementById('orderPaymentStatus').textContent='Pedido '+savedOrder.orderId+' registrado. Si ya pagaste, adjunta aquí tu comprobante.';
   }else{
@@ -1275,5 +1275,18 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  }
  send.onclick=sendMessage;input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendMessage();}});
 })();
+
+function mountCustomerOrderChat(){
+ const ctx=window.cchPaymentContext;if(!ctx?.orderId||!ctx?.accessToken)return;
+ let box=document.getElementById('cchCustomerChat');if(box)return;
+ box=document.createElement('section');box.id='cchCustomerChat';box.style.cssText='margin:18px auto;padding:16px;max-width:720px;border:1px solid #e6b7ca;border-radius:16px;background:#fff8fb;color:#351b2b';
+ box.innerHTML='<h3 style="margin-top:0">💬 Mensajes sobre tu pedido</h3><p>Escribe aquí si tienes alguna consulta. La administradora podrá responderte desde el panel.</p><div id="cchCustomerMessages" style="max-height:240px;overflow:auto;background:white;padding:10px;border-radius:10px"></div><textarea id="cchCustomerMessage" maxlength="1200" placeholder="Escribe tu mensaje…" style="width:100%;min-height:75px;margin-top:10px"></textarea><button id="cchCustomerSend" type="button" style="margin-top:8px;padding:12px 18px;border:0;border-radius:24px;background:#681b43;color:white">Enviar mensaje</button><p id="cchCustomerChatStatus" aria-live="polite"></p>';
+ const anchor=document.getElementById('orderPaymentUpload')||document.getElementById('orderForm');(anchor?.parentNode||document.body).insertBefore(box,anchor?.nextSibling||null);
+ const thread=document.getElementById('cchCustomerMessages'),status=document.getElementById('cchCustomerChatStatus');
+ async function refresh(){try{const r=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/messages?accessToken='+encodeURIComponent(ctx.accessToken));const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo cargar el chat.');thread.replaceChildren();(d.messages||[]).forEach(m=>{const p=document.createElement('p');p.style.cssText='padding:8px;border-radius:8px;background:'+(m.sender_role==='admin'?'#f6e7ed':'#f3f5f8');const b=document.createElement('b');b.textContent=m.sender_role==='admin'?'Canta con el corazón':'Tú';const t=document.createElement('span');t.textContent=' · '+new Date(m.created_at).toLocaleString('es-PE');const body=document.createElement('div');body.textContent=m.message;p.append(b,t,body);thread.appendChild(p)});thread.scrollTop=thread.scrollHeight;}catch(e){status.textContent=e.message;}}
+ document.getElementById('cchCustomerSend').onclick=async()=>{const input=document.getElementById('cchCustomerMessage'),message=input.value.trim();if(!message)return;const btn=document.getElementById('cchCustomerSend');btn.disabled=true;try{const r=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,message})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');input.value='';status.textContent='Mensaje enviado.';await refresh();}catch(e){status.textContent=e.message;}finally{btn.disabled=false;}};
+ refresh();box._cchPoll=setInterval(refresh,8000);
+}
+
 </script>
 \n</body></html>
