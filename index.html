@@ -901,7 +901,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
 #cchAiPanel{position:fixed;z-index:9999;right:12px;bottom:78px;width:min(390px,calc(100vw - 24px));height:min(600px,calc(100dvh - 110px));background:#fff7f2;color:#351b2b;border:1px solid #e9a5bd;border-radius:20px;box-shadow:0 12px 40px #0006;display:none;flex-direction:column;overflow:hidden}
 #cchAiPanel.open{display:flex}#cchAiHead{padding:14px;background:#3b1028;color:white;font-weight:800;display:flex;justify-content:space-between;align-items:center}
 #cchAiMessages{padding:12px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:9px}
-.cchAiMsg{padding:10px 12px;border-radius:14px;max-width:90%;white-space:pre-wrap;line-height:1.4;font-size:14px}.cchAiBot{background:#f2e2e9;align-self:flex-start}.cchAiUser{background:#3b1028;color:white;align-self:flex-end}
+.cchAiMsg{padding:14px 15px;border-radius:14px;max-width:96%;white-space:pre-wrap;line-height:1.55;font-size:17px;overflow-wrap:anywhere}.cchAiBot{font-size:17px}.cchAiUser{font-size:16px}#cchAiMessages{padding:14px;gap:12px}#cchAiInput{font-size:17px;min-height:48px;padding:13px}#cchAiSend,#cchAiTransfer{font-size:17px;min-height:48px;padding:13px}.cchAiBot{background:#f2e2e9;align-self:flex-start}.cchAiUser{background:#3b1028;color:white;align-self:flex-end}
 #cchAiControls{padding:10px;border-top:1px solid #ead8e1}#cchAiInput{width:100%;padding:11px;border:1px solid #d9c4ce;border-radius:10px;font:inherit}#cchAiSend,#cchAiTransfer{border:0;border-radius:10px;padding:11px;background:#681b43;color:white;font-weight:700;margin-top:8px;width:100%}#cchAiTransfer{background:#93622a}
 </style>
 <button id="cchAiOpen" type="button">✨ ¿Te ayudo con tu canción?</button>
@@ -916,7 +916,17 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  const messages=[{role:'assistant',content:initial}],box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend'),autoStatus=document.getElementById('cchAiAutoStatus');
  let finalQuestionAsked=false,conversationTransferred=false,cachedOrderData={};
  const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
- document.getElementById('cchAiOpen').onclick=()=>panel.classList.toggle('open');document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
+ let manualStarted=false;
+ document.getElementById('cchAiOpen').onclick=()=>{
+  panel.classList.add('open');
+  if(!manualStarted){
+   manualStarted=true;
+   const welcome=document.querySelector('#cchAiMessages .cchAiBot');
+   if(welcome)welcome.remove();
+   beginManualFallback();
+  }
+ };
+ document.getElementById('cchAiClose').onclick=()=>panel.classList.remove('open');
  function fillForm(data){
   const ids={buyer:'buyer',contact:'contact',recipient:'recipient',occasion:'occasion',story:'story',style:'style',customGenre:'customGenre',voice:'voice',specialPhrase:'specialPhrase',lyricDuration:'lyricDuration',lyricTone:'lyricTone',package:'package',urgency:'urgency'};
   Object.entries(ids).forEach(([k,id])=>{const el=document.getElementById(id),v=String(data?.[k]||'').trim();if(!el||!v)return;if(el.tagName==='SELECT'){const opt=[...el.options].find(o=>o.text.trim().toLowerCase()===v.toLowerCase()||o.value.trim().toLowerCase()===v.toLowerCase());if(opt)el.value=opt.value;}else el.value=v;});
@@ -931,7 +941,10 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  function isReady(data){return Boolean(data?.buyer&&data?.contact&&data?.recipient&&data?.occasion&&data?.story&&data?.style);}
  async function transferToForm(){
   conversationTransferred=true;
-  try{await extractConversation();}catch(e){console.warn('Se conservan los datos aunque falle la extracción:',e?.message||e);fillForm(cachedOrderData);}
+  // En modo manual temporal no se consulta Groq ni Gemini: se usan las respuestas ya guardadas.
+  if(!manualMode){
+   try{await extractConversation();}catch(e){console.warn('Se conservan los datos aunque falle la extracción:',e?.message||e);fillForm(cachedOrderData);}
+  }
   fillForm(cachedOrderData);
   autoStatus.textContent='💗 Tus respuestas están listas en el formulario. Revísalas y pulsa «Generar mi letra».';
   add('assistant','¡Perfecto! 💗 Gracias por contarme tu historia. Ahora vamos a generar la letra de tu canción. Ya pasé tus respuestas al formulario: revísalas, completa cualquier dato que falte y pulsa «✨ Generar mi letra personalizada». La letra no se generará hasta que pulses ese botón.');
