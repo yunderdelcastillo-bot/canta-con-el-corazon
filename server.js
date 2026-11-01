@@ -258,15 +258,14 @@ app.get("/api/audio",async(req,res)=>{
 app.get("/api/verify-grant",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({valid:false,error:"Storage privado aún no está configurado."});
-  const token=String(req.query.token||"");
   const path=String(req.query.path||"");
-  if(!token||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({valid:false});
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(path))return res.status(400).json({valid:false});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",path).maybeSingle();
   if(!song)return res.status(404).json({valid:false,canMp3:false,canVideo:false});
-  const hash=crypto.createHash("sha256").update(token).digest("hex");
-  const {data:g}=await db.from("download_grants").select("id,can_mp3,can_video,package_key,package_price").eq("token_hash",hash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
-  res.set("Cache-Control","no-store").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null});
+  const {data:g,error}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
+  if(error)throw error;
+  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null});
  }catch(e){res.status(500).json({valid:false});}
 });
 
@@ -321,14 +320,12 @@ app.post("/api/grants",async(req,res)=>{
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para autorizar esta canción."});
-  const token=crypto.randomBytes(32).toString("base64url");
-  const token_hash=crypto.createHash("sha256").update(token).digest("hex");
-  const expires_at=new Date(Date.now()+7*24*60*60*1000).toISOString();
   const packageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial";
   const canMp3=true,canVideo=packageKey==="detalle"||packageKey==="completo";
-  const {error:insertError}=await db.from("download_grants").insert({song_id:song.id,token_hash,created_by:user.id,expires_at,package_key:packageKey,package_price:Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]),can_mp3:canMp3,can_video:canVideo});
-  if(insertError){console.error("download_grants insert failed:",insertError.message,insertError.code);return res.status(500).json({error:"No se pudo guardar la autorización: "+insertError.message+" ("+(insertError.code||"sin código") + "). Ejecuta supabase-download-grants.sql en Supabase SQL Editor."});}
-  res.set("Cache-Control","no-store").json({token,expiresAt:expires_at,packageKey,packagePrice:Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]),canMp3,canVideo});
+  const packagePrice=Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]);
+  const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:canMp3,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
+  if(permissionError){console.error("Package permission save failed:",permissionError.message);return res.status(500).json({error:"No se pudo activar el paquete en el mismo enlace: "+permissionError.message+". Ejecuta la nueva migración SQL en Supabase."});}
+  res.set("Cache-Control","no-store").json({ok:true,songId:song.id,packageKey,packagePrice,canMp3,canVideo});
  }catch(e){res.status(500).json({error:"Error interno al autorizar la descarga."});}
 });
 
