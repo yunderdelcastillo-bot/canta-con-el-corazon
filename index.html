@@ -179,15 +179,18 @@ async function alignGiftLyrics(){
    const blob=await response.blob();
    if(blob.size>18*1024*1024)throw new Error('El audio supera el tamaño permitido para la sincronización precisa.');
    if(!lyricTimeline.length){
-   const audioBase64=await new Promise((resolve,reject)=>{
-    const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar el audio.'));
-    reader.readAsDataURL(blob);
-   });
-   const result=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:audioPlayer.duration})},2);
-   const data=await result.json().catch(()=>({}));
-   if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
-   lyricTimeline=data.segments;
-   updateSyncedLyric();
+    const audioBase64=await new Promise((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+     reader.onerror=()=>reject(new Error('No se pudo preparar el audio.'));
+     reader.readAsDataURL(blob);
+    });
+    const result=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:audioPlayer.duration})},2);
+    const data=await result.json().catch(()=>({}));
+    if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
+    lyricTimeline=data.segments;
+    updateSyncedLyric();
+   }
    if(hint)hint.textContent='Letra sincronizada con las marcas de tiempo de la voz.';
   }catch(error){
    console.warn('Sincronización de letra:',error?.message||error);
