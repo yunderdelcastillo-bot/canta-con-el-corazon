@@ -242,6 +242,16 @@ app.get("/api/audio",async(req,res)=>{
    const {data:packagePermission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",song.id).maybeSingle();
    if(packagePermission?.can_mp3)grantAuthorized=true;
   }
+  const replaySequence=Number(req.query.replay||0);
+  if(!grantAuthorized&&Number.isSafeInteger(replaySequence)&&replaySequence>0){
+   const {data:replay,error:replayError}=await db.from("song_replay_authorizations").select("replay_count,consumed_count").eq("song_id",song.id).maybeSingle();
+   if(replayError)throw replayError;
+   const consumed=Number(replay?.consumed_count||0);
+   if(!replay||replaySequence>Number(replay.replay_count||0)||replaySequence<=consumed)return res.status(403).json({error:"No hay una reproducción nueva autorizada."});
+   const {data:used,error:useError}=await db.from("song_replay_authorizations").update({consumed_count:replaySequence,updated_at:new Date().toISOString()}).eq("song_id",song.id).eq("consumed_count",consumed).select("song_id").maybeSingle();
+   if(useError||!used)return res.status(409).json({error:"Esta autorización ya fue utilizada."});
+   grantAuthorized=true;
+  }
   if(!grantAuthorized){
    if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
    const previewHash=crypto.createHash("sha256").update(preview).digest("hex");
@@ -269,7 +279,9 @@ app.get("/api/verify-grant",async(req,res)=>{
   if(!song)return res.status(404).json({valid:false,canMp3:false,canVideo:false});
   const {data:g,error}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
   if(error)throw error;
-  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null});
+  const {data:replay,error:replayError}=await db.from("song_replay_authorizations").select("replay_count").eq("song_id",song.id).maybeSingle();
+  if(replayError)throw replayError;
+  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null,replayCount:Number(replay?.replay_count||0)});
  }catch(e){res.status(500).json({valid:false});}
 });
 
@@ -310,6 +322,27 @@ app.post("/api/songs",async(req,res)=>{
   if(saveError)return res.status(500).json({error:"El archivo se subió, pero la base de datos rechazó la canción: "+saveError.message});
   res.set("Cache-Control","no-store").json({ok:true,song:row});
  }catch(e){console.error("Error saving song:",e?.message||e);res.status(500).json({error:"Error interno al guardar la canción."});}
+});
+
+app.post("/api/admin/replay",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const bearer=String(req.headers.authorization||"").match(/^Bearer (.+)$/i);
+  if(!bearer)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const caller=createClient(url,anonKey,{auth:{persistSession:false,autoRefreshToken:false}});
+  const {data:{user},error:authError}=await caller.auth.getUser(bearer[1]);
+  if(authError||!user)return res.status(401).json({error:"Sesión no válida."});
+  const songId=String(req.body?.songId||"");
+  const db=admin();
+  const {data:song,error:songError}=await db.from("songs").select("id,owner_id").eq("id",songId).maybeSingle();
+  if(songError||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para autorizar esta canción."});
+  const {data:existing,error:readError}=await db.from("song_replay_authorizations").select("replay_count,consumed_count").eq("song_id",songId).maybeSingle();
+  if(readError)throw readError;
+  const replayCount=Number(existing?.replay_count||0)+1;
+  const {error:saveError}=await db.from("song_replay_authorizations").upsert({song_id:songId,replay_count:replayCount,consumed_count:Number(existing?.consumed_count||0),updated_at:new Date().toISOString()},{onConflict:"song_id"});
+  if(saveError)throw saveError;
+  res.set("Cache-Control","no-store").json({ok:true,replayCount});
+ }catch(e){console.error("Admin replay authorization:",e?.message||e);res.status(500).json({error:"No se pudo autorizar la nueva reproducción. Ejecuta la migración SQL de reproducciones."});}
 });
 
 app.post("/api/grants",async(req,res)=>{
