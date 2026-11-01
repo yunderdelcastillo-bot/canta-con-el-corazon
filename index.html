@@ -164,6 +164,36 @@ if(lyricText){
  if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent='♪'}
 }
 const API_BASE='https://canta-corazon-private-api.onrender.com';
+let lyricAlignmentPromise=null;
+async function alignGiftLyrics(){
+ if(lyricAlignmentPromise)return lyricAlignmentPromise;
+ if(!lyricLines.length||!audioPlayer.src)return;
+ lyricAlignmentPromise=(async()=>{
+  const hint=document.getElementById('lyricsHint');
+  try{
+   if(hint)hint.textContent='Sincronizando cada frase directamente con la voz…';
+   const response=await fetch(audioPlayer.src);
+   if(!response.ok)throw new Error('No se pudo leer el audio para sincronizar.');
+   const blob=await response.blob();
+   if(blob.size>18*1024*1024)throw new Error('El audio supera el tamaño permitido para la sincronización precisa.');
+   if(!lyricTimeline.length){
+   const audioBase64=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar el audio.'));
+    reader.readAsDataURL(blob);
+   });
+   const result=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:audioPlayer.duration})},2);
+   const data=await result.json().catch(()=>({}));
+   if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
+   lyricTimeline=data.segments;
+   updateSyncedLyric();
+   if(hint)hint.textContent='Letra sincronizada con las marcas de tiempo de la voz.';
+  }catch(error){
+   console.warn('Sincronización de letra:',error?.message||error);
+   if(hint)hint.textContent='La sincronización vocal no estuvo disponible; se mantiene la reproducción de la canción.';
+  }
+ })();
+ return lyricAlignmentPromise;
+}
 async function fetchWithSafeRetry(url,options={},attempts=2){
  let lastError;
  for(let attempt=0;attempt<attempts;attempt++){
@@ -282,7 +312,7 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
   try{if(!previewLinkToken||localStorage.getItem('cch-preview-played-'+audio+'-'+previewLinkToken)==='1')lockPreview('Este enlace de muestra ya se utilizó. Solicita otro enlace desde el panel.')}catch(e){}
  }
- audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric()});
+ audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric();alignGiftLyrics()});
  audioPlayer.addEventListener('timeupdate',updateSyncedLyric);
  audioPlayer.addEventListener('seeked',updateSyncedLyric);
  audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
@@ -461,8 +491,8 @@ downloadButton.addEventListener('click',async()=>{
   if(!Number.isFinite(recordingDuration)||recordingDuration<=0)throw new Error('No se pudo leer la duración completa de la canción.');
   if(Number.isFinite(sourceDuration)&&sourceDuration>0&&recordingDuration<sourceDuration-2)throw new Error('El audio descargado está incompleto ('+Math.round(recordingDuration)+' s frente a '+Math.round(sourceDuration)+' s). No se generó un video recortado; vuelve a intentarlo.');
   // Alinea las frases con el audio real antes de grabar; no usa tiempos repartidos artificialmente.
-  lyricTimeline=[];
-  if(lyricLines.length){
+  if(lyricLines.length&&!Array.isArray(lyricTimeline)||lyricLines.length&&lyricTimeline.length!==lyricLines.length){
+   lyricTimeline=[];
    videoStage='sincronización de la letra con la voz';
    downloadNotice.textContent='Analizando la voz para sincronizar cada frase… No cierres esta página.';
    const audioBase64=await new Promise((resolve,reject)=>{
@@ -477,6 +507,7 @@ downloadButton.addEventListener('click',async()=>{
     throw new Error(alignData.error||'No se pudo sincronizar toda la letra con la voz. No se generó un video descoordinado; inténtalo nuevamente.');
    }
    lyricTimeline=alignData.segments;
+   }
   }
 
   // Gemini elige una dirección artística ligera a partir de la letra y la dedicatoria.
