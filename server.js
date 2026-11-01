@@ -311,7 +311,7 @@ app.post("/api/songs",async(req,res)=>{
    if(paymentError||!payment)return res.status(404).json({error:"No se encontró el pago del pedido vinculado."});
    if(payment.payment_status!=="approved")return res.status(409).json({error:"El comprobante del pedido aún no está aprobado."});
    paidOrderPayment=payment;
-  }  const db=admin();
+  }
   const {data:old,error:oldError}=await db.from("songs").select("id,owner_id,audio_path").eq("id",id).maybeSingle();
   if(oldError)return res.status(500).json({error:"No se pudo comprobar la canción en la base de datos: "+oldError.message});
   if(old&&old.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para editar esta canción."});
