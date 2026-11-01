@@ -391,7 +391,7 @@ app.post("/api/share-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
-  if(!allowedDownload){const {data:permission}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!permission?.can_video;}
+  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
   if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
   const chunks=[];let total=0;const maxBytes=30*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 30 MB."});chunks.push(chunk);}
@@ -433,7 +433,7 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
-  if(!allowedDownload){const {data:permission}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!permission?.can_video;}
+  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
   if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
   const chunks=[];let total=0;const maxBytes=45*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
