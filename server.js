@@ -341,7 +341,8 @@ app.post("/api/songs",async(req,res)=>{
   }
   if(paidOrderPayment){
    const paidAmount=Number(paidOrderPayment.amount||20);
-   const paidPackage=paidAmount>=30?"completo":paidAmount>=25?"detalle":"esencial";
+   const paidPackageName=String(paidOrderPayment.package_name||"").toLowerCase();
+   const paidPackage=paidPackageName.includes("completo")?"completo":paidPackageName.includes("detalle")?"detalle":paidPackageName.includes("esencial")?"esencial":paidAmount>=35?"completo":paidAmount>=30?"detalle":"esencial";
    const canVideo=paidPackage==="detalle"||paidPackage==="completo";
    const {error:linkError}=await db.from("payment_submissions").update({song_id:id,updated_at:new Date().toISOString()}).eq("order_id",orderId);
    if(linkError)throw linkError;
