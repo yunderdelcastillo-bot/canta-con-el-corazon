@@ -128,12 +128,40 @@ document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 
 let lyricLines=[];
 let lyricTimeline=[];
+function estimateLyricWeight(line){
+ const words=String(line||'').toLowerCase().match(/[a-záéíóúüñ0-9]+/gi)||[];
+ // Approximate sung duration from syllables rather than assigning identical time to every line.
+ return Math.max(1,words.reduce((sum,word)=>sum+Math.max(1,(word.match(/[aeiouáéíóúü]/gi)||[]).length),0));
+}
+function buildLyricTimeline(duration){
+ if(!lyricLines.length||!Number.isFinite(duration)||duration<=0)return;
+ const intro=Math.min(duration*.12,Math.max(2,duration*.06));
+ const singingDuration=Math.max(1,duration-intro);
+ const weights=lyricLines.map(estimateLyricWeight);
+ const total=weights.reduce((a,b)=>a+b,0)||1;
+ let cursor=intro;
+ lyricTimeline=weights.map(weight=>{
+  const start=cursor;
+  cursor+=singingDuration*weight/total;
+  return {start,end:cursor};
+ });
+}
+function updateSyncedLyric(){
+ const duration=audioPlayer.duration,current=audioPlayer.currentTime;
+ if(!lyricLines.length||!Number.isFinite(duration)||duration<=0)return;
+ if(!lyricTimeline.length||Math.abs((lyricTimeline.at(-1)?.end||0)-duration)>1)buildLyricTimeline(duration);
+ let index=lyricTimeline.findIndex((slot,i)=>current>=slot.start&&(current<slot.end||i===lyricTimeline.length-1));
+ if(current<lyricTimeline[0].start)index=-1;
+ const text=index<0?'♪':lyricLines[index];
+ const target=document.getElementById('lyricsCurrent');
+ if(target&&target.textContent!==text)target.textContent=text;
+}
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){
  const cleanLyrics=lyricText.replace(/\[(?:verso|coro|puente|intro|outro|pre[- ]?coro)[^\]]*\]/gi,'|').replace(/\r/g,'');
  lyricLines=cleanLyrics.split(/[|\n]+/).flatMap(part=>part.split(/(?<=[.!?])\s+/)).map(part=>part.replace(/^[-•\s]+|[-•\s]+$/g,'').trim()).filter(part=>part.length>2);
- if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent=lyricLines[0]}
+ if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent='♪'}
 }
 const API_BASE='https://canta-corazon-private-api.onrender.com';
 async function fetchWithSafeRetry(url,options={},attempts=2){
@@ -254,7 +282,9 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
   try{if(!previewLinkToken||localStorage.getItem('cch-preview-played-'+audio+'-'+previewLinkToken)==='1')lockPreview('Este enlace de muestra ya se utilizó. Solicita otro enlace desde el panel.')}catch(e){}
  }
- audioPlayer.addEventListener('timeupdate',()=>{const duration=audioPlayer.duration;if(Number.isFinite(duration)&&duration>0&&lyricLines.length){const idx=Math.min(lyricLines.length-1,Math.floor((audioPlayer.currentTime/duration)*lyricLines.length));document.getElementById('lyricsCurrent').textContent=lyricLines[idx]||'♪'}});
+ audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric()});
+ audioPlayer.addEventListener('timeupdate',updateSyncedLyric);
+ audioPlayer.addEventListener('seeked',updateSyncedLyric);
  audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
  audioPlayer.addEventListener('timeupdate',()=>{if(!grantToken)previewLastTime=Math.max(previewLastTime,audioPlayer.currentTime)});
  audioPlayer.addEventListener('ended',async()=>{
