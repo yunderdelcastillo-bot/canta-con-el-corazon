@@ -637,8 +637,33 @@ app.post("/api/lyrics/align",async(req,res)=>{
     if(best&&best.score===0)break;
    }
    if(!best||best.score>0.48)throw new Error("No se pudo reconocer con suficiente precisión la frase "+(lineIndex+1)+": "+lyrics[lineIndex]);
-   const first=words[best.from],last=words[best.from+best.size-1];
-   segments.push({index:lineIndex,start:Math.max(0,first.start),end:Math.min(duration,last.end)});
+   const matchedWords=words.slice(best.from,best.from+best.size);
+   const first=matchedWords[0],last=matchedWords[matchedWords.length-1];
+   // Alinear palabra por palabra dentro de la frase, conservando exactamente el texto original.
+   const n=expected.length,m=matchedWords.length;
+   const dp=Array.from({length:n+1},()=>Array(m+1).fill(0));
+   for(let i=0;i<=n;i++)dp[i][0]=i;
+   for(let j=0;j<=m;j++)dp[0][j]=j;
+   for(let i=1;i<=n;i++)for(let j=1;j<=m;j++){
+    const cost=expected[i-1]===matchedWords[j-1].normalized?0:1;
+    dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);
+   }
+   const mapping=Array(n).fill(null);let i=n,j=m;
+   while(i>0||j>0){
+    if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+(expected[i-1]===matchedWords[j-1].normalized?0:1)){
+     mapping[i-1]=matchedWords[j-1];i--;j--;
+    }else if(i>0&&dp[i][j]===dp[i-1][j]+1){i--;}
+    else if(j>0){j--;}else break;
+   }
+   const originalTokens=lyrics[lineIndex].split(/(\\s+)/);
+   let wordIndex=0;
+   const wordCues=[];
+   for(const token of originalTokens){
+    if(!token.trim())continue;
+    const heard=mapping[wordIndex++];
+    if(heard)wordCues.push({text:token,start:Math.max(0,heard.start),end:Math.min(duration,heard.end)});
+   }
+   segments.push({index:lineIndex,start:Math.max(0,first.start),end:Math.min(duration,last.end),words:wordCues});
    cursor=best.from+best.size;
   }
   res.set("Cache-Control","no-store").json({ok:true,segments,model:"gemini-3.5-transcribe",timing:"word-level"});
