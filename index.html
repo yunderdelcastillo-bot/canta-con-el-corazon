@@ -956,23 +956,23 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   }
   fillForm(cachedOrderData);
   autoStatus.textContent='💗 Tus respuestas están listas en el formulario. Revísalas y pulsa «Generar mi letra».';
-  add('assistant','¡Perfecto! 💗 Gracias por contarme tu historia. Ahora vamos a generar la letra de tu canción. Ya pasé tus respuestas al formulario: revísalas, completa cualquier dato que falte y pulsa «✨ Generar mi letra personalizada». La letra no se generará hasta que pulses ese botón.');
+  add('assistant','¡Tu idea ya está tomando forma! 💗 He pasado tus respuestas al formulario para que puedas revisarlas. Verifica los nombres y detalles, completa lo que falte y pulsa «✨ Generar mi letra personalizada» cuando estés listo/a. La letra se generará únicamente cuando pulses ese botón.');
   panel.classList.remove('open');
   document.getElementById('order').scrollIntoView({behavior:'smooth',block:'start'});
   document.getElementById('generateCustomerLyrics').scrollIntoView({behavior:'smooth',block:'center'});
  }
  const manualFlow=[
-  {field:'buyer',prompt:'Primero, ¿cuál es tu nombre?'},
-  {field:'contact',prompt:'¿Cuál es tu número de WhatsApp para contactarte?'},
-  {field:'recipient',prompt:'¿Para quién será la canción? Dime su nombre o apodo.'},
-  {field:'occasion',prompt:'¿Qué ocasión celebramos o qué motivo inspira esta canción?'},
-  {field:'story',prompt:'Cuéntame su historia y qué deseas expresar. Puedes contarme recuerdos, cómo se conocieron, momentos importantes y lo que sientes.'},
-  {field:'style',prompt:'¿Qué género musical prefieres? Por ejemplo: balada romántica, cumbia peruana, ranchera mexicana, salsa, reguetón romántico, huayno, pop latino u otro.'},
-  {field:'customGenre',prompt:'¿Deseas especificar algún ritmo, artista de referencia, instrumentos o ambiente musical? Si no tienes una preferencia adicional, responde «ninguno».'},
-  {field:'voice',prompt:'¿Qué tipo de voz prefieres: femenina, masculina, dueto o te da igual?'},
-  {field:'lyricDuration',prompt:'¿Qué duración aproximada deseas para la canción: 2, 3 o 4 minutos?'},
-  {field:'lyricTone',prompt:'¿Qué emoción quieres transmitir: amor profundo, ternura, alegría, nostalgia, perdón, gratitud, esperanza u otra?'},
-  {field:'specialPhrase',prompt:'¿Hay una frase especial, apodo o recuerdo que quieras incluir? Si no, responde «ninguna».'},
+  {field:'buyer',prompt:'¡Qué alegría tenerte aquí! 💗 Vamos a crear un regalo único, hecho con tu historia y tus sentimientos. Para comenzar, ¿cómo te llamas?'},
+  {field:'contact',prompt:'¡Mucho gusto! 😊 ¿A qué número de WhatsApp podemos escribirte para coordinar los detalles de tu canción? Escríbelo con código de país si estás fuera de Perú.'},
+  {field:'recipient',prompt:'Ahora cuéntame: ¿para quién vamos a crear esta canción? Puedes indicarme su nombre, apodo o cómo le dices con cariño.'},
+  {field:'occasion',prompt:'¡Qué bonito detalle! 🌷 ¿Qué ocasión o motivo quieres celebrar? Si no encuentras una opción exacta, puedes elegir la más cercana o contármelo con tus propias palabras.'},
+  {field:'story',prompt:'Esta es la parte más especial. 💞 Cuéntame un poquito de su historia: cómo se conocieron, qué momentos recuerdas, qué admiras de esa persona y qué quisieras decirle. No necesitas escribir perfecto; puedes expresarte con tus propias palabras.'},
+  {field:'style',prompt:'Vamos a elegir el sonido de tu canción. 🎶 ¿Qué género musical te gustaría? Si no estás seguro, puedo orientarte: una balada suele ser íntima y emotiva; la cumbia aporta alegría y ritmo; una ranchera transmite sentimiento y fuerza.'},
+  {field:'customGenre',prompt:'¿Quieres agregar algún detalle musical, como un ritmo específico, instrumentos o ambiente? Es opcional. Si las opciones anteriores ya representan lo que buscas, responde «ninguno».'},
+  {field:'voice',prompt:'¿Cómo te gustaría escucharla? Puedes elegir una voz femenina, masculina, un dueto o dejar que el equipo elija la que mejor combine con la canción.'},
+  {field:'lyricDuration',prompt:'¿Qué duración te gustaría? Una canción de 2 minutos es más breve; 3 minutos permite desarrollar mejor la historia; 4 minutos da más espacio para los detalles.'},
+  {field:'lyricTone',prompt:'¿Qué emoción quieres que esa persona sienta al escucharla? Puede ser amor, ternura, alegría, nostalgia, perdón, gratitud, esperanza u otra. Elige la que mejor represente tu mensaje.'},
+  {field:'specialPhrase',prompt:'¿Hay alguna frase, apodo, fecha o recuerdo que tenga un significado especial para ustedes y que quisieras incluir? Es opcional; si no tienes uno, responde «ninguna».'},
   {field:'package',prompt:'¡Ahora elige el paquete para tu regalo! 💗\n\n1. ESENCIAL — S/20: tu canción personalizada en MP3.\n2. DETALLE ESPECIAL — S/25: tu canción + un video con dedicatoria e imágenes ilustrativas relacionadas con la letra. No incluye fotografías reales.\n3. REGALO COMPLETO — desde S/30: tu canción + video elaborado con fotografías reales que tú nos enviarás. El precio final depende del trabajo y te lo confirmaremos antes del pago.\n\nPuedes responder ESENCIAL, DETALLE ESPECIAL o REGALO COMPLETO. ¿Cuál eliges?'},
   {field:'urgency',prompt:'¡Perfecto! Ahora elige cuándo necesitas tu canción. ⏰\n\n1. ENTREGA NORMAL: 24–48 horas, previa confirmación. Sin recargo.\n2. MAÑANA: podemos coordinarla, sujeta a disponibilidad y confirmación.\n3. HOY: sujeta a disponibilidad y confirmación de la administradora.\n4. EXPRESS: entrega en 30 minutos con S/5 adicionales al precio de cualquier paquete. Totales: ESENCIAL S/25; DETALLE ESPECIAL S/30; REGALO COMPLETO desde S/35. Debemos confirmar disponibilidad antes de aceptar el servicio.\n5. FECHA FLEXIBLE: indícanos qué día te conviene y lo coordinamos.\n\n¿Cuál alternativa eliges? Puedes responder normal, mañana, hoy, express o fecha flexible.'}
  ];
@@ -1041,7 +1041,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   const next=nextManualField();
   if(!next){
    manualCurrentField='__final';
-   add('assistant','Antes de terminar, recuerda: el pago se coordina por Yape y la constancia se envía por WhatsApp. La plataforma no confirma automáticamente los pagos; la administradora verifica el comprobante. No realices el pago del paquete Regalo Completo hasta confirmar el precio final. El plazo y el servicio express también deben ser confirmados por la administradora.\n\n¡Ya reuní tus datos! 💗 ¿Deseas agregar algo más a tu canción o a la dedicatoria?');
+   add('assistant','¡Excelente! 💗 Ya reunimos la información para personalizar tu canción. Antes de continuar, ten en cuenta: el pago se coordina por Yape y el comprobante se verifica manualmente por la administradora. Si elegiste Regalo Completo, confirma el precio final antes de pagar. La entrega y el servicio exprés también requieren confirmación de disponibilidad.\n\n¿Deseas agregar algún otro detalle a tu canción o dedicatoria?');
    return;
   }
   manualCurrentField=next.field;
@@ -1058,7 +1058,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   manualMode=true;
   // Vaciar valores predeterminados para que el modo manual pregunte expresamente estos datos.
   ['occasion','style','voice','lyricTone','package','urgency'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  add('assistant','La IA está temporalmente sin disponibilidad. 💗 No te preocupes: continuaré contigo en modo manual, paso a paso. Te preguntaré todos los datos del pedido y también te explicaré los paquetes, precios, entrega, servicio express y forma de pago. No necesitas reiniciar la conversación.');
+  add('assistant','¡Bienvenido/a a Canta con el corazón! 💗 Te acompañaré paso a paso para preparar una canción personalizada, con los detalles que la harán única. Puedes responder con el número de una opción o escribirlo con tus propias palabras. Si necesitas ayuda, no te preocupes: te orientaré.');
   manualIndex=0;askManualNext();
  }
  function handleManualReply(answer){
