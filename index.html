@@ -898,13 +898,13 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
 
 <style>
 #cchAiOpen{position:fixed;right:16px;bottom:18px;z-index:9998;border:0;border-radius:28px;padding:14px 18px;background:#f6d78c;color:#3b1028;font-weight:800;box-shadow:0 6px 25px #0005}
-#cchAiPanel{position:fixed;z-index:9999;right:12px;bottom:78px;width:min(520px,calc(100vw - 24px));height:min(760px,calc(100dvh - 110px));background:#fffaf7;color:#351b2b;border:1px solid #e9a5bd;border-radius:22px;box-shadow:0 14px 44px #0007;display:none;flex-direction:column;overflow:hidden}
+#cchAiPanel{position:fixed;z-index:9999;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;background:#fffaf7;color:#351b2b;border:0;border-radius:0;box-shadow:none;display:none;flex-direction:column;overflow:hidden;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 #cchAiPanel.open{display:flex}#cchAiHead{padding:17px 18px;background:#3b1028;color:white;font-size:19px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
 #cchAiMessages{padding:16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
 .cchAiMsg{box-sizing:border-box;padding:16px 18px;border-radius:16px;max-width:98%;white-space:pre-wrap;line-height:1.65;font-size:18px;overflow-wrap:anywhere;letter-spacing:.01em}.cchAiBot{font-size:18px;background:#f5e7ed;align-self:stretch;border:1px solid #ead5df}.cchAiUser{font-size:17px;background:#3b1028;color:white;align-self:flex-end;max-width:90%}
 #cchAiControls{padding:14px 16px;border-top:1px solid #ead8e1;background:#fffaf7;flex-shrink:0}#cchAiInput{box-sizing:border-box;width:100%;padding:14px 15px;border:1px solid #d9c4ce;border-radius:12px;font-size:18px;min-height:54px;background:white}#cchAiSend,#cchAiTransfer{border:0;border-radius:12px;padding:14px;background:#681b43;color:white;font-size:18px;font-weight:750;margin-top:10px;width:100%;min-height:54px}#cchAiTransfer{background:#93622a}
 .cchAiMsg:not(:first-child){margin-top:2px}
-@media(max-width:520px){#cchAiPanel{right:8px;bottom:76px;width:calc(100vw - 16px);height:min(82dvh,820px);border-radius:20px}.cchAiMsg{font-size:17px;padding:15px 16px;line-height:1.6}#cchAiHead{font-size:18px}#cchAiMessages{padding:12px;gap:12px}}
+@media(max-width:520px){#cchAiPanel{inset:0;width:100vw;height:100vh;height:100dvh;border-radius:0}.cchAiMsg{font-size:17px;padding:15px 16px;line-height:1.6}#cchAiHead{font-size:18px;padding:calc(14px + env(safe-area-inset-top)) 16px 14px}#cchAiMessages{padding:12px;gap:12px}#cchAiControls{padding:12px 14px calc(12px + env(safe-area-inset-bottom))}}
 </style>
 <button id="cchAiOpen" type="button">✨ ¿Te ayudo con tu canción?</button>
 <section id="cchAiPanel" aria-label="Asistente para pedidos">
