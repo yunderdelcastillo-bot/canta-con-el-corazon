@@ -279,9 +279,10 @@ app.get("/api/verify-grant",async(req,res)=>{
   if(!song)return res.status(404).json({valid:false,canMp3:false,canVideo:false});
   const {data:g,error}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
   if(error)throw error;
-  const {data:replay,error:replayError}=await db.from("song_replay_authorizations").select("replay_count").eq("song_id",song.id).maybeSingle();
+  const {data:replay,error:replayError}=await db.from("song_replay_authorizations").select("replay_count,consumed_count").eq("song_id",song.id).maybeSingle();
   if(replayError)throw replayError;
-  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null,replayCount:Number(replay?.replay_count||0)});
+  const replayCount=Number(replay?.replay_count||0),consumedCount=Number(replay?.consumed_count||0);
+  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null,replayCount,pendingReplayCount:Math.max(0,replayCount-consumedCount),nextReplaySequence:consumedCount+1});
  }catch(e){res.status(500).json({valid:false});}
 });
 
