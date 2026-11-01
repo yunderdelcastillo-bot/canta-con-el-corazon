@@ -321,6 +321,15 @@ app.post("/api/songs",async(req,res)=>{
   const row={id,title,recipient,dedication,lyrics:String(body.lyrics||""),theme:String(body.theme||"romantico"),audio_path,audio_url:null,owner_id:user.id,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
   const {error:saveError}=await db.from("songs").upsert(row);
   if(saveError)return res.status(500).json({error:"El archivo se subió, pero la base de datos rechazó la canción: "+saveError.message});
+  // Sincroniza el paquete editado con los permisos ya concedidos.
+  const {data:oldGrant,error:grantReadError}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",id).maybeSingle();
+  if(grantReadError)return res.status(500).json({error:"La canción se guardó, pero no se pudieron sincronizar sus beneficios: "+grantReadError.message});
+  if(oldGrant){
+   const enabled=!!oldGrant.can_mp3;
+   const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
+   const {error:grantSyncError}=await db.from("song_package_permissions").upsert({song_id:id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:enabled,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
+   if(grantSyncError)return res.status(500).json({error:"La canción se guardó, pero no se pudieron actualizar los permisos: "+grantSyncError.message});
+  }
   res.set("Cache-Control","no-store").json({ok:true,song:row});
  }catch(e){console.error("Error saving song:",e?.message||e);res.status(500).json({error:"Error interno al guardar la canción."});}
 });
