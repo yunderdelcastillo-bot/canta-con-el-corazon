@@ -359,9 +359,10 @@ app.post("/api/grants",async(req,res)=>{
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para cambiar los beneficios de esta canción."});
-  const packagePrice=Number(song.package_price)||20;
-  // El precio registrado protege contra una etiqueta de paquete equivocada en canciones antiguas.
-  const packageKey=packagePrice===20?"esencial":packagePrice===25?"detalle":packagePrice>=30?"completo":(["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial");
+  // La opción de paquete guardada en la canción es la fuente principal; el precio solo recupera registros antiguos sin paquete.
+  const savedPackageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:null;
+  const packagePrice=Number(song.package_price)||({esencial:20,detalle:25,completo:30}[savedPackageKey||"esencial"]);
+  const packageKey=savedPackageKey||(packagePrice>=30?"completo":packagePrice>=25?"detalle":"esencial");
   const canMp3=enabled;
   const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
   const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:canMp3,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
