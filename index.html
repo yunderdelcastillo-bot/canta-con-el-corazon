@@ -898,11 +898,13 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
 
 <style>
 #cchAiOpen{position:fixed;right:16px;bottom:18px;z-index:9998;border:0;border-radius:28px;padding:14px 18px;background:#f6d78c;color:#3b1028;font-weight:800;box-shadow:0 6px 25px #0005}
-#cchAiPanel{position:fixed;z-index:9999;right:12px;bottom:78px;width:min(390px,calc(100vw - 24px));height:min(600px,calc(100dvh - 110px));background:#fff7f2;color:#351b2b;border:1px solid #e9a5bd;border-radius:20px;box-shadow:0 12px 40px #0006;display:none;flex-direction:column;overflow:hidden}
-#cchAiPanel.open{display:flex}#cchAiHead{padding:14px;background:#3b1028;color:white;font-weight:800;display:flex;justify-content:space-between;align-items:center}
-#cchAiMessages{padding:12px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:9px}
-.cchAiMsg{padding:14px 15px;border-radius:14px;max-width:96%;white-space:pre-wrap;line-height:1.55;font-size:17px;overflow-wrap:anywhere}.cchAiBot{font-size:17px}.cchAiUser{font-size:16px}#cchAiMessages{padding:14px;gap:12px}#cchAiInput{font-size:17px;min-height:48px;padding:13px}#cchAiSend,#cchAiTransfer{font-size:17px;min-height:48px;padding:13px}.cchAiBot{background:#f2e2e9;align-self:flex-start}.cchAiUser{background:#3b1028;color:white;align-self:flex-end}
-#cchAiControls{padding:10px;border-top:1px solid #ead8e1}#cchAiInput{width:100%;padding:11px;border:1px solid #d9c4ce;border-radius:10px;font:inherit}#cchAiSend,#cchAiTransfer{border:0;border-radius:10px;padding:11px;background:#681b43;color:white;font-weight:700;margin-top:8px;width:100%}#cchAiTransfer{background:#93622a}
+#cchAiPanel{position:fixed;z-index:9999;right:12px;bottom:78px;width:min(520px,calc(100vw - 24px));height:min(760px,calc(100dvh - 110px));background:#fffaf7;color:#351b2b;border:1px solid #e9a5bd;border-radius:22px;box-shadow:0 14px 44px #0007;display:none;flex-direction:column;overflow:hidden}
+#cchAiPanel.open{display:flex}#cchAiHead{padding:17px 18px;background:#3b1028;color:white;font-size:19px;font-weight:800;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+#cchAiMessages{padding:16px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;scroll-behavior:smooth}
+.cchAiMsg{box-sizing:border-box;padding:16px 18px;border-radius:16px;max-width:98%;white-space:pre-wrap;line-height:1.65;font-size:18px;overflow-wrap:anywhere;letter-spacing:.01em}.cchAiBot{font-size:18px;background:#f5e7ed;align-self:stretch;border:1px solid #ead5df}.cchAiUser{font-size:17px;background:#3b1028;color:white;align-self:flex-end;max-width:90%}
+#cchAiControls{padding:14px 16px;border-top:1px solid #ead8e1;background:#fffaf7;flex-shrink:0}#cchAiInput{box-sizing:border-box;width:100%;padding:14px 15px;border:1px solid #d9c4ce;border-radius:12px;font-size:18px;min-height:54px;background:white}#cchAiSend,#cchAiTransfer{border:0;border-radius:12px;padding:14px;background:#681b43;color:white;font-size:18px;font-weight:750;margin-top:10px;width:100%;min-height:54px}#cchAiTransfer{background:#93622a}
+.cchAiMsg:not(:first-child){margin-top:2px}
+@media(max-width:520px){#cchAiPanel{right:8px;bottom:76px;width:calc(100vw - 16px);height:min(82dvh,820px);border-radius:20px}.cchAiMsg{font-size:17px;padding:15px 16px;line-height:1.6}#cchAiHead{font-size:18px}#cchAiMessages{padding:12px;gap:12px}}
 </style>
 <button id="cchAiOpen" type="button">✨ ¿Te ayudo con tu canción?</button>
 <section id="cchAiPanel" aria-label="Asistente para pedidos">
@@ -915,7 +917,14 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  const panel=document.getElementById('cchAiPanel'),initial='¡Hola! 💗 Bienvenido/a a Canta con el corazón. Creamos canciones personalizadas para expresar lo que sientes y sorprender a alguien especial. 🎶\n\nTe ayudaré a contarme tu historia y escoger la música y la voz. No necesitas llenar el formulario mientras conversamos: iré guardando tus respuestas. Al final podrás revisar tus datos y pulsar «Generar mi letra». 💝\n\nPara comenzar, ¿cómo te llamas y para quién será la canción?';
  const messages=[{role:'assistant',content:initial}],box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend'),autoStatus=document.getElementById('cchAiAutoStatus');
  let finalQuestionAsked=false,conversationTransferred=false,cachedOrderData={};
- const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=content;box.appendChild(d);box.scrollTop=box.scrollHeight;};
+ const formatChatText=value=>String(value??'')
+  .replace(/\\\\n/g,'\\n')
+  .replace(/\\*\\*(.*?)\\*\\*/g,'$1')
+  .replace(/(^|\\n)(\\d+\\.)[ \\t]*/g,'$1$2 ')
+  .replace(/([^\\n])(\\d+\\.)[ \\t]+/g,'$1\\n\\n$2 ')
+  .replace(/\\n{3,}/g,'\\n\\n')
+  .trim();
+ const add=(role,content)=>{const d=document.createElement('div');d.className='cchAiMsg '+(role==='user'?'cchAiUser':'cchAiBot');d.textContent=formatChatText(content);box.appendChild(d);box.scrollTop=box.scrollHeight;};
  let manualStarted=false;
  document.getElementById('cchAiOpen').onclick=()=>{
   panel.classList.add('open');
