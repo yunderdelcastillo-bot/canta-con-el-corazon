@@ -342,6 +342,8 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   if(lyricLines.length)document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥';
   if(downloadAllowed){document.getElementById('replayGiftAudio').classList.remove('hidden');return}
   if(!grantToken){
+   // Mostrar la pantalla de compra inmediatamente al terminar la muestra; no esperar la respuesta del servidor.
+   if(!downloadAllowed)showPaymentCta();
    try{
     const response=await fetch(API_BASE+'/api/preview/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
     const result=await response.json();
