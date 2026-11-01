@@ -1026,7 +1026,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    const choices=manualSelectChoices(el);
    let opt=null;
    // La numeración corresponde exactamente al orden mostrado al cliente (1 = primera alternativa).
-   const number=value.match(/^(?:opción\\s*)?(\\d+)$/i);
+   const number=value.match(/^(?:opción\s*)?(\d+)$/i);
    if(number){
     const index=Number(number[1])-1;
     if(index>=0&&index<choices.length)opt=choices[index];
