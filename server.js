@@ -355,16 +355,18 @@ app.post("/api/grants",async(req,res)=>{
   const {data:{user},error:authError}=await caller.auth.getUser(bearer[1]);
   if(authError||!user)return res.status(401).json({error:"Sesión no válida."});
   const songId=String(req.body.songId||"");
+  const enabled=req.body.enabled!==false;
   const db=admin();
   const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
-  if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para autorizar esta canción."});
+  if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para cambiar los beneficios de esta canción."});
   const packageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:"esencial";
-  const canMp3=true,canVideo=packageKey==="detalle"||packageKey==="completo";
+  const canMp3=enabled;
+  const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
   const packagePrice=Number(song.package_price)||({esencial:20,detalle:25,completo:30}[packageKey]);
   const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:canMp3,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
-  if(permissionError){console.error("Package permission save failed:",permissionError.message);return res.status(500).json({error:"No se pudo activar el paquete en el mismo enlace: "+permissionError.message+". Ejecuta la nueva migración SQL en Supabase."});}
-  res.set("Cache-Control","no-store").json({ok:true,songId:song.id,packageKey,packagePrice,canMp3,canVideo});
- }catch(e){res.status(500).json({error:"Error interno al autorizar la descarga."});}
+  if(permissionError){console.error("Package permission save failed:",permissionError.message);return res.status(500).json({error:"No se pudo cambiar el permiso: "+permissionError.message});}
+  res.set("Cache-Control","no-store").json({ok:true,songId:song.id,enabled,packageKey,packagePrice,canMp3,canVideo});
+ }catch(e){res.status(500).json({error:"Error interno al cambiar los beneficios."});}
 });
 
 app.post("/api/share-video",async(req,res)=>{
@@ -381,7 +383,8 @@ app.post("/api/share-video",async(req,res)=>{
   if(previewToken&&/^[A-Za-z0-9_-]{40,100}$/.test(previewToken)){
    const hash=crypto.createHash("sha256").update(previewToken).digest("hex");
    const {data:link}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",hash).eq("download_enabled",true).maybeSingle();
-   allowedDownload=!!link;
+   const {data:packagePermission}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();
+   allowedDownload=!!link&&!!packagePermission?.can_video;
   }
   if(!allowedDownload&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
    const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
