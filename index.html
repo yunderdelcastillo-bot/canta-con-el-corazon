@@ -240,12 +240,26 @@ if(sharedVideoUrl){
   const revealHeart=document.createElement('div');revealHeart.textContent='♥';revealHeart.style.cssText='font-size:3rem;color:#f3a7c5;margin-top:16px';reveal.appendChild(revealHeart);
   stage.appendChild(reveal);
   document.body.appendChild(cover);document.body.appendChild(stage);
-  play.addEventListener('click',async()=>{
-   cover.style.display='none';stage.style.display='flex';
-   try{await vp.play()}catch(e){caption.textContent='Toca reproducir para descubrir tu regalo ♥'}
-   // Deja leer el nombre y la dedicatoria antes de despejar la vista al video.
-   setTimeout(()=>{reveal.style.opacity='0';setTimeout(()=>{reveal.style.display='none'},1500)},3500);
-  });
+  let surpriseOpened=false;
+  const openSurprise=async()=>{
+   if(surpriseOpened)return;
+   surpriseOpened=true;
+   cover.style.display='none';
+   stage.style.display='flex';
+   stage.style.visibility='visible';
+   reveal.style.display='flex';
+   reveal.style.opacity='1';
+   // El contenido aparece incluso si el navegador bloquea la reproducción automática.
+   try{vp.load();await vp.play();caption.textContent='Hecho con amor ♥ Canta con el corazón'}
+   catch(e){caption.textContent='Tu sorpresa está aquí ♥ Pulsa reproducir en el video para escucharla';vp.controls=true}
+   setTimeout(()=>{reveal.style.opacity='0';setTimeout(()=>{reveal.style.display='none'},1500)},4500);
+  };
+  play.addEventListener('click',openSurprise);
+  cover.addEventListener('click',openSurprise);
+  cover.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSurprise()}});
+  cover.tabIndex=0;
+  cover.setAttribute('role','button');
+  cover.setAttribute('aria-label','Toca para descubrir tu sorpresa');
  }
  document.getElementById('downloadGift').textContent='⬇️ Descargar mi regalo en video';
  document.getElementById('downloadNotice').textContent='El video completo ya está creado. Puedes reproducirlo o descargarlo aquí.';
