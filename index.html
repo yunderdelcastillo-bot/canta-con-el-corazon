@@ -114,6 +114,14 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
 <button class="btn" style="margin-top:20px" type="submit">Enviar mi solicitud por WhatsApp ♥</button>
 <p class="note">El formulario abrirá WhatsApp con los datos del pedido. No se realiza ningún cobro en esta página.</p>
 </form>
+<div id="orderPaymentUpload" class="payment hidden" style="margin-top:16px">
+ <h3>📤 Adjunta tu comprobante de pago</h3>
+ <p class="microcopy" id="orderPaymentStatus">Tu pedido quedó registrado. Puedes adjuntar tu voucher aquí para que lo revisemos.</p>
+ <label for="orderVoucherFile">Comprobante (JPG, PNG, WEBP o PDF; máximo 8 MB)</label>
+ <input id="orderVoucherFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
+ <button class="btn secondary" id="uploadOrderVoucher" type="button">Enviar comprobante seguro</button>
+ <p class="microcopy">El comprobante se guarda de forma privada. El pago no se confirma ni se desbloquea hasta verificarlo.</p>
+</div>
 </section>
 <section class="card section faq" id="preguntas"><h2>Preguntas frecuentes</h2><details><summary>¿La canción se crea especialmente para mí?</summary><p>Sí. Usamos la historia, los nombres y el estilo que nos indiques para preparar tu canción por encargo.</p></details><details><summary>¿Cuánto demora?</summary><p>Confirmamos el plazo por WhatsApp según el pedido y la fecha que necesitas.</p></details><details><summary>¿Cómo pago?</summary><p>Coordinamos el precio final y el medio de pago por WhatsApp antes de iniciar el trabajo.</p></details><details><summary>¿Puedo pedir un fotovideo o un cuento?</summary><p>Escríbenos para confirmar materiales, disponibilidad y precio.</p></details><p class="note">Usamos los datos del formulario para responder tu solicitud. Evita incluir información sensible.</p><a class="btn full" href="https://wa.me/51977974730?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20una%20canci%C3%B3n%20personalizada" target="_blank" rel="noopener">Consultar por WhatsApp</a></section><footer>© Canta con el corazón · Regalos musicales personalizados<br>Usamos tus datos solo para coordinar tu solicitud.</footer>
 </main>
@@ -931,12 +939,35 @@ async function saveCustomerOrder(includeLyrics=true){
  return result;
 }
 
+document.getElementById('uploadOrderVoucher').addEventListener('click',async()=>{
+ const file=document.getElementById('orderVoucherFile').files[0],status=document.getElementById('orderPaymentStatus'),btn=document.getElementById('uploadOrderVoucher'),ctx=window.cchPaymentContext;
+ if(!ctx?.orderId||!ctx?.accessToken){status.textContent='No encontramos el acceso seguro de este pedido. Vuelve a enviar el formulario o escríbenos por WhatsApp.';return;}
+ if(!file){status.textContent='Selecciona primero la foto o PDF de tu comprobante.';return;}
+ if(file.size>8*1024*1024){status.textContent='El comprobante debe pesar máximo 8 MB.';return;}
+ btn.disabled=true;status.textContent='Subiendo tu comprobante de forma segura…';
+ try{
+  const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer el archivo.'));reader.readAsDataURL(file);});
+  const response=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64})});
+  const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'No se pudo enviar el comprobante.');
+  status.textContent='✅ Comprobante recibido. Lo revisaremos y te avisaremos cuando el pago quede confirmado.';
+  btn.textContent='Comprobante enviado';
+ }catch(error){status.textContent='No se pudo enviar: '+error.message;}
+ finally{btn.disabled=false;}
+});
 document.getElementById('orderForm').addEventListener('submit',async e=>{
  e.preventDefault();
  const btn=e.submitter,wa=window.open('about:blank','_blank');
  if(btn)btn.disabled=true;
  try{
-  await saveCustomerOrder(false);
+  const savedOrder=await saveCustomerOrder(false);
+  if(savedOrder.paymentReady&&savedOrder.paymentAccessToken){
+   window.cchPaymentContext={orderId:savedOrder.orderId,accessToken:savedOrder.paymentAccessToken};
+   document.getElementById('orderPaymentUpload').classList.remove('hidden');
+   document.getElementById('orderPaymentStatus').textContent='Pedido '+savedOrder.orderId+' registrado. Si ya pagaste, adjunta aquí tu comprobante.';
+  }else{
+   document.getElementById('orderPaymentUpload').classList.remove('hidden');
+   document.getElementById('orderPaymentStatus').textContent='Tu pedido se registró, pero la carga segura de comprobantes aún necesita que se ejecute la migración de pagos en Supabase. También puedes enviarlo por WhatsApp.';
+  }
   const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false));
   if(wa)wa.location.href=url;else window.location.href=url;
   document.getElementById('customerLyricsStatus').textContent='💗 Tu solicitud quedó registrada. Se enviarán tus datos e historia por WhatsApp; Canta con el corazón preparará la letra manualmente.';
