@@ -120,7 +120,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
  <label for="orderVoucherFile">Comprobante (JPG, PNG, WEBP o PDF; máximo 8 MB)</label>
  <input id="orderVoucherFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
  <button class="btn secondary" id="uploadOrderVoucher" type="button">Enviar comprobante seguro</button>
- <p class="microcopy">El comprobante se guarda de forma privada. El pago no se confirma ni se desbloquea hasta verificarlo.</p>
+ <p class="microcopy">El comprobante se guarda de forma privada. La IA revisa el importe y el código de operación visibles; si no puede leerlos con seguridad, queda pendiente de revisión. La captura no consulta directamente los movimientos de Yape.</p>
 </div>
 </section>
 <section class="card section faq" id="preguntas"><h2>Preguntas frecuentes</h2><details><summary>¿La canción se crea especialmente para mí?</summary><p>Sí. Usamos la historia, los nombres y el estilo que nos indiques para preparar tu canción por encargo.</p></details><details><summary>¿Cuánto demora?</summary><p>Confirmamos el plazo por WhatsApp según el pedido y la fecha que necesitas.</p></details><details><summary>¿Cómo pago?</summary><p>Coordinamos el precio final y el medio de pago por WhatsApp antes de iniciar el trabajo.</p></details><details><summary>¿Puedo pedir un fotovideo o un cuento?</summary><p>Escríbenos para confirmar materiales, disponibilidad y precio.</p></details><p class="note">Usamos los datos del formulario para responder tu solicitud. Evita incluir información sensible.</p><a class="btn full" href="https://wa.me/51977974730?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20una%20canci%C3%B3n%20personalizada" target="_blank" rel="noopener">Consultar por WhatsApp</a></section><footer>© Canta con el corazón · Regalos musicales personalizados<br>Usamos tus datos solo para coordinar tu solicitud.</footer>
@@ -949,7 +949,7 @@ document.getElementById('uploadOrderVoucher').addEventListener('click',async()=>
   const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer el archivo.'));reader.readAsDataURL(file);});
   const response=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64})});
   const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'No se pudo enviar el comprobante.');
-  status.textContent='✅ Comprobante recibido. Lo revisaremos y te avisaremos cuando el pago quede confirmado.';
+  status.textContent=result.status==='approved'?'✅ Comprobante leído y aceptado automáticamente. Tu MP3 se habilitará cuando la canción esté lista; el video depende del paquete.':result.status==='rejected'?'⚠️ La captura no coincide o no se pudo aceptar. Envía una imagen más clara o comunícate por WhatsApp.':'📩 Comprobante recibido. La IA no pudo validarlo con seguridad; quedó pendiente de revisión.';
   btn.textContent='Comprobante enviado';
  }catch(error){status.textContent='No se pudo enviar: '+error.message;}
  finally{btn.disabled=false;}
