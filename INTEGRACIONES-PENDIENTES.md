@@ -7,6 +7,14 @@ Las integraciones quedan preparadas, pero **no se ejecutan ni cobran/envían men
 2. Ejecutar después `supabase-messaging-notifications.sql` (crea conversaciones internas y notificaciones).
 3. No volver a ejecutar migraciones ya aplicadas es necesario; los scripts usan `IF NOT EXISTS`.
 
+## Revisión automática de vouchers Yape
+- El servidor analiza imágenes/PDF con Gemini cuando existe `GEMINI_API_KEY`.
+- Compara el importe extraído con el total del pedido y exige un código de operación legible.
+- Evita reutilizar la misma captura o el mismo código de operación usando el campo único `provider_payment_id` existente.
+- Si la captura no es clara, el importe no coincide o la IA no está disponible, el voucher queda pendiente o rechazado; la administradora conserva la revisión manual.
+- La aceptación basada en captura es una validación visual, no una consulta a los movimientos reales de Yape. Puede aceptar una captura falsificada; no debe interpretarse como confirmación bancaria.
+- Cuando la canción del pedido se guarda desde el panel con el pedido activo, el servidor vincula el pago y activa automáticamente MP3 y, solo para DETALLE/COMPLETO, video. ESENCIAL (S/20) habilita únicamente MP3.
+
 ## Culqi (pendiente)
 Variables de entorno en Render API:
 - `CULQI_PUBLIC_KEY`
