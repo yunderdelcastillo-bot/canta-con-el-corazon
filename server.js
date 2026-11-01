@@ -239,6 +239,10 @@ app.get("/api/audio",async(req,res)=>{
    grantAuthorized=!!g?.can_mp3;
   }
   if(!grantAuthorized){
+   const {data:packagePermission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",song.id).maybeSingle();
+   if(packagePermission?.can_mp3)grantAuthorized=true;
+  }
+  if(!grantAuthorized){
    if(!preview)return res.status(403).json({error:"Inicia la vista previa desde el botón del regalo."});
    const previewHash=crypto.createHash("sha256").update(preview).digest("hex");
    const {data:session,error:sessionError}=await db.from("song_preview_links").select("id,started_at,completed_at,download_enabled").eq("song_id",song.id).eq("token_hash",previewHash).maybeSingle();
@@ -350,6 +354,7 @@ app.post("/api/share-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
+  if(!allowedDownload){const {data:permission}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!permission?.can_video;}
   if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
   const chunks=[];let total=0;const maxBytes=30*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 30 MB."});chunks.push(chunk);}
@@ -391,6 +396,7 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
+  if(!allowedDownload){const {data:permission}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!permission?.can_video;}
   if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
   const chunks=[];let total=0;const maxBytes=45*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
