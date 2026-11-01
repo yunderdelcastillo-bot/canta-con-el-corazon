@@ -979,10 +979,50 @@ app.post("/api/orders",async(req,res)=>{
   rec.count++;assistantChatLimits.set(bucket,rec);
   const {data,error}=await admin().from("customer_orders").insert(order).select("id,created_at").single();
   if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
+  let paymentAccessToken=null,paymentReady=false;
+  try{
+   const rawPackage=String(order.package_name||"").toLowerCase();
+   const baseAmount=rawPackage.includes("s/25")||rawPackage.includes("25")?25:rawPackage.includes("s/30")||rawPackage.includes("30")?30:20;
+   const amount=baseAmount+(String(order.urgency||"").toLowerCase().includes("30 minutos")?5:0);
+   paymentAccessToken=crypto.randomBytes(32).toString("base64url");
+   const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
+   const {error:paymentError}=await admin().from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
+   if(paymentError)throw paymentError;
+   paymentReady=true;
+  }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   if(order.lyrics&&order.lyrics.length>=40)setImmediate(()=>{generateOrderAudio(data.id,order);});
-  res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at});
+  res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
+app.post("/api/orders/:id/voucher",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El sistema de pagos no está configurado."});
+  const id=String(req.params.id||""),token=String(req.body?.accessToken||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Pedido o autorización no válidos."});
+  const mime=String(req.body?.mimeType||"").toLowerCase();
+  const allowed=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"],["application/pdf","pdf"]]);
+  if(!allowed.has(mime))return res.status(400).json({error:"Adjunta una imagen JPG, PNG, WEBP o un PDF."});
+  const raw=String(req.body?.fileBase64||"").replace(/^data:[^;]+;base64,/i,"");
+  if(!raw||raw.length>11*1024*1024)return res.status(413).json({error:"El comprobante está vacío o supera 8 MB."});
+  const buffer=Buffer.from(raw,"base64");if(!buffer.length||buffer.length>8*1024*1024)return res.status(413).json({error:"El comprobante supera 8 MB."});
+  const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
+  if(paymentError||!payment)return res.status(403).json({error:"No se pudo validar el acceso a este pedido."});
+  if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
+  const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
+  if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
+   const {error:createError}=await db.storage.createBucket("payment-vouchers",{public:false,fileSizeLimit:"8MB",allowedMimeTypes:[...allowed.keys()]});
+   if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+  }
+  const path=id+"/"+Date.now()+"-"+crypto.randomBytes(5).toString("hex")+"."+allowed.get(mime);
+  const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
+  if(uploadError)throw uploadError;
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",updated_at:new Date().toISOString()}).eq("id",payment.id);
+  if(updateError)throw updateError;
+  res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",message:"Comprobante recibido. Se revisará antes de activar los beneficios."});
+ }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
+});
+
 app.get("/api/orders/:id/audio-status",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
@@ -1004,7 +1044,12 @@ app.get("/api/admin/orders",async(req,res)=>{
   const {data:audioFiles,error:audioError}=await db.storage.from("songs-audio").list("orders",{limit:1000});
   if(audioError)throw audioError;
   const audioNames=new Set((audioFiles||[]).map(file=>file.name));
-  const orders=(data||[]).map(order=>({...order,audio_ready:audioNames.has(order.id+".mp3")}));
+  const orderIds=(data||[]).map(order=>order.id);
+  const {data:payments,error:paymentError}=orderIds.length?await db.from("payment_submissions").select("id,order_id,amount,package_name,payment_status,provider,voucher_path,song_id,created_at,updated_at").in("order_id",orderIds):{data:[],error:null};
+  if(paymentError)throw paymentError;
+  const paymentByOrder=new Map();
+  for(const payment of payments||[]){let voucherUrl=null;if(payment.voucher_path){const {data:signed}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);voucherUrl=signed?.signedUrl||null;}paymentByOrder.set(payment.order_id,{...payment,voucher_url:voucherUrl});}
+  const orders=(data||[]).map(order=>({...order,audio_ready:audioNames.has(order.id+".mp3"),payment:paymentByOrder.get(order.id)||null}));
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
 });
@@ -1039,6 +1084,32 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,audio_ready:true});
  }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el audio en el pedido."});}
 });
+app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||""),status=String(req.body?.status||""),songId=String(req.body?.songId||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||!["approved","rejected"].includes(status))return res.status(400).json({error:"Solicitud de revisión no válida."});
+  const db=admin();
+  const {data:payment,error}=await db.from("payment_submissions").select("*").eq("order_id",id).maybeSingle();
+  if(error||!payment)return res.status(404).json({error:"No se encontró el registro de pago."});
+  let benefitsActivated=false;
+  if(status==="approved"&&songId){
+   const {data:song,error:songError}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
+   if(songError||!song||song.owner_id!==user.id)return res.status(403).json({error:"La canción seleccionada no pertenece a tu biblioteca."});
+   const key=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:(Number(song.package_price)>=30?"completo":Number(song.package_price)>=25?"detalle":"esencial");
+   const price=Number(song.package_price)||Number(payment.amount)||20;
+   const {error:grantError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:key,package_price:price,can_mp3:true,can_video:key==="detalle"||key==="completo",updated_at:new Date().toISOString()},{onConflict:"song_id"});
+   if(grantError)throw grantError;
+   benefitsActivated=true;
+  }
+  const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString(),...(songId?{song_id:songId}:{})}).eq("id",payment.id);
+  if(updateError)throw updateError;
+  if(status==="approved"){const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);if(orderError)throw orderError;}
+  res.set("Cache-Control","no-store").json({ok:true,status,benefitsActivated,message:benefitsActivated?"Pago confirmado y beneficios activados en la canción vinculada.":status==="approved"?"Pago confirmado. Vincula la canción del cliente para activar sus beneficios.":"Comprobante rechazado."});
+ }catch(e){console.error("Payment review:",e?.message||e);res.status(500).json({error:"No se pudo guardar la revisión del pago."});}
+});
+
 app.patch("/api/admin/orders/:id",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
