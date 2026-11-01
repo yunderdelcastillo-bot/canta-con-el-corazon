@@ -1013,18 +1013,29 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   }
   return bestScore>=0.48?best:null;
  }
+ function manualSelectChoices(el){
+  return [...el.options].filter(o=>String(o.text||'').trim()&&!(o.value===''&&/elige una opción|elige un género|elige el tipo|elige la duración|elige la emoción/i.test(o.text)));
+ }
  function saveManualAnswer(field,answer){
   const el=document.getElementById(field);if(!el)return true;
   let value=String(answer||'').trim();if(!value)return false;
   if(/^(ninguno|ninguna|no|no tengo|me da igual|indiferente)$/i.test(value)&&['customGenre','specialPhrase'].includes(field)){el.value='';cachedOrderData[field]='';return true;}
   if(el.tagName==='SELECT'){
-   const options=[...el.options].filter(o=>o.value||o.text);
-   const opt=closestSelectOption(field,value,options);
+   const choices=manualSelectChoices(el);
+   let opt=null;
+   // La numeración corresponde exactamente al orden mostrado al cliente (1 = primera alternativa).
+   const number=value.match(/^(?:opción\\s*)?(\\d+)$/i);
+   if(number){
+    const index=Number(number[1])-1;
+    if(index>=0&&index<choices.length)opt=choices[index];
+   }else{
+    opt=closestSelectOption(field,value,choices);
+   }
    if(!opt){
-    add('assistant','No te preocupes 😊. No logré identificar esa opción. ¿Puedes escribirla de nuevo o elegir la más parecida a estas alternativas?\\n'+options.map((o,i)=>(i+1)+'. '+o.text).join('\\n'));
+    add('assistant','No te preocupes 😊. No pude identificar esa respuesta. No seleccionaré nada por error. Elige el número de la alternativa o escribe su nombre:\n\n'+choices.map((o,i)=>(i+1)+'. '+o.text).join('\n\n'));
     return false;
    }
-   el.value=opt.value||opt.text;
+   el.value=opt.value;
   }else el.value=value;
   cachedOrderData[field]=el.value;
   return true;
@@ -1048,7 +1059,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   let prompt=next.prompt;
   const fieldEl=document.getElementById(next.field);
   if(fieldEl&&fieldEl.tagName==='SELECT'){
-   const choices=[...fieldEl.options].filter(o=>String(o.text||'').trim()&&!(o.value===''&&/elige una opción|elige un género|elige el tipo|elige la duración|elige la emoción/i.test(o.text)));
+   const choices=manualSelectChoices(fieldEl);
    if(choices.length)prompt+='\n\nOpciones disponibles:\n\n'+choices.map((o,i)=>(i+1)+'. '+o.text).join('\n\n')+'\n\nResponde con el número o escribe la opción que prefieras.';
   }
   add('assistant',prompt);
@@ -1068,7 +1079,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
    }
    transferToForm();return;
   }
-  if(manualCurrentField)saveManualAnswer(manualCurrentField,answer);
+  if(manualCurrentField){const saved=saveManualAnswer(manualCurrentField,answer);if(!saved)return;}
   manualIndex++;askManualNext();
  }
  async function sendMessage(){
