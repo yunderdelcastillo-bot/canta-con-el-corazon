@@ -293,7 +293,7 @@ function lockPreview(message){
  audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
  const playButton=document.getElementById('playPreview');if(playButton)playButton.classList.add('hidden');
  audioNote.textContent=message||'La vista previa gratuita ya terminó. Solicita el enlace de pago para recibir tu canción completa.';
- audioNote.classList.remove('hidden');showPaymentCta();
+ audioNote.classList.remove('hidden');
 }
 async function startPreview(){
  const playButton=document.getElementById('playPreview');
