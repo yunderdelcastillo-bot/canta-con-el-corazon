@@ -1131,20 +1131,22 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
    if(!/^[0-9a-f-]{36}$/i.test(ownerId))return res.set("Cache-Control","no-store").json({ok:true,status:"failed",message:"Falta configurar el usuario administrador para publicar la muestra."});
    const existing=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
    if(existing.error)throw existing.error;
-   if(existing.data)song=existing.data;
-   const packageText=String(order.package_name||"").toLowerCase();
-   const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
-   const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
-   const path=ownerId+"/"+id+".mp3";
-   const {data:canonical,error:downloadError}=await db.storage.from("songs-audio").download("orders/"+id+".mp3");
-   if(downloadError||!canonical)throw downloadError||new Error("No se pudo recuperar el audio generado.");
-   const {error:copyError}=await db.storage.from("songs-audio").upload(path,Buffer.from(await canonical.arrayBuffer()),{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
-   if(copyError)throw copyError;
-   const occasion=String(order.occasion||"").toLowerCase();
-   const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
-   const row={id,owner_id:ownerId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:path,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
-   const {error:saveError}=await db.from("songs").upsert(row);if(saveError)throw saveError;
-   song={id,owner_id:ownerId,audio_path:path};
+   if(existing.data){song=existing.data;}
+   else{
+    const packageText=String(order.package_name||"").toLowerCase();
+    const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
+    const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+    const path=ownerId+"/"+id+".mp3";
+    const {data:canonical,error:downloadError}=await db.storage.from("songs-audio").download("orders/"+id+".mp3");
+    if(downloadError||!canonical)throw downloadError||new Error("No se pudo recuperar el audio generado.");
+    const {error:copyError}=await db.storage.from("songs-audio").upload(path,Buffer.from(await canonical.arrayBuffer()),{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+    if(copyError)throw copyError;
+    const occasion=String(order.occasion||"").toLowerCase();
+    const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
+    const row={id,owner_id:ownerId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:path,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
+    const {error:saveError}=await db.from("songs").upsert(row);if(saveError)throw saveError;
+    song={id,owner_id:ownerId,audio_path:path};
+   }
   }
   const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
   const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:song.owner_id,download_enabled:false});
