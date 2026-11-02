@@ -58,8 +58,9 @@ textarea{min-height:100px}
  .preview-frame{height:440px}
 }
 
+.panel-nav.menu-collapsed{display:none!important}.panel-nav{flex-wrap:wrap}.panel-nav a[aria-current="page"]{background:#681b43;color:#fff;border-color:#681b43}#panelMenuToggle{margin:0 0 8px}
 </style></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
-<nav class="panel-nav" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
+<div style="max-width:980px;margin:10px auto;padding:0 14px"><button class="btn alt" id="panelMenuToggle" type="button" aria-expanded="false" aria-controls="panelMenu">☰ Menú del panel</button></div><nav class="panel-nav menu-collapsed" id="panelMenu" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
 <section class="card"><h2>1. Conectar almacenamiento en la nube</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
 <section class="card"><h2>2. Iniciar sesión</h2><div class="grid"><div><label>Correo administrador</label><input id="email" type="email" autocomplete="username"></div><div><label>Contraseña</label><input id="password" type="password" autocomplete="current-password"></div></div><div class="row"><button class="btn" id="login">Iniciar sesión</button><button class="btn alt" id="logout">Cerrar sesión</button></div><div class="status" id="authStatus">Conecta Supabase y luego inicia sesión.</div></section>
@@ -317,7 +318,9 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
 (function(){
  const ids=['customerOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
  const nav=document.querySelector('.panel-nav');
+ const menuToggle=document.getElementById('panelMenuToggle');
  if(!nav)return;
+ if(menuToggle){menuToggle.onclick=()=>{const opening=nav.classList.contains('menu-collapsed');nav.classList.toggle('menu-collapsed');menuToggle.setAttribute('aria-expanded',String(opening));menuToggle.textContent=opening?'✕ Cerrar menú':'☰ Menú del panel';};}
  function showPanel(id){
    ids.forEach(x=>{const el=document.getElementById(x);if(el)el.classList.toggle('hidden',x!==id);});
    nav.querySelectorAll('a').forEach(a=>{
@@ -330,7 +333,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>{
    const id=(a.getAttribute('href')||'').slice(1);
    if(!ids.includes(id))return;
-   e.preventDefault();showPanel(id);
+   e.preventDefault();showPanel(id);nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}
  }));
  // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
  showPanel('customerOrders');
