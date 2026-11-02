@@ -168,6 +168,15 @@ async function loadCustomerOrders(){
      card.append(songSelect,approve,reject);
     }
    }else{const noPay=document.createElement('p');noPay.className='muted';noPay.textContent='No hay registro de comprobante. Ejecuta la migración de pagos para habilitarlo.';card.appendChild(noPay);}
+   if(o.audio_ready&&o.preview_url){
+    const previewCard=document.createElement('div');previewCard.className='status';
+    const previewTitle=document.createElement('strong');previewTitle.textContent='🎁 Enlace de muestra listo para el cliente';previewCard.appendChild(previewTitle);
+    const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent='Abrir enlace del regalo';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
+    const previewActions=document.createElement('div');previewActions.className='row';
+    const copyPreview=document.createElement('button');copyPreview.type='button';copyPreview.className='btn alt';copyPreview.textContent='Copiar enlace';copyPreview.onclick=async()=>{try{await navigator.clipboard.writeText(o.preview_url);copyPreview.textContent='¡Copiado!';}catch{alert('No se pudo copiar automáticamente. Abre el enlace y copia la dirección.')}};
+    const sendPreview=document.createElement('a');sendPreview.className='btn alt';sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.href='https://wa.me/51'+String(o.contact||'').replace(/\\D/g,'')+'?text='+encodeURIComponent('💗 ¡Tu muestra musical está lista! Escúchala aquí: '+o.preview_url);sendPreview.textContent='Enviar por WhatsApp';
+    previewActions.append(copyPreview,sendPreview);previewCard.append(previewLink,previewActions);card.appendChild(previewCard);
+   }
    if(o.audio_ready){
     const audioBtn=document.createElement("button");audioBtn.className="btn alt";audioBtn.type="button";audioBtn.textContent="🎧 Escuchar canción generada";
     audioBtn.onclick=async()=>{audioBtn.disabled=true;audioBtn.textContent="Cargando audio…";try{const rr=await fetch(API_BASE+"/api/admin/orders/"+o.id+"/audio",{headers:{Authorization:"Bearer "+token}});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||"No se pudo abrir el audio.");let player=card.querySelector("audio.order-private-audio");if(!player){player=document.createElement("audio");player.className="order-private-audio";player.controls=true;player.style.width="100%";card.appendChild(player);}player.src=dd.url;player.load();await player.play().catch(()=>{});audioBtn.textContent="🎧 Canción lista";}catch(e){audioBtn.textContent="No se pudo abrir";alert(e.message);}finally{audioBtn.disabled=false;}};
