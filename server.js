@@ -1377,6 +1377,8 @@ app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
   const db=admin();
   const {data:payment,error}=await db.from("payment_submissions").select("*").eq("order_id",id).maybeSingle();
   if(error||!payment)return res.status(404).json({error:"No se encontró el registro de pago."});
+  const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",payment.id);
+  if(updateError)throw updateError;
   let benefitsActivated=false,linkedSongId=songId||null;
   if(status==="approved"){
    let song=null;
@@ -1391,8 +1393,7 @@ app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
    }
    if(song){benefitsActivated=await syncApprovedOrderBenefits(db,id,song,user.id);linkedSongId=song.id;}
   }
-  const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString(),...(linkedSongId?{song_id:linkedSongId}:{})}).eq("id",payment.id);
-  if(updateError)throw updateError;
+  if(linkedSongId){const {error:linkError}=await db.from("payment_submissions").update({song_id:linkedSongId,updated_at:new Date().toISOString()}).eq("id",payment.id);if(linkError)throw linkError;}
   if(status==="approved"){const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);if(orderError)throw orderError;await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:"Pago confirmado",body:"El pago de tu pedido ha sido confirmado."});}
   res.set("Cache-Control","no-store").json({ok:true,status,benefitsActivated,message:benefitsActivated?"Pago confirmado y permisos del paquete activados automáticamente.":status==="approved"?"Pago confirmado. Los permisos se activarán automáticamente cuando el MP3 del pedido esté listo.":"Comprobante rechazado."});
  }catch(e){console.error("Payment review:",e?.message||e);res.status(500).json({error:"No se pudo guardar la revisión del pago."});}
