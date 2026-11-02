@@ -1424,6 +1424,30 @@ app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
  }catch(e){console.error("Payment review:",e?.message||e);res.status(500).json({error:"No se pudo guardar la revisión del pago."});}
 });
 
+app.delete("/api/admin/orders/:id",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de pedido no válido."});
+  const db=admin();
+  const {data:order,error:findError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
+  if(findError)throw findError;if(!order)return res.status(404).json({error:"El pedido ya no existe."});
+  const {data:payments,error:paymentReadError}=await db.from("payment_submissions").select("id,voucher_path").eq("order_id",id);
+  if(paymentReadError)throw paymentReadError;
+  const voucherPaths=(payments||[]).map(x=>x.voucher_path).filter(Boolean);
+  const {error:messagesError}=await db.from("order_messages").delete().eq("order_id",id);
+  if(messagesError)throw messagesError;
+  const {error:notificationsError}=await db.from("system_notifications").delete().eq("order_id",id);
+  if(notificationsError&&notificationsError.code!=="42P01")throw notificationsError;
+  const {error:paymentsError}=await db.from("payment_submissions").delete().eq("order_id",id);
+  if(paymentsError)throw paymentsError;
+  const {error:deleteError}=await db.from("customer_orders").delete().eq("id",id);
+  if(deleteError)throw deleteError;
+  if(voucherPaths.length){const {error:storageError}=await db.storage.from("payment-vouchers").remove(voucherPaths);if(storageError)console.warn("No se pudieron retirar algunos comprobantes del pedido eliminado:",storageError.message);}
+  res.set("Cache-Control","no-store").json({ok:true,message:"Pedido eliminado."});
+ }catch(e){console.error("Delete customer order:",e?.message||e);res.status(500).json({error:"No se pudo eliminar el pedido. No se borraron sus canciones de la biblioteca."});}
+});
+
 app.patch("/api/admin/orders/:id",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
