@@ -1371,6 +1371,19 @@ function mountCustomerOrderChat(){
  refresh();box._cchPoll=setInterval(refresh,8000);
 }
 
+(function(){
+ const query=new URLSearchParams(location.search);
+ if(query.get('pago')!=='1')return;
+ const orderId=query.get('pedido')||'',accessToken=query.get('acceso')||'';
+ if(!/^[0-9a-f-]{36}$/i.test(orderId)||!/^[A-Za-z0-9_-]{40,100}$/.test(accessToken))return;
+ window.cchPaymentContext={orderId,accessToken};
+ try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
+ const form=document.getElementById('orderForm');if(form)form.classList.add('hidden');
+ const upload=document.getElementById('orderPaymentUpload');if(upload){upload.classList.remove('hidden');const status=document.getElementById('orderPaymentStatus');if(status)status.textContent='Este es tu acceso privado para adjuntar el comprobante de tu pedido. Selecciona tu captura de Yape o Plin y envíala de forma segura.';}
+ const orderSection=document.getElementById('order');if(orderSection)orderSection.scrollIntoView({behavior:'auto',block:'start'});
+ mountCustomerOrderChat();
+})();
+
 </script>
 \n<script>
 /* La invitación abre el asistente de pedidos y conserva el formulario, la letra y el seguimiento automático de la muestra. */
