@@ -73,7 +73,7 @@ textarea{min-height:100px}
 #ordersList{background:transparent;padding:0}
 #refreshOrders:disabled{opacity:.65;cursor:wait}
 @media(max-width:560px){.order-card{padding:11px!important}.order-card h3{font-size:1rem}.order-toolbar{top:52px}.order-card .order-quick-actions .btn{flex:1 1 44%}}
-</style></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
+</style><meta name="cch-app-version" content="2026-11-02-1240-auto"></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
 <div style="max-width:980px;margin:10px auto;padding:0 14px"><button class="btn alt" id="panelMenuToggle" type="button" aria-expanded="false" aria-controls="panelMenu">☰ Menú del panel</button></div><nav class="panel-nav menu-collapsed" id="panelMenu" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
 <section class="card"><h2>1. Conectar almacenamiento en la nube</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
@@ -353,4 +353,28 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('customerOrders');});
 })();
 
+</script><script>
+/* Comprueba si se publicó una versión nueva del panel. Actualizar este marcador en cada publicación. */
+(function(){
+ const current=document.querySelector('meta[name="cch-app-version"]')?.content;
+ if(!current)return;
+ let updatePending=false,checking=false;
+ async function checkVersion(){
+  if(checking)return;
+  checking=true;
+  try{
+   const response=await fetch(location.pathname+'?cch_version_check='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+   if(!response.ok)return;
+   const html=await response.text();
+   const match=html.match(/<meta\\s+name=["']cch-app-version["']\\s+content=["']([^"']+)["']/i);
+   if(match&&match[1]!==current){
+    if(document.visibilityState==='visible')location.reload();
+    else updatePending=true;
+   }
+  }catch(error){console.warn('No se pudo comprobar si hay una nueva versión:',error);}
+  finally{checking=false;}
+ }
+ setInterval(checkVersion,60000);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(updatePending)location.reload();else checkVersion();}});
+})();
 </script></body></html>
