@@ -59,6 +59,7 @@ textarea{min-height:100px}
 }
 
 .panel-nav.menu-collapsed{display:none!important}.panel-nav{flex-wrap:wrap}.panel-nav a[aria-current="page"]{background:#681b43;color:#fff;border-color:#681b43}#panelMenuToggle{margin:0 0 8px}
+.order-info-details{margin:8px 0!important;background:#fff8fb;border:1px solid var(--line);border-radius:10px;padding:9px 11px}.order-info-details summary{font-weight:700;color:#681b43;cursor:pointer;padding:3px}.order-info-details p{margin:7px 0;font-size:.9rem;line-height:1.4;overflow-wrap:anywhere}.order-card h3{font-size:1.08rem!important;margin-bottom:5px}.order-card .order-quick-actions{gap:7px}.order-card .order-quick-actions .btn{min-height:42px}
 /* Modo de trabajo rápido: tarjetas compactas y controles visibles en móvil */
 .order-card{padding:13px!important;margin:8px 0!important}
 .order-card>p{margin:6px 0;font-size:.92rem;line-height:1.4}
@@ -238,12 +239,12 @@ async function loadCustomerOrders(){
    const card=document.createElement('article');card.className='song order-card';card.dataset.filter=o.audio_ready?'ready':(o.payment?.payment_status==='approved'?'pending':'payment');card.dataset.source=String(o.story||'').startsWith('PEDIDO POR WHATSAPP')?'whatsapp':'web';card.dataset.search=[o.buyer,o.recipient,o.contact,o.occasion,o.package_name].join(' ').toLowerCase();const source=document.createElement('p');source.className='status';source.textContent=card.dataset.source==='whatsapp'?'💬 ORIGEN: Pedido recibido por WhatsApp':'🌐 ORIGEN: Pedido automático desde la página web';card.appendChild(source);
    const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
    const p=document.createElement('p');p.textContent='Cliente: '+o.buyer+' · WhatsApp: '+o.contact+' · '+new Date(o.created_at).toLocaleString('es-PE');card.appendChild(p);
-   const story=document.createElement('p');story.textContent='Historia: '+o.story;card.appendChild(story);
-   const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;card.appendChild(detail);
+   const infoDetails=document.createElement('details');infoDetails.className='order-info-details';const infoSummary=document.createElement('summary');infoSummary.textContent='Ver historia y detalles del pedido';infoDetails.appendChild(infoSummary);const story=document.createElement('p');story.textContent='Historia: '+o.story;infoDetails.appendChild(story);
+   const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;infoDetails.appendChild(detail);card.appendChild(infoDetails);
    if(o.payment){
     const pay=document.createElement('div');pay.className='status';
     const labels={pending:'Pendiente de comprobante',voucher_submitted:'Voucher recibido · pendiente de revisión',approved:'Pago confirmado',rejected:'Voucher rechazado'};
-    pay.textContent='💳 Pago: '+(labels[o.payment.payment_status]||o.payment.payment_status)+' · Importe: S/'+Number(o.payment.amount||0).toFixed(2)+' · Método: '+(o.payment.provider||'manual')+(o.payment.payment_status==='approved'?' · ACEPTADO AUTOMÁTICAMENTE / BENEFICIOS AL GUARDAR CANCIÓN':'');
+    pay.textContent='💳 Pago: '+(labels[o.payment.payment_status]||o.payment.payment_status)+' · Importe: S/'+Number(o.payment.amount||0).toFixed(2)+' · Método: '+(o.payment.provider||'manual')+(o.payment.payment_status==='approved'?' · Confirmado por administración':'');
     card.appendChild(pay);
     if(card.dataset.source==='whatsapp'&&o.payment.payment_status!=='approved'){
      const savedToken=cchPaymentLinkStore()[o.id];
