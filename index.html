@@ -1046,6 +1046,16 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    const saved=await saveCustomerOrder(true);
    window.cchAutoSavedOrderId=saved.orderId||'';
    try{localStorage.setItem('cchLastCustomerOrderId',window.cchAutoSavedOrderId);}catch(e){}
+   if(saved.paymentReady&&saved.paymentAccessToken){
+    window.cchPaymentContext={orderId:saved.orderId,accessToken:saved.paymentAccessToken};
+    try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
+    mountCustomerOrderChat();
+    document.getElementById('orderPaymentUpload').classList.remove('hidden');
+    document.getElementById('orderPaymentStatus').textContent='Pedido registrado correctamente. Si ya pagaste por Yape, adjunta aquí tu comprobante para revisarlo.';
+   }else{
+    document.getElementById('orderPaymentUpload').classList.remove('hidden');
+    document.getElementById('orderPaymentStatus').textContent='Tu pedido está registrado. Puedes pagar con Yape y enviar tu comprobante por WhatsApp; la carga segura de voucher requiere completar la configuración de pagos.';
+   }
   }
   if(!window.cchAutoSavedOrderId)throw new Error('No se recibió el número del pedido.');
   status.textContent='💗 ¡Tu pedido llegó a nuestra plataforma! Mantente en espera hasta que la barra complete el 100 %. En ese momento aparecerá tu muestra para escucharla.';
@@ -1072,6 +1082,8 @@ document.getElementById('orderForm').addEventListener('input',()=>{
  }
 });
 try{
+ const savedPaymentContext=sessionStorage.getItem('cchPaymentContext');
+ if(savedPaymentContext){const parsed=JSON.parse(savedPaymentContext);if(parsed?.orderId&&parsed?.accessToken){window.cchPaymentContext=parsed;mountCustomerOrderChat();document.getElementById('orderPaymentUpload').classList.remove('hidden');}}
  const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
  if(restoredOrderId&&/^[0-9a-f-]{36}$/i.test(restoredOrderId)){
   window.cchAutoSavedOrderId=restoredOrderId;
