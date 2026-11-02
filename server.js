@@ -1364,9 +1364,17 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de pedido no válido."});
-  const status=String(req.body?.status||"");
-  if(!["nuevo","contactado","pago_verificado","en_proceso","audio_subiendo","audio_subido","muestra_lista","entregado","cancelado"].includes(status))return res.status(400).json({error:"Estado no válido."});
-  const {data,error}=await admin().from("customer_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id).select("id,status").single();
+  const status=req.body?.status===undefined?null:String(req.body.status);
+  const allowed=["nuevo","contactado","pago_verificado","en_proceso","audio_subiendo","audio_subido","muestra_lista","entregado","cancelado"];
+  if(status!==null&&!allowed.includes(status))return res.status(400).json({error:"Estado no válido."});
+  const updates={updated_at:new Date().toISOString()};
+  if(status!==null)updates.status=status;
+  if(req.body?.lyrics!==undefined){
+   const lyrics=cleanOrderText(req.body.lyrics,12000);
+   if(lyrics.length<40)return res.status(400).json({error:"La letra debe contener al menos 40 caracteres."});
+   updates.lyrics=lyrics;
+  }
+  const {data,error}=await admin().from("customer_orders").update(updates).eq("id",id).select("id,status,lyrics").single();
   if(error)throw error;
   res.set("Cache-Control","no-store").json({ok:true,order:data});
  }catch(e){console.error("Update customer order:",e?.message||e);res.status(500).json({error:"No se pudo actualizar el pedido."});}
