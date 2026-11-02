@@ -1129,6 +1129,9 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
    const ownerIds=[...new Set((owners||[]).map(x=>x.owner_id).filter(Boolean))];
    const ownerId=String(process.env.ADMIN_OWNER_ID||(ownerIds.length===1?ownerIds[0]:""));
    if(!/^[0-9a-f-]{36}$/i.test(ownerId))return res.set("Cache-Control","no-store").json({ok:true,status:"failed",message:"Falta configurar el usuario administrador para publicar la muestra."});
+   const existing=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+   if(existing.error)throw existing.error;
+   if(existing.data)song=existing.data;
    const packageText=String(order.package_name||"").toLowerCase();
    const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
    const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
@@ -1261,7 +1264,7 @@ app.get("/api/admin/orders",async(req,res)=>{
    const audioReady=audioNames.has(order.id+".mp3");
    let previewUrl=null;
    if(audioReady){
-    const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("id",order.id).maybeSingle();
+    const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
     if(song?.audio_path){
      const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
      const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:false});
