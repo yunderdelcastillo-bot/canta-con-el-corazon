@@ -1112,7 +1112,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
     return res.status(409).json({error:"El código de operación de este comprobante ya fue utilizado."});
    }
   }
-  const nextStatus=review.status==="approved"?"approved":review.status==="rejected"?"rejected":"voucher_submitted";
+  const nextStatus=review.status==="rejected"?"rejected":"voucher_submitted";
   const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:nextStatus,provider_payment_id:operationKey,updated_at:new Date().toISOString(),...(nextStatus==="approved"?{reviewed_at:new Date().toISOString()}: {})}).eq("id",payment.id);
   if(updateError)throw updateError;
   if(nextStatus==="approved"){
@@ -1129,7 +1129,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   }else{
    await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:nextStatus==="rejected"?"Comprobante no válido":"Comprobante requiere revisión",body:review.reason||"Revisa el comprobante desde el panel privado."});
   }
-  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="approved"?"✅ Comprobante leído y aceptado automáticamente. El MP3 se habilitará al guardar la canción; el video dependerá del paquete.":nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
+  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":review.status==="approved"?"Comprobante legible. Falta confirmar el ingreso real del dinero antes de activar los beneficios.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
