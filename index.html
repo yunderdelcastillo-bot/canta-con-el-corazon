@@ -996,7 +996,7 @@ async function watchCustomerOrderAudio(orderId){
  if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
  const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));percent.textContent=value+'%';bar.style.width=value+'%';stage.textContent=message;};
- setProgress(12,'💗 ¡Pedido recibido! Estamos preparando tu canción. En cuanto subamos tu muestra, esta barra llegará al 100%.');
+ setProgress(15,'💗 Pedido recibido. Ya llegó a nuestro panel.');
  const deadline=Date.now()+7*24*60*60*1000;
  while(Date.now()<deadline){
   await new Promise(resolve=>setTimeout(resolve,8000));
@@ -1011,7 +1011,8 @@ async function watchCustomerOrderAudio(orderId){
     link.href=data.previewUrl;link.classList.remove('hidden');
     return;
    }
-   setProgress(12,'🎶 Tu pedido está registrado. Estamos preparando tu canción; la barra llegará al 100% cuando la muestra esté guardada y lista.');
+   const pct=Number(data.progress??15);const msg=data.message|| (pct>=90?'Audio guardado. Preparando tu muestra.':pct>=75?'Estamos subiendo tu audio.':pct>=40?'Estamos preparando tu canción.':'Pedido recibido.');
+   setProgress(pct,'💗 '+msg);
   }catch(error){
    setProgress(12,'💗 Tu pedido está seguro. Estamos intentando actualizar el estado de tu muestra.');
   }
