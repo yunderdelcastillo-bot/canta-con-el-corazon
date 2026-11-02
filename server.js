@@ -25,6 +25,21 @@ const serviceKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anonKey=process.env.SUPABASE_ANON_KEY;
 const ready=()=>Boolean(url&&serviceKey&&anonKey);
 const admin=()=>createClient(url,serviceKey,{auth:{persistSession:false,autoRefreshToken:false}});
+async function syncApprovedOrderBenefits(db,orderId,song,ownerId){
+ if(!song?.id||!ownerId)return false;
+ const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,amount,package_name,payment_status").eq("order_id",orderId).maybeSingle();
+ if(paymentError)throw paymentError;
+ if(!payment||payment.payment_status!=="approved")return false;
+ const label=String(payment.package_name||"").toLowerCase();
+ const key=label.includes("completo")||label.includes("30")?"completo":label.includes("detalle")||label.includes("25")?"detalle":"esencial";
+ const basePrice=key==="completo"?30:key==="detalle"?25:20;
+ const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:ownerId,package_key:key,package_price:Number(payment.amount)||basePrice,can_mp3:true,can_video:key==="detalle"||key==="completo",updated_at:new Date().toISOString()},{onConflict:"song_id"});
+ if(permissionError)throw permissionError;
+ const {error:linkError}=await db.from("payment_submissions").update({song_id:song.id,updated_at:new Date().toISOString()}).eq("id",payment.id);
+ if(linkError)throw linkError;
+ return true;
+}
+
 
 // Garantiza que exista el bucket privado usado por las canciones.
 // No lo hace público: las descargas siguen usando enlaces temporales firmados.
@@ -1099,6 +1114,12 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:nextStatus,provider_payment_id:operationKey,updated_at:new Date().toISOString(),...(nextStatus==="approved"?{reviewed_at:new Date().toISOString()}: {})}).eq("id",payment.id);
   if(updateError)throw updateError;
   if(nextStatus==="approved"){
+   const ownerId=String(process.env.ADMIN_OWNER_ID||"");
+   if(ownerId){
+    const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+    if(songLookupError)throw songLookupError;
+    if(existingSong)await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
+   }
    const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);
    if(orderError)throw orderError;
    await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:"Voucher revisado automáticamente",body:"La IA leyó el comprobante y el importe coincide. El permiso de la canción se activará al guardar/vincular el MP3 del pedido."});
@@ -1150,6 +1171,7 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
     song={id,owner_id:ownerId,audio_path:path};
    }
   }
+  await syncApprovedOrderBenefits(db,id,song,song.owner_id||"");
   const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
   const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:song.owner_id,download_enabled:false});
   if(linkError)throw linkError;
@@ -1355,20 +1377,24 @@ app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
   const db=admin();
   const {data:payment,error}=await db.from("payment_submissions").select("*").eq("order_id",id).maybeSingle();
   if(error||!payment)return res.status(404).json({error:"No se encontró el registro de pago."});
-  let benefitsActivated=false;
-  if(status==="approved"&&songId){
-   const {data:song,error:songError}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
-   if(songError||!song||song.owner_id!==user.id)return res.status(403).json({error:"La canción seleccionada no pertenece a tu biblioteca."});
-   const key=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:(Number(song.package_price)>=30?"completo":Number(song.package_price)>=25?"detalle":"esencial");
-   const price=Number(song.package_price)||Number(payment.amount)||20;
-   const {error:grantError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:key,package_price:price,can_mp3:true,can_video:key==="detalle"||key==="completo",updated_at:new Date().toISOString()},{onConflict:"song_id"});
-   if(grantError)throw grantError;
-   benefitsActivated=true;
+  let benefitsActivated=false,linkedSongId=songId||null;
+  if(status==="approved"){
+   let song=null;
+   if(songId){
+    const {data:selected,error:songError}=await db.from("songs").select("id,owner_id,audio_path").eq("id",songId).maybeSingle();
+    if(songError||!selected||selected.owner_id!==user.id)return res.status(403).json({error:"La canción seleccionada no pertenece a tu biblioteca."});
+    song=selected;
+   }else{
+    const {data:found,error:findError}=await db.from("songs").select("id,owner_id,audio_path").eq("owner_id",user.id).eq("audio_path",user.id+"/"+id+".mp3").maybeSingle();
+    if(findError)throw findError;
+    song=found||null;
+   }
+   if(song){benefitsActivated=await syncApprovedOrderBenefits(db,id,song,user.id);linkedSongId=song.id;}
   }
-  const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString(),...(songId?{song_id:songId}:{})}).eq("id",payment.id);
+  const {error:updateError}=await db.from("payment_submissions").update({payment_status:status,reviewed_by:user.id,reviewed_at:new Date().toISOString(),updated_at:new Date().toISOString(),...(linkedSongId?{song_id:linkedSongId}:{})}).eq("id",payment.id);
   if(updateError)throw updateError;
   if(status==="approved"){const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);if(orderError)throw orderError;await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:"Pago confirmado",body:"El pago de tu pedido ha sido confirmado."});}
-  res.set("Cache-Control","no-store").json({ok:true,status,benefitsActivated,message:benefitsActivated?"Pago confirmado y beneficios activados en la canción vinculada.":status==="approved"?"Pago confirmado. Vincula la canción del cliente para activar sus beneficios.":"Comprobante rechazado."});
+  res.set("Cache-Control","no-store").json({ok:true,status,benefitsActivated,message:benefitsActivated?"Pago confirmado y permisos del paquete activados automáticamente.":status==="approved"?"Pago confirmado. Los permisos se activarán automáticamente cuando el MP3 del pedido esté listo.":"Comprobante rechazado."});
  }catch(e){console.error("Payment review:",e?.message||e);res.status(500).json({error:"No se pudo guardar la revisión del pago."});}
 });
 
