@@ -1265,6 +1265,24 @@ app.post("/api/admin/orders/:id/messages",async(req,res)=>{
 app.get("/api/admin/push/public-key",async(req,res)=>{
  try{if(!ready())return res.status(503).json({error:"Supabase no está configurado."});const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});if(!process.env.VAPID_PUBLIC_KEY||!process.env.VAPID_PRIVATE_KEY||!process.env.VAPID_SUBJECT)return res.status(503).json({error:"Las notificaciones Push aún no están configuradas en el servidor."});res.set("Cache-Control","no-store").json({ok:true,publicKey:process.env.VAPID_PUBLIC_KEY});}catch(e){res.status(500).json({error:"No se pudo preparar la suscripción Push."});}
 });
+app.post("/api/admin/push/test",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const db=admin();
+  const {data:subs,error}=await db.from("cch_push_subscriptions").select("id,subscription").eq("user_id",user.id).limit(20);
+  if(error)throw error;
+  if(!subs?.length)return res.status(404).json({error:"Este celular todavía no tiene una suscripción Push registrada."});
+  if(!process.env.VAPID_PUBLIC_KEY||!process.env.VAPID_PRIVATE_KEY||!process.env.VAPID_SUBJECT)return res.status(503).json({error:"Falta configurar el servicio Push en el servidor."});
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT,process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
+  const payload=JSON.stringify({title:"Canta con el corazón",body:"🔔 Esta es una prueba. Los avisos Push de tu panel están llegando.",url:"/admin.html",tag:"cch-push-test"});
+  const results=await Promise.all(subs.map(async row=>{try{await webpush.sendNotification(row.subscription,payload,{TTL:60,urgency:"high"});return {ok:true};}catch(e){if(e.statusCode===404||e.statusCode===410)await db.from("cch_push_subscriptions").delete().eq("id",row.id);return {ok:false,status:e.statusCode||0};}}));
+  const sent=results.filter(x=>x.ok).length;
+  if(!sent)return res.status(502).json({error:"El servidor no pudo entregar la notificación Push. Vuelve a registrar este celular."});
+  res.set("Cache-Control","no-store").json({ok:true,sent,message:"Notificación de prueba enviada."});
+ }catch(e){console.error("Push test:",e?.message||e);res.status(500).json({error:"No se pudo enviar la notificación de prueba."});}
+});
+
 app.post("/api/admin/push/subscribe",async(req,res)=>{
  try{if(!ready())return res.status(503).json({error:"Supabase no está configurado."});const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});const sub=req.body?.subscription;if(!sub?.endpoint||!sub?.keys?.p256dh||!sub?.keys?.auth)return res.status(400).json({error:"Suscripción del navegador incompleta."});const db=admin();const {error}=await db.from("cch_push_subscriptions").upsert({user_id:user.id,endpoint:sub.endpoint,subscription:sub,updated_at:new Date().toISOString()},{onConflict:"endpoint"});if(error)throw error;res.status(201).json({ok:true});}catch(e){console.error("Save push subscription:",e?.message||e);res.status(500).json({error:"No se pudo guardar este dispositivo."});}
 });
