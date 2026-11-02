@@ -1031,7 +1031,7 @@ app.post("/api/orders",async(req,res)=>{
    paymentReady=true;
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido recibido",body:"Tienes un nuevo pedido en Canta con el corazón."});
-  if(order.lyrics&&order.lyrics.length>=40)setImmediate(()=>{generateOrderAudio(data.id,order);});
+  orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
@@ -1115,12 +1115,14 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
   const db=admin();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
   const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
   if(error)throw error;
   const state=orderAudioStatus.get(id);
-  if(!(files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,status:state?.status||"processing"});
-  const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
-  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const stageMap={nuevo:{status:"received",progress:15,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Pedido recibido. Estamos revisando tus datos."},pago_verificado:{status:"received",progress:15,message:"Pedido recibido y pago verificado."},en_proceso:{status:"creating",progress:40,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:75,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra."},muestra_lista:{status:"ready",progress:100,message:"¡Tu muestra está lista!"},entregado:{status:"ready",progress:100,message:"¡Tu canción está lista!"},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
+  const stage=stageMap[order.status]||stageMap.nuevo;
+  if(!(files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,...stage,status:state?.status==="failed"?"failed":stage.status});
   let song=null;
   if(state?.songId){const found=await db.from("songs").select("id,owner_id,audio_path").eq("id",state.songId).maybeSingle();song=found.data;}
   if(!song){
@@ -1158,7 +1160,9 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const themeKey=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
   const giftUrl=new URL("https://canta-con-el-corazon.onrender.com/");
   giftUrl.search=new URLSearchParams({para:order.recipient||"",mensaje:order.special_phrase||order.story||"",audio:song.audio_path,letra:String(order.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:themeKey,paquete:packageLabel,precio:String(price),surprise:"1",previewLink:token}).toString();
-  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",previewUrl:giftUrl.toString()});
+  await db.from("customer_orders").update({status:"muestra_lista",updated_at:new Date().toISOString()}).eq("id",id);
+  orderAudioStatus.set(id,{status:"ready",progress:100,updatedAt:Date.now()});
+  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:giftUrl.toString()});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
@@ -1311,7 +1315,9 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
   const {error}=await db.storage.from("songs-audio").upload("orders/"+id+".mp3",buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
   if(error)throw error;
-  res.set("Cache-Control","no-store").json({ok:true,audio_ready:true});
+  await db.from("customer_orders").update({status:"audio_subido",updated_at:new Date().toISOString()}).eq("id",id);
+  orderAudioStatus.set(id,{status:"uploaded",progress:90,updatedAt:Date.now()});
+  res.set("Cache-Control","no-store").json({ok:true,audio_ready:true,progress:90});
  }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el audio en el pedido."});}
 });
 app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
@@ -1346,7 +1352,7 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"ID de pedido no válido."});
   const status=String(req.body?.status||"");
-  if(!["nuevo","contactado","pago_verificado","en_proceso","entregado","cancelado"].includes(status))return res.status(400).json({error:"Estado no válido."});
+  if(!["nuevo","contactado","pago_verificado","en_proceso","audio_subiendo","audio_subido","muestra_lista","entregado","cancelado"].includes(status))return res.status(400).json({error:"Estado no válido."});
   const {data,error}=await admin().from("customer_orders").update({status,updated_at:new Date().toISOString()}).eq("id",id).select("id,status").single();
   if(error)throw error;
   res.set("Cache-Control","no-store").json({ok:true,order:data});
