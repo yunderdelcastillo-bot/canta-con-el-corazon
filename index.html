@@ -120,7 +120,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
   <textarea id="customerLyricsText" rows="16" style="min-height:300px"></textarea>
   <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
-  <button class="btn" id="sendCustomerLyrics" type="button">🎵 Crear mi canción automáticamente</button>
+  <button class="btn" id="sendCustomerLyrics" type="button">💗 Enviar mi pedido y letra</button>
   <button class="btn alt hidden" id="sendCustomerLyricsWhatsApp" type="button">💬 Enviar pedido y letra por WhatsApp</button>
    <button class="btn hidden" id="notifyAdminAudioReady" type="button">✅ Avisarnos por WhatsApp: canción generada</button>
  </div>
@@ -1007,50 +1007,37 @@ async function generateCustomerLyrics(){
 document.getElementById('generateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('regenerateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
-async function watchCustomerOrderAudio(orderId){
+async async function watchCustomerOrderAudio(orderId){
  const progress=document.getElementById('customerAudioProgress');
  if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
- const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));percent.textContent=value+'%';bar.style.width=value+'%';stage.textContent=message;};
- const started=Date.now(),maxEstimate=240000;
- const updateEstimate=()=>{
-  const elapsed=Date.now()-started;
-  const value=Math.min(88,15+(elapsed/maxEstimate)*73);
-  const message=elapsed<45000?'🎼 Preparando los datos musicales…':elapsed<150000?'🎙️ La IA está creando tu canción…':elapsed<210000?'☁️ Guardando el audio y preparando tu muestra privada…':'⏳ La canción sigue en proceso. Esperamos la confirmación del servidor.';
-  setProgress(value,'💗 '+message);
- };
- updateEstimate();
- const timer=setInterval(updateEstimate,1000);
+ const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';if(stage)stage.textContent=message;};
  const deadline=Date.now()+7*24*60*60*1000;
+ const labels={received:'💗 Tu pedido llegó correctamente a nuestra plataforma. Pronto comenzaremos a preparar tu canción.',creating:'🎼 Estamos trabajando en tu canción.',uploading:'☁️ Estamos subiendo el audio a la plataforma.',saving:'🎁 Audio recibido. Estamos preparando tu muestra privada.',ready:'💗 ¡Tu muestra está lista! Ya puedes escucharla.'};
  try{
   while(Date.now()<deadline){
-   await new Promise(resolve=>setTimeout(resolve,5000));
    try{
     const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/audio-status',{cache:'no-store'});
     const data=await check.json().catch(()=>({}));
-    if(!check.ok){setProgress(Math.min(88,Math.max(15,Number(data.progress)||15)),'💗 Tu pedido está guardado. Seguimos consultando la creación de tu canción.');continue;}
-    if(data.status==='ready'&&data.previewUrl){
-     clearInterval(timer);
-     setProgress(100,'💗 ¡Tu canción está lista! Ya puedes escuchar tu muestra.');
-     let link=document.getElementById('customerAutomaticPreviewLink');
-     if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_blank';link.rel='noopener';link.textContent='🎁 Toca aquí para escuchar tu muestra';progress.after(link);}
-     link.href=data.previewUrl;link.classList.remove('hidden');
-     return;
+    if(check.ok){
+     const value=Number(data.progress)||15;
+     setProgress(value,labels[data.status]||data.message||'💗 Tu pedido está registrado y en seguimiento.');
+     if(data.status==='ready'&&data.previewUrl){
+      setProgress(100,labels.ready);
+      let link=document.getElementById('customerAutomaticPreviewLink');
+      if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_blank';link.rel='noopener';link.textContent='🎁 Toca aquí para escuchar tu muestra';progress.after(link);}
+      link.href=data.previewUrl;link.classList.remove('hidden');
+      return;
+     }
+     if(data.status==='cancelled'){setProgress(0,'Este pedido fue cancelado. Si necesitas ayuda, escríbenos por WhatsApp.');return;}
+    }else{
+     setProgress(15,'💗 Tu pedido ya fue enviado. Estamos consultando su estado.');
     }
-    if(data.status==='failed'){
-     clearInterval(timer);
-     setProgress(0,'⚠️ La IA no pudo terminar la canción automáticamente. Tu pedido quedó registrado. Puedes continuar por WhatsApp para recibir ayuda.');
-     const fallback=document.getElementById('sendCustomerLyricsWhatsApp');if(fallback)fallback.classList.remove('hidden');
-     return;
-    }
-    const serverProgress=Number(data.progress||0);
-    if(serverProgress>15&&serverProgress<100)setProgress(Math.max(serverProgress,Math.min(88,15+((Date.now()-started)/maxEstimate)*73)),'💗 '+(data.message||'Estamos preparando tu canción…'));
-   }catch(error){
-    updateEstimate();
-   }
+   }catch(error){setProgress(15,'💗 Tu pedido está guardado. Volveremos a consultar su estado en unos momentos.');}
+   await new Promise(resolve=>setTimeout(resolve,5000));
   }
-  setProgress(88,'⏳ Tu pedido sigue registrado. La creación está tardando más de lo esperado; te avisaremos cuando la muestra esté lista.');
- }finally{clearInterval(timer);}
+  setProgress(15,'💗 Tu pedido sigue registrado. Puedes cerrar esta página; la muestra aparecerá aquí cuando esté lista.');
+ }finally{}
 }
 document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>{
  const button=document.getElementById('sendCustomerLyrics'),fallback=document.getElementById('sendCustomerLyricsWhatsApp'),status=document.getElementById('customerLyricsStatus');
@@ -1060,7 +1047,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
  if(!progress){
   progress=document.createElement('section');progress.id='customerAudioProgress';
   progress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
-  progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu canción está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Registrando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá únicamente cuando la muestra esté guardada y el enlace esté listo. Puedes cerrar esta página; tu pedido no se pierde.</p>';
+  progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">💗 Tu pedido fue recibido</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Registrando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El progreso avanzará cuando actualicemos tu pedido. Al llegar al 100%, podrás escuchar tu muestra. Puedes cerrar esta página; tu pedido no se pierde.</p>';
   button.after(progress);
  }
  progress.classList.remove('hidden');
@@ -1071,7 +1058,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    try{localStorage.setItem('cchLastCustomerOrderId',window.cchAutoSavedOrderId);}catch(e){}
   }
   if(!window.cchAutoSavedOrderId)throw new Error('No se recibió el número del pedido.');
-  status.textContent='💗 Tu pedido fue enviado correctamente. Prepararemos tu canción y te avisaremos cuando la muestra esté lista.';
+  status.textContent='💗 ¡Tu pedido llegó a nuestra plataforma! Prepararemos la canción y la muestra aparecerá aquí cuando esté lista.';
   button.textContent='✅ Pedido enviado';
   button.disabled=true;
   progress.scrollIntoView({behavior:'smooth',block:'center'});
@@ -1092,7 +1079,7 @@ try{
   if(!restoredProgress){
    restoredProgress=document.createElement('section');restoredProgress.id='customerAudioProgress';
    restoredProgress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
-   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu canción está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">15%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:15%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Recuperando el estado de tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
+   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">15%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:15%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Recuperando el estado de tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
    const lyricsResult=document.getElementById('customerLyricsResult');
    (lyricsResult||document.getElementById('sendCustomerLyrics')?.parentElement||document.body).appendChild(restoredProgress);
   }
