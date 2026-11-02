@@ -1256,7 +1256,25 @@ app.get("/api/admin/orders",async(req,res)=>{
   if(paymentError)throw paymentError;
   const paymentByOrder=new Map();
   for(const payment of payments||[]){let voucherUrl=null;if(payment.voucher_path){const {data:signed}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);voucherUrl=signed?.signedUrl||null;}paymentByOrder.set(payment.order_id,{...payment,voucher_url:voucherUrl});}
-  const orders=(data||[]).map(order=>({...order,audio_ready:audioNames.has(order.id+".mp3"),payment:paymentByOrder.get(order.id)||null}));
+  const orders=[];
+  for(const order of data||[]){
+   const audioReady=audioNames.has(order.id+".mp3");
+   let previewUrl=null;
+   if(audioReady){
+    const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("id",order.id).maybeSingle();
+    if(song?.audio_path){
+     const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+     const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:false});
+     if(!linkError){
+      const labels={esencial:"ESENCIAL",detalle:"DETALLE ESPECIAL",completo:"REGALO COMPLETO"};
+      const u=new URL("https://canta-con-el-corazon.onrender.com/");
+      u.search=new URLSearchParams({para:song.recipient||order.recipient||"",mensaje:song.dedication||order.story||"",audio:song.audio_path,letra:String(song.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:song.theme||"romantico",paquete:labels[song.package_key]||"ESENCIAL",precio:String(song.package_price||20),surprise:"1",previewLink:token}).toString();
+      previewUrl=u.toString();
+     }
+    }
+   }
+   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:paymentByOrder.get(order.id)||null});
+  }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
 });
