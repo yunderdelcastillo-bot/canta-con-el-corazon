@@ -210,7 +210,6 @@ async function loadCustomerOrders(){
   d.orders.forEach(o=>{
    const card=document.createElement('article');card.className='song order-card';card.dataset.filter=o.audio_ready?'ready':(o.payment?.payment_status==='approved'?'pending':'payment');card.dataset.search=[o.buyer,o.recipient,o.contact,o.occasion,o.package_name].join(' ').toLowerCase();
    const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
-   const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
    const p=document.createElement('p');p.textContent='Cliente: '+o.buyer+' · WhatsApp: '+o.contact+' · '+new Date(o.created_at).toLocaleString('es-PE');card.appendChild(p);
    const story=document.createElement('p');story.textContent='Historia: '+o.story;card.appendChild(story);
    const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;card.appendChild(detail);
