@@ -1250,6 +1250,19 @@ app.get("/api/admin/integrations/status",async(req,res)=>{
  }catch(e){res.status(500).json({error:"No se pudo consultar la configuración."});}
 });
 
+app.post("/api/admin/orders/manual-whatsapp",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const b=req.body||{};
+  const order={buyer:cleanOrderText(b.buyer,120),contact:cleanOrderText(b.contact,40),recipient:cleanOrderText(b.recipient,120),occasion:cleanOrderText(b.occasion,100),story:"PEDIDO POR WHATSAPP\n"+cleanOrderText(b.story,3500),style:cleanOrderText(b.style,120),custom_genre:cleanOrderText(b.customGenre,180),voice:cleanOrderText(b.voice,80),special_phrase:cleanOrderText(b.specialPhrase,500),lyric_duration:cleanOrderText(b.lyricDuration,80),lyric_tone:cleanOrderText(b.lyricTone,100),package_name:cleanOrderText(b.package,160),urgency:cleanOrderText(b.urgency,160),lyrics:"",status:"nuevo"};
+  if(!order.buyer||!order.contact||!order.recipient||!order.occasion||!cleanOrderText(b.story,3500)||!order.package_name)return res.status(400).json({error:"Completa cliente, WhatsApp, destinatario, ocasión, historia y paquete."});
+  const {data,error}=await admin().from("customer_orders").insert(order).select("id,created_at").single();
+  if(error)throw error;
+  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido por WhatsApp",body:"Tienes un pedido manual de WhatsApp para preparar."});
+  res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at});
+ }catch(e){console.error("Create WhatsApp manual order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido de WhatsApp."});}
+});
 app.get("/api/admin/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
