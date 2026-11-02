@@ -21,6 +21,25 @@
 .order-card progress{accent-color:#8b2857}
 .order-card .btn{min-height:42px}
 @media(max-width:560px){.order-toolbar{grid-template-columns:1fr}.order-stats{gap:7px}.order-stat{padding:9px}.order-stat strong{font-size:1.2rem}.order-stat span{font-size:.72rem}.card{padding:15px}}
+
+/* Vista compacta: conserva todas las funciones y reduce el desplazamiento */
+.hero{padding:13px 16px}.hero h1{font-size:1.35rem}.hero p{margin:4px 0 8px;font-size:.88rem}
+main{padding:9px 10px 28px}.card{padding:13px;margin:8px 0;border-radius:13px}
+h2{font-size:1.08rem;margin:0 0 8px}.panel-nav{padding:7px 10px;gap:6px}
+.panel-nav a{padding:7px 10px;font-size:.8rem}
+label{margin:8px 0 4px;font-size:.88rem}
+input,textarea,select{padding:9px;border-radius:8px;font-size:.92rem}
+textarea{min-height:64px}
+.btn{padding:9px 12px;margin:6px 4px 0 0;font-size:.88rem}
+.status,.notice,.section-help{padding:9px;margin:8px 0;font-size:.86rem}
+.grid{gap:8px}.song{padding:10px;margin:7px 0}
+.order-stats{gap:7px;margin:8px 0}.order-stat{padding:8px}.order-stat strong{font-size:1.2rem}
+.order-toolbar{gap:7px;margin:8px 0}.song.order-card{padding:12px}
+#adminLyricsText{min-height:150px!important;height:170px}
+.preview-frame{height:420px}
+@media(min-width:900px){main{max-width:1120px}.card{padding:15px}}
+@media(max-width:560px){.hero{padding:12px}.hero h1{font-size:1.18rem}main{padding:7px 8px 22px}.card{padding:11px;margin:7px 0}.grid{grid-template-columns:1fr;gap:5px}.panel-nav a{padding:6px 9px;font-size:.76rem}.order-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.order-stat strong{font-size:1.05rem}#adminLyricsText{height:145px}.preview-frame{height:340px}}
+
 </style></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
 <nav class="panel-nav" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
