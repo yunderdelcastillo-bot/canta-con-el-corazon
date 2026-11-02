@@ -120,15 +120,15 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
   <textarea id="customerLyricsText" rows="16" style="min-height:300px"></textarea>
   <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
-  <label for="package">Paquete que deseas</label><select id="package"><option>ESENCIAL — Solo audio — S/20</option><option>DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25</option><option>REGALO COMPLETO — Canción + video con fotos reales — desde S/30</option><option>Quiero que me orienten</option></select><button class="btn" id="sendCustomerLyrics" type="button">💗 Enviar mi pedido y letra</button>
+  <label for="package">Paquete que deseas</label><select id="package"><option>ESENCIAL — Solo audio — S/20</option><option>DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25</option><option>REGALO COMPLETO — Canción + video con fotos reales — desde S/30</option><option>Quiero que me orienten</option></select><button class="btn" id="sendCustomerLyrics" type="button">💗 Enviar pedido y comenzar seguimiento</button>
   <button class="btn alt hidden" id="sendCustomerLyricsWhatsApp" type="button">💬 Enviar pedido y letra por WhatsApp</button>
    <button class="btn hidden" id="notifyAdminAudioReady" type="button">✅ Avisarnos por WhatsApp: canción generada</button>
  </div>
 </div>
 
 <section class="payment" aria-labelledby="payTitle"><h3 id="payTitle" style="color:#ffe5ee;margin:0">💜 Paga de forma sencilla con Yape</h3><p class="microcopy">Escanea este QR desde la app de Yape. Verifica el nombre del destinatario antes de confirmar el pago.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar Canta con el corazón"><div>Importe del paquete</div><div class="payamount" id="payAmount">S/20</div><p class="microcopy">Titular que aparece en el QR: <strong>Yunder Marco Del-castillo Cueva</strong>. Si eliges el paquete con fotovideo, confirma el precio final por WhatsApp antes de pagar.</p><p class="microcopy">Después de pagar, envíanos la constancia por WhatsApp. El pago se verifica manualmente; esta página no confirma automáticamente las transferencias.</p><a class="btn secondary" href="https://wa.me/51977974730?text=Hola%2C%20quiero%20enviar%20la%20constancia%20de%20pago%20de%20mi%20canci%C3%B3n" target="_blank" rel="noopener">Enviar constancia por WhatsApp</a></section>\n<label for="urgency">¿Con cuánta anticipación la necesitas?</label><select id="urgency" required><option value="Entrega normal (24–48 horas), por confirmar">Entrega normal (24–48 horas)</option><option value="La necesito hoy, confirmar disponibilidad">La necesito hoy</option><option value="Servicio express: la necesito en 30 minutos (+ S/5, sujeto a disponibilidad)">¡La necesito en 30 minutos! (+ S/5)</option><option value="La necesito mañana">La necesito mañana</option><option value="Fecha flexible, podemos coordinar">Tengo fecha flexible</option></select><p class="note" style="text-align:left">El servicio express en 30 minutos tiene un adicional de S/5 (además del precio del paquete) y está sujeto a disponibilidad. Te confirmaremos antes de comenzar.</p>
-<button class="btn" style="margin-top:20px" type="submit">Enviar mi solicitud por WhatsApp ♥</button>
-<p class="note">El formulario abrirá WhatsApp con los datos del pedido. No se realiza ningún cobro en esta página.</p>
+<button class="btn" id="submitCustomerOrder" style="margin-top:20px" type="submit">💗 Enviar pedido y comenzar seguimiento</button>
+<p class="note">Genera primero tu letra personalizada. Al enviar el pedido, verás el progreso hasta que tu muestra esté lista. Si ocurre un problema, podrás continuar por WhatsApp.</p>
 </form>
 <div id="orderPaymentUpload" class="payment hidden" style="margin-top:16px">
  <h3>📤 Adjunta tu comprobante de pago</h3>
@@ -970,27 +970,16 @@ document.getElementById('uploadOrderVoucher').addEventListener('click',async()=>
  }catch(error){status.textContent='No se pudo enviar: '+error.message;}
  finally{btn.disabled=false;}
 });
-document.getElementById('orderForm').addEventListener('submit',async e=>{
+document.getElementById('orderForm').addEventListener('submit',e=>{
  e.preventDefault();
- const btn=e.submitter,wa=window.open('about:blank','_blank');
- if(btn)btn.disabled=true;
- try{
-  const savedOrder=await saveCustomerOrder(false);
-  if(savedOrder.paymentReady&&savedOrder.paymentAccessToken){
-   window.cchPaymentContext={orderId:savedOrder.orderId,accessToken:savedOrder.paymentAccessToken};mountCustomerOrderChat();
-   document.getElementById('orderPaymentUpload').classList.remove('hidden');
-   document.getElementById('orderPaymentStatus').textContent='Pedido '+savedOrder.orderId+' registrado. Si ya pagaste, adjunta aquí tu comprobante.';
-  }else{
-   document.getElementById('orderPaymentUpload').classList.remove('hidden');
-   document.getElementById('orderPaymentStatus').textContent='Tu pedido se registró, pero la carga segura de comprobantes aún necesita que se ejecute la migración de pagos en Supabase. También puedes enviarlo por WhatsApp.';
-  }
-  const url='https://wa.me/51977974730?text='+encodeURIComponent(buildCustomerOrderMessage(false));
-  if(wa)wa.location.href=url;else window.location.href=url;
-  document.getElementById('customerLyricsStatus').textContent='💗 Tu solicitud quedó registrada. Se enviarán tus datos e historia por WhatsApp; Canta con el corazón preparará la letra manualmente.';
- }catch(err){
-  if(wa)wa.close();
-  alert('No se pudo registrar el pedido: '+err.message+'\\nTus datos siguen en el formulario. Intenta nuevamente.');
- }finally{if(btn)btn.disabled=false;}
+ const lyrics=orderValue('customerLyricsText');
+ const status=document.getElementById('customerLyricsStatus');
+ if(!lyrics){
+  status.textContent='✨ Antes de enviar, pulsa “Generar mi letra personalizada” y revisa el resultado.';
+  document.getElementById('generateCustomerLyrics').scrollIntoView({behavior:'smooth',block:'center'});
+  return;
+ }
+ document.getElementById('sendCustomerLyrics').click();
 });
 async function generateCustomerLyrics(){
  const btn=document.getElementById('generateCustomerLyrics'),status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
@@ -1071,6 +1060,16 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   if(stage)stage.textContent='No pudimos registrar el pedido: '+error.message+'. Intenta nuevamente o envíanoslo por WhatsApp.';
   fallback.classList.remove('hidden');button.disabled=false;
  } 
+});
+document.getElementById('orderForm').addEventListener('input',()=>{
+ if(window.cchAutoSavedOrderId){
+  window.cchAutoSavedOrderId='';
+  try{localStorage.removeItem('cchLastCustomerOrderId');}catch(e){}
+  const p=document.getElementById('customerAudioProgress');if(p)p.remove();
+  const link=document.getElementById('customerAutomaticPreviewLink');if(link)link.remove();
+  const send=document.getElementById('sendCustomerLyrics');if(send){send.disabled=false;send.textContent='💗 Enviar pedido y comenzar seguimiento';}
+  const main=document.getElementById('submitCustomerOrder');if(main){main.disabled=false;main.textContent='💗 Enviar pedido y comenzar seguimiento';}
+ }
 });
 try{
  const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
