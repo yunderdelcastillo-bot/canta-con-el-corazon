@@ -205,7 +205,7 @@ async function loadCustomerOrders(){
   const r=await fetch(API_BASE+'/api/admin/orders',{headers:{Authorization:'Bearer '+token}});
   const d=await r.json();if(!r.ok)throw new Error(d.error||'Error al cargar pedidos.');
   const total=d.orders.length,readyCount=d.orders.filter(x=>x.audio_ready).length,pendingCount=d.orders.filter(x=>!x.audio_ready).length;$('ordersTotal').textContent=total;$('ordersPending').textContent=pendingCount;$('ordersReady').textContent=readyCount;if(!d.orders.length){box.textContent='Todavía no hay pedidos registrados.';return;}
-  const {data:mySongs}=await db.from('songs').select('id,title,recipient,package_key,package_price').eq('owner_id',user.id).order('updated_at',{ascending:false});
+  let mySongs=[];if(d.orders.some(o=>o.payment&&o.payment.payment_status!=='approved')){const songsResult=await db.from('songs').select('id,title,recipient,package_key,package_price').eq('owner_id',user.id).order('updated_at',{ascending:false});if(songsResult.error)console.warn('No se pudo cargar la biblioteca para vincular canciones:',songsResult.error.message);mySongs=songsResult.data||[];}
   box.innerHTML='';
   d.orders.forEach(o=>{
    const card=document.createElement('article');card.className='song order-card';card.dataset.filter=o.audio_ready?'ready':(o.payment?.payment_status==='approved'?'pending':'payment');card.dataset.search=[o.buyer,o.recipient,o.contact,o.occasion,o.package_name].join(' ').toLowerCase();
