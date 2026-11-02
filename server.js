@@ -973,10 +973,30 @@ async function generateOrderAudio(orderId,order){
   if(!audioBase64&&payload.output_audio?.data){audioBase64=String(payload.output_audio.data);audioMime=String(payload.output_audio.mime_type||"audio/mpeg");}
   if(!audioBase64)throw new Error("Lyria no devolvió un archivo de audio reconocible.");
   const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
-  const {error}=await admin().storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
-  if(error)throw error;
-  orderAudioStatus.set(jobKey,{status:"ready",updatedAt:Date.now()});
-  console.log("Automatic customer song generated:",jobKey,buffer.length);
+  const db=admin();
+  const {error:orderUploadError}=await db.storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(orderUploadError)throw orderUploadError;
+  const {data:owners,error:ownerError}=await db.from("songs").select("owner_id").limit(20);
+  if(ownerError)throw ownerError;
+  const ownerIds=[...new Set((owners||[]).map(x=>x.owner_id).filter(Boolean))];
+  const ownerId=String(process.env.ADMIN_OWNER_ID||(ownerIds.length===1?ownerIds[0]:""));
+  if(!/^[0-9a-f-]{36}$/i.test(ownerId))throw new Error("No se pudo identificar de forma segura al usuario administrador. Configura ADMIN_OWNER_ID en Render.");
+  const canonicalPath=ownerId+"/"+jobKey+".mp3";
+  const {error:canonicalUploadError}=await db.storage.from("songs-audio").upload(canonicalPath,buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(canonicalUploadError)throw canonicalUploadError;
+  const {data:existingSong,error:existingSongError}=await db.from("songs").select("id").eq("audio_path",canonicalPath).maybeSingle();
+  if(existingSongError)throw existingSongError;
+  const packageText=String(order.package_name||"").toLowerCase();
+  const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
+  const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+  const occasion=String(order.occasion||"").toLowerCase();
+  const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
+  const songId=existingSong?.id||crypto.randomUUID();
+  const songRow={id:songId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics,theme,audio_path:canonicalPath,audio_url:null,owner_id:ownerId,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
+  const {error:songSaveError}=await db.from("songs").upsert(songRow);
+  if(songSaveError)throw songSaveError;
+  orderAudioStatus.set(jobKey,{status:"ready",updatedAt:Date.now(),songId});
+  console.log("Automatic customer song generated and added to library:",jobKey,songId,buffer.length);
  }catch(e){orderAudioStatus.set(jobKey,{status:"failed",updatedAt:Date.now(),reason:String(e?.message||e).slice(0,300)});console.error("Automatic customer song failed:",jobKey,e?.message||e);}
  finally{orderAudioJobs.delete(jobKey);}
 }
@@ -1094,12 +1114,47 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
-  const {data:files,error}=await admin().storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
+  const db=admin();
+  const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
   if(error)throw error;
-  if((files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,status:"ready"});
   const state=orderAudioStatus.get(id);
-  return res.set("Cache-Control","no-store").json({ok:true,status:state?.status||"processing"});
- }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo consultar el estado del audio."});}
+  if(!(files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,status:state?.status||"processing"});
+  const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  let song=null;
+  if(state?.songId){const found=await db.from("songs").select("id,owner_id,audio_path").eq("id",state.songId).maybeSingle();song=found.data;}
+  if(!song){
+   const {data:owners,error:ownerError}=await db.from("songs").select("owner_id").limit(20);
+   if(ownerError)throw ownerError;
+   const ownerIds=[...new Set((owners||[]).map(x=>x.owner_id).filter(Boolean))];
+   const ownerId=String(process.env.ADMIN_OWNER_ID||(ownerIds.length===1?ownerIds[0]:""));
+   if(!/^[0-9a-f-]{36}$/i.test(ownerId))return res.set("Cache-Control","no-store").json({ok:true,status:"failed",message:"Falta configurar el usuario administrador para publicar la muestra."});
+   const packageText=String(order.package_name||"").toLowerCase();
+   const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
+   const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+   const path=ownerId+"/"+id+".mp3";
+   const {data:canonical,error:downloadError}=await db.storage.from("songs-audio").download("orders/"+id+".mp3");
+   if(downloadError||!canonical)throw downloadError||new Error("No se pudo recuperar el audio generado.");
+   const {error:copyError}=await db.storage.from("songs-audio").upload(path,Buffer.from(await canonical.arrayBuffer()),{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+   if(copyError)throw copyError;
+   const occasion=String(order.occasion||"").toLowerCase();
+   const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
+   const row={id,owner_id:ownerId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:path,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
+   const {error:saveError}=await db.from("songs").upsert(row);if(saveError)throw saveError;
+   song={id,owner_id:ownerId,audio_path:path};
+  }
+  const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+  const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:song.owner_id,download_enabled:false});
+  if(linkError)throw linkError;
+  const packageText=String(order.package_name||"").toLowerCase();
+  const packageLabel=packageText.includes("completo")?"REGALO COMPLETO":packageText.includes("detalle")?"DETALLE ESPECIAL":"ESENCIAL";
+  const price=packageLabel==="REGALO COMPLETO"?30:packageLabel==="DETALLE ESPECIAL"?25:20;
+  const occasion=String(order.occasion||"").toLowerCase();
+  const themeKey=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
+  const giftUrl=new URL("https://canta-con-el-corazon.onrender.com/");
+  giftUrl.search=new URLSearchParams({para:order.recipient||"",mensaje:order.special_phrase||order.story||"",audio:song.audio_path,letra:String(order.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:themeKey,paquete:packageLabel,precio:String(price),surprise:"1",previewLink:token}).toString();
+  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",previewUrl:giftUrl.toString()});
+ }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
 async function customerPaymentAccess(db,id,token){
