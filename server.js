@@ -1053,7 +1053,7 @@ app.post("/api/orders",async(req,res)=>{
 async function analyzeYapeVoucher(buffer,mime,expectedAmount){
  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
  if(!apiKey)return {status:"manual",reason:"No está configurada la IA de revisión."};
- const prompt="Analiza esta captura o PDF de un comprobante Yape. Extrae únicamente datos que sean claramente visibles. Devuelve SOLO JSON válido con: is_payment_receipt (boolean), amount (number o null), operation_id (string o null), transaction_date (string o null), payment_app (string o null), confidence (number entre 0 y 1), notes (string). No inventes ni completes datos borrosos. No confundas saldo, número telefónico, hora ni fecha con el código de operación. Si no es claramente un comprobante de transferencia/pago Yape, is_payment_receipt=false. Importe esperado: S/"+Number(expectedAmount).toFixed(2)+".";
+ const prompt="Analiza esta captura o PDF de un comprobante de pago peruano Yape o Plin. Extrae únicamente datos claramente visibles. Devuelve SOLO JSON válido con: is_payment_receipt (boolean), amount (number o null), operation_id (string o null), transaction_date (string o null), payment_app (Yape o Plin o null), confidence (number entre 0 y 1), notes (string). No inventes ni completes datos borrosos. No confundas saldo, número telefónico, hora ni fecha con el código de operación. Acepta únicamente comprobantes identificables claramente como Yape o Plin. Si no es claramente un comprobante Yape o Plin, is_payment_receipt=false. Importe esperado: S/"+Number(expectedAmount).toFixed(2)+".";
  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey),{
   method:"POST",headers:{"Content-Type":"application/json"},
   body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:mime,data:buffer.toString("base64")}}]}],generationConfig:{temperature:0,responseMimeType:"application/json"}}),
@@ -1066,11 +1066,13 @@ async function analyzeYapeVoucher(buffer,mime,expectedAmount){
  const amount=Number(parsed.amount);
  const operationId=String(parsed.operation_id||"").trim().replace(/\s+/g,"").slice(0,80);
  const confidence=Number(parsed.confidence||0);
- const isReceipt=parsed.is_payment_receipt===true&&/yape/i.test(String(parsed.payment_app||"yape"))&&Number.isFinite(amount);
- if(!isReceipt)return {status:"rejected",reason:"La captura no parece ser un comprobante Yape legible.",confidence};
+ const paymentApp=String(parsed.payment_app||"").trim().toLowerCase();
+ const normalizedApp=paymentApp.includes("plin")?"plin":paymentApp.includes("yape")?"yape":"";
+ const isReceipt=parsed.is_payment_receipt===true&&Boolean(normalizedApp)&&Number.isFinite(amount);
+ if(!isReceipt)return {status:"rejected",reason:"La captura no parece ser un comprobante Yape o Plin legible.",confidence};
  if(Math.abs(amount-Number(expectedAmount))>0.009)return {status:"rejected",reason:"El importe visible no coincide con el total del pedido.",amount,operationId,confidence};
  if(!operationId||confidence<0.82)return {status:"manual",reason:"No se pudo leer con suficiente seguridad el código de operación.",amount,operationId,confidence};
- return {status:"approved",reason:"Comprobante legible; importe y código de operación extraídos.",amount,operationId,confidence};
+ return {status:"approved",reason:"Comprobante "+(normalizedApp==="plin"?"Plin":"Yape")+" legible; importe y código de operación extraídos.",amount,operationId,confidence,paymentApp:normalizedApp};
 }
 app.post("/api/orders/:id/voucher",async(req,res)=>{
  try{
@@ -1100,8 +1102,8 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
   let review={status:"manual",reason:"La IA no pudo revisar automáticamente el comprobante."};
-  try{review=await analyzeYapeVoucher(buffer,mime,payment.amount);}catch(reviewError){console.warn("Automatic Yape voucher review unavailable:",reviewError?.message||reviewError);}
-  const operationKey=review.operationId?"yape:"+review.operationId:"sha256:"+fileHash;
+  try{review=await analyzeYapeVoucher(buffer,mime,payment.amount);}catch(reviewError){console.warn("Automatic Yape/Plin voucher review unavailable:",reviewError?.message||reviewError);}
+  const operationKey=review.operationId?(String(review.paymentApp||"yape")+":"+review.operationId):"sha256:"+fileHash;
   if(review.status==="approved"){
    const {data:used,error:usedError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id",operationKey).maybeSingle();
    if(usedError)throw usedError;
