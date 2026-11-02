@@ -1007,7 +1007,7 @@ async function generateCustomerLyrics(){
 document.getElementById('generateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('regenerateCustomerLyrics').addEventListener('click',generateCustomerLyrics);
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
-async async function watchCustomerOrderAudio(orderId){
+async function watchCustomerOrderAudio(orderId){
  const progress=document.getElementById('customerAudioProgress');
  if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
