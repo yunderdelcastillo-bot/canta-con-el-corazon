@@ -1032,6 +1032,7 @@ app.post("/api/orders",async(req,res)=>{
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido recibido",body:"Tienes un nuevo pedido en Canta con el corazón."});
   orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
+  if(order.lyrics&&order.lyrics.length>=40){setImmediate(()=>{generateOrderAudio(data.id,order);});}
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
