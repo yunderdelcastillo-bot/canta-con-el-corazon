@@ -1000,7 +1000,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   progress=document.createElement('section');progress.id='customerAudioProgress';
   progress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
   progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Estamos creando tu canción</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Preparando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El porcentaje es orientativo; el 100% solo aparecerá cuando el audio esté guardado y el enlace de muestra esté listo. No cierres esta ventana.</p>';
-  status.after(progress);
+  button.after(progress);
  }
  progress.classList.remove('hidden');
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
