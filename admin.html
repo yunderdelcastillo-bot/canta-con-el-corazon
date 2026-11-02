@@ -40,6 +40,12 @@ textarea{min-height:64px}
 @media(min-width:900px){main{max-width:1120px}.card{padding:15px}}
 @media(max-width:560px){.hero{padding:12px}.hero h1{font-size:1.18rem}main{padding:7px 8px 22px}.card{padding:11px;margin:7px 0}.grid{grid-template-columns:1fr;gap:5px}.panel-nav a{padding:6px 9px;font-size:.76rem}.order-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.order-stat strong{font-size:1.05rem}#adminLyricsText{height:145px}.preview-frame{height:340px}}
 
+
+/* Navegación por pantallas: una sola herramienta visible cada vez */
+.panel-nav a[aria-current="page"]{background:#681b43;color:#fff;border-color:#681b43}
+.panel-nav{position:sticky;top:0}
+#customerOrders,#editor,#library,#lyricsStudio,#mediaLibrary,#systemAlerts,#integrationStatus{scroll-margin-top:70px}
+
 </style></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
 <nav class="panel-nav" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
@@ -291,5 +297,29 @@ $('enableAlertSound').onclick=()=>{cchAudioUnlocked=true;cchAlertSoundEnabled=tr
 $('testAlertSound').onclick=()=>{cchAudioUnlocked=true;cchSpeakAlert('Atención. Tienes un nuevo pedido en Canta con el corazón.');if(!cchAlertSoundEnabled)$('alertSoundStatus').textContent='Pulsa Activar sonido para habilitar las alertas automáticas.';};
 $('toggleAlertSound').onclick=()=>{cchAlertSoundEnabled=!cchAlertSoundEnabled;localStorage.setItem('cch_alert_sound',cchAlertSoundEnabled?'on':'off');$('alertSoundStatus').textContent=cchAlertSoundEnabled?'Sonido activado.':'Sonido silenciado.';};
 async function cchAddOrderChat(card,order,token){const panel=document.createElement('details');panel.style.marginTop='12px';const summary=document.createElement('summary');summary.textContent='💬 Mensajes del cliente';panel.appendChild(summary);const thread=document.createElement('div');thread.className='status';thread.textContent='Abre para cargar la conversación.';const input=document.createElement('textarea');input.maxLength=1200;input.placeholder='Escribe tu respuesta al cliente…';const send=document.createElement('button');send.className='btn';send.type='button';send.textContent='Enviar respuesta';panel.append(thread,input,send);card.appendChild(panel);async function refresh(){const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok){thread.textContent=d.error||'No se pudo cargar el chat.';return;}thread.replaceChildren();(d.messages||[]).forEach(m=>{const p=document.createElement('p');const b=document.createElement('b');b.textContent=m.sender_role==='admin'?'Tú: ':'Cliente: ';const s=document.createElement('span');s.textContent=m.message;p.append(b,s);thread.appendChild(p)});thread.scrollTop=thread.scrollHeight;}send.onclick=async()=>{const message=input.value.trim();if(!message)return;send.disabled=true;try{const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');input.value='';await refresh();}catch(e){alert(e.message)}finally{send.disabled=false;}};panel.addEventListener('toggle',()=>{if(panel.open)refresh()});}
+
+
+/* Menú sencillo para evitar una página interminable */
+(function(){
+ const ids=['customerOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
+ const nav=document.querySelector('.panel-nav');
+ if(!nav)return;
+ function showPanel(id){
+   ids.forEach(x=>{const el=document.getElementById(x);if(el)el.classList.toggle('hidden',x!==id);});
+   nav.querySelectorAll('a').forEach(a=>{
+     const active=a.getAttribute('href')==='#'+id;
+     if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
+   });
+   const target=document.getElementById(id);
+   if(target){target.classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
+ }
+ nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>{
+   const id=(a.getAttribute('href')||'').slice(1);
+   if(!ids.includes(id))return;
+   e.preventDefault();showPanel(id);
+ }));
+ // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
+ showPanel('customerOrders');
+})();
 
 </script></body></html>
