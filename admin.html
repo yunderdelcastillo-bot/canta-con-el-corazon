@@ -320,6 +320,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  }));
  // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
  showPanel('customerOrders');
+ window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('customerOrders');});
 })();
 
 </script></body></html>
