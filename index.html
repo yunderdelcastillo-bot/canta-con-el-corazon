@@ -1019,13 +1019,23 @@ async function watchCustomerOrderAudio(orderId){
       return;
      }
      if(data.status==='cancelled'){setProgress(0,'Este pedido fue cancelado. Si necesitas ayuda, escríbenos por WhatsApp.');return;}
+    }else if(check.status===404||check.status===400){
+     try{localStorage.removeItem('cchLastCustomerOrderId');}catch(e){}
+     if(window.cchAutoSavedOrderId===orderId)window.cchAutoSavedOrderId='';
+     progress.remove();
+     const link=document.getElementById('customerAutomaticPreviewLink');if(link)link.remove();
+     const paymentContext=window.cchPaymentContext;
+     if(paymentContext?.orderId===orderId){window.cchPaymentContext=null;try{sessionStorage.removeItem('cchPaymentContext');}catch(e){}}
+     const upload=document.getElementById('orderPaymentUpload');if(upload)upload.classList.add('hidden');
+     const status=document.getElementById('customerLyricsStatus');if(status)status.textContent='No encontramos un pedido anterior. Tu letra está lista; cuando pulses «Enviar pedido», se registrará una nueva solicitud.';
+     return;
     }else{
-     setProgress(15,'💗 Tu pedido ya fue enviado. Estamos consultando su estado.');
+     setProgress(0,'No pudimos verificar el pedido en este momento. Estamos intentando nuevamente; todavía no podemos confirmar su registro.');
     }
-   }catch(error){setProgress(15,'💗 Tu pedido está guardado. Volveremos a consultar su estado en unos momentos.');}
+   }catch(error){setProgress(0,'No se pudo conectar para verificar el pedido. Volveremos a intentarlo.');}
    await new Promise(resolve=>setTimeout(resolve,5000));
   }
-  setProgress(15,'💗 Tu pedido sigue registrado. Puedes cerrar esta página; la muestra aparecerá aquí cuando esté lista.');
+  setProgress(0,'No pudimos confirmar el estado del pedido. Vuelve a conectarte para consultar su registro.');
  }finally{}
 }
 document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>{
@@ -1081,22 +1091,39 @@ document.getElementById('orderForm').addEventListener('input',()=>{
   const main=document.getElementById('submitCustomerOrder');if(main){main.disabled=false;main.textContent='💗 Enviar pedido y comenzar seguimiento';}
  }
 });
-try{
- const savedPaymentContext=sessionStorage.getItem('cchPaymentContext');
- if(savedPaymentContext){const parsed=JSON.parse(savedPaymentContext);if(parsed?.orderId&&parsed?.accessToken){window.cchPaymentContext=parsed;mountCustomerOrderChat();document.getElementById('orderPaymentUpload').classList.remove('hidden');}}
- const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
- if(restoredOrderId&&/^[0-9a-f-]{36}$/i.test(restoredOrderId)){
-  window.cchAutoSavedOrderId=restoredOrderId;
+async function restoreCustomerOrderProgress(orderId){
+ if(!orderId||!/^[0-9a-f-]{36}$/i.test(orderId))return;
+ try{
+  const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/audio-status',{cache:'no-store'});
+  const data=await check.json().catch(()=>({}));
+  if(check.status===404||check.status===400){
+   try{localStorage.removeItem('cchLastCustomerOrderId');}catch(e){}
+   const savedPayment=sessionStorage.getItem('cchPaymentContext');
+   if(savedPayment){try{if(JSON.parse(savedPayment)?.orderId===orderId)sessionStorage.removeItem('cchPaymentContext');}catch(e){}}
+   return;
+  }
+  if(!check.ok)return;
+  window.cchAutoSavedOrderId=orderId;
   let restoredProgress=document.getElementById('customerAudioProgress');
   if(!restoredProgress){
    restoredProgress=document.createElement('section');restoredProgress.id='customerAudioProgress';
    restoredProgress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
-   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">15%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:15%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Recuperando el estado de tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
+   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Pedido verificado. Consultando su estado…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
    const lyricsResult=document.getElementById('customerLyricsResult');
    (lyricsResult||document.getElementById('sendCustomerLyrics')?.parentElement||document.body).appendChild(restoredProgress);
   }
-  watchCustomerOrderAudio(restoredOrderId);
- }
+  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
+  const value=Math.max(0,Math.min(100,Math.round(Number(data.progress)||15)));
+  if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';
+  if(stage)stage.textContent=data.message||'💗 Tu pedido está registrado y en seguimiento.';
+  watchCustomerOrderAudio(orderId);
+ }catch(e){console.warn('No se pudo verificar el pedido anterior:',e?.message||e);}
+}
+try{
+ const savedPaymentContext=sessionStorage.getItem('cchPaymentContext');
+ if(savedPaymentContext){const parsed=JSON.parse(savedPaymentContext);if(parsed?.orderId&&parsed?.accessToken){window.cchPaymentContext=parsed;mountCustomerOrderChat();document.getElementById('orderPaymentUpload').classList.remove('hidden');}}
+ const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
+ if(restoredOrderId)restoreCustomerOrderProgress(restoredOrderId);
 }catch(e){}
 document.getElementById('notifyAdminAudioReady').addEventListener('click',()=>{
   if(!window.cchAutoSavedOrderId){alert('No encontramos el número de tu pedido. Escríbenos por WhatsApp para ayudarte.');return;}
