@@ -1357,16 +1357,22 @@ function mountCustomerOrderChat(){
 
 </script>
 \n<script>
-/* Si el cliente abre la invitación con #order, llevarlo directamente al formulario. */
+/* La invitación abre el asistente de pedidos y conserva el formulario, la letra y el seguimiento automático de la muestra. */
 (function(){
- function openOrderForm(){
+ function openOrderExperience(){
   if(window.location.hash!=='#order')return;
   const target=document.getElementById('order');
   if(target)target.scrollIntoView({behavior:'auto',block:'start'});
+  /* El asistente recoge los datos paso a paso y luego los transfiere al formulario. */
+  setTimeout(()=>{
+   const assistantButton=document.getElementById('cchAiOpen');
+   const assistantPanel=document.getElementById('cchAiPanel');
+   if(assistantButton&&assistantPanel&&!assistantPanel.classList.contains('open'))assistantButton.click();
+  },650);
  }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(openOrderForm,180),{once:true});
- else setTimeout(openOrderForm,180);
- window.addEventListener('hashchange',openOrderForm);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(openOrderExperience,180),{once:true});
+ else setTimeout(openOrderExperience,180);
+ window.addEventListener('hashchange',openOrderExperience);
 })();
 </script>
 </body></html>
