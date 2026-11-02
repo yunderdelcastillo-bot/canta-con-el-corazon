@@ -1035,6 +1035,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   if(!window.cchAutoSavedOrderId){
    const saved=await saveCustomerOrder(true);
    window.cchAutoSavedOrderId=saved.orderId||'';
+   try{localStorage.setItem('cchLastCustomerOrderId',window.cchAutoSavedOrderId);}catch(e){}
   }
   if(!window.cchAutoSavedOrderId)throw new Error('No se recibió el número del pedido.');
   status.textContent='💗 Tu pedido fue enviado correctamente. Prepararemos tu canción y te avisaremos cuando la muestra esté lista.';
@@ -1050,6 +1051,21 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   fallback.classList.remove('hidden');button.disabled=false;
  } 
 });
+try{
+ const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
+ if(restoredOrderId&&/^[0-9a-f-]{36}$/i.test(restoredOrderId)){
+  window.cchAutoSavedOrderId=restoredOrderId;
+  let restoredProgress=document.getElementById('customerAudioProgress');
+  if(!restoredProgress){
+   restoredProgress=document.createElement('section');restoredProgress.id='customerAudioProgress';
+   restoredProgress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
+   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu canción está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">15%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:15%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Recuperando el estado de tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
+   const lyricsResult=document.getElementById('customerLyricsResult');
+   (lyricsResult||document.getElementById('sendCustomerLyrics')?.parentElement||document.body).appendChild(restoredProgress);
+  }
+  watchCustomerOrderAudio(restoredOrderId);
+ }
+}catch(e){}
 document.getElementById('notifyAdminAudioReady').addEventListener('click',()=>{
   if(!window.cchAutoSavedOrderId){alert('No encontramos el número de tu pedido. Escríbenos por WhatsApp para ayudarte.');return;}
   const message=[
