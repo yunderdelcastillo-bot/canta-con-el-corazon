@@ -1356,4 +1356,17 @@ function mountCustomerOrderChat(){
 }
 
 </script>
-\n</body></html>
+\n<script>
+/* Si el cliente abre la invitación con #order, llevarlo directamente al formulario. */
+(function(){
+ function openOrderForm(){
+  if(window.location.hash!=='#order')return;
+  const target=document.getElementById('order');
+  if(target)target.scrollIntoView({behavior:'auto',block:'start'});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(openOrderForm,180),{once:true});
+ else setTimeout(openOrderForm,180);
+ window.addEventListener('hashchange',openOrderForm);
+})();
+</script>
+</body></html>
