@@ -1015,10 +1015,10 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
   progressTimer=setInterval(()=>{
    const elapsed=(Date.now()-began)/1000;
    const value=Math.min(90,12+elapsed/270*78);
-   const message=value<28?'🎼 Preparando los datos musicales…':value<78?'🎙️ Lyria está trabajando en tu canción…':value<90?'☁️ Esperando la respuesta y preparando el archivo…':'⏳ La generación continúa. Estamos esperando la confirmación del servidor…';
+   const message=elapsed<55?'🎼 Preparando los datos musicales…':elapsed<180?'🎙️ Estamos preparando tu canción…':elapsed<270?'☁️ Esperando que el audio quede guardado…':'⏳ Tu canción sigue en preparación. Cuando subamos el MP3 a tu pedido, esta pantalla se actualizará automáticamente al 100%.';
    setProgress(value,message);
   },1000);
-  const deadline=Date.now()+270000;
+  const deadline=Date.now()+43200000; // Mantener la pantalla sincronizada hasta 12 horas para admitir la subida manual desde administración.
   while(Date.now()<deadline){
    await new Promise(resolve=>setTimeout(resolve,5000));
    const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(autoSavedOrderId)+'/audio-status',{cache:'no-store'});
