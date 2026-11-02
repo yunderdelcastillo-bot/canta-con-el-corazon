@@ -931,7 +931,6 @@ function buildCustomerOrderMessage(includeLyrics){
  return text;
 }
 
-let window.cchAutoSavedOrderId = '';
 async function saveCustomerOrder(includeLyrics=true){
  const payload={buyer:orderValue('buyer'),contact:orderValue('contact'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),customGenre:orderValue('customGenre'),voice:orderValue('voice'),specialPhrase:orderValue('specialPhrase'),lyricDuration:orderValue('lyricDuration'),lyricTone:orderValue('lyricTone'),package:orderValue('package'),urgency:orderValue('urgency'),lyrics:includeLyrics?orderValue('customerLyricsText'):''};
  const response=await fetchWithSafeRetry(API_BASE+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},1);
@@ -1051,10 +1050,10 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
  } 
 });
 document.getElementById('notifyAdminAudioReady').addEventListener('click',()=>{
-  if(!autoSavedOrderId){alert('No encontramos el número de tu pedido. Escríbenos por WhatsApp para ayudarte.');return;}
+  if(!window.cchAutoSavedOrderId){alert('No encontramos el número de tu pedido. Escríbenos por WhatsApp para ayudarte.');return;}
   const message=[
    '💗 ¡Hola! Mi canción personalizada ya se generó correctamente.',
-   '📋 Pedido: '+autoSavedOrderId,
+   '📋 Pedido: '+window.cchAutoSavedOrderId,
    '👤 Cliente: '+orderValue('buyer'),
    '🎁 Para: '+orderValue('recipient'),
    '📦 Paquete: '+orderValue('package'),
