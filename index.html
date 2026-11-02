@@ -1043,6 +1043,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
  const button=document.getElementById('sendCustomerLyrics'),fallback=document.getElementById('sendCustomerLyricsWhatsApp'),status=document.getElementById('customerLyricsStatus');
  if(!orderValue('customerLyricsText')){status.textContent='Primero genera tu letra personalizada.';return;}
  button.disabled=true;fallback.classList.add('hidden');
+ const mainSubmit=document.getElementById('submitCustomerOrder');if(mainSubmit){mainSubmit.disabled=true;mainSubmit.textContent='⏳ Registrando pedido…';}
  let progress=document.getElementById('customerAudioProgress');
  if(!progress){
   progress=document.createElement('section');progress.id='customerAudioProgress';
