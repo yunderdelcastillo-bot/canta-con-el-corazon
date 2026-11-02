@@ -1,4 +1,5 @@
 import express from "express";
+import webpush from "web-push";
 import cors from "cors";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "node:crypto";
@@ -1196,9 +1197,22 @@ async function customerPaymentAccess(db,id,token){
  const {data,error}=await db.from("payment_submissions").select("id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
  return !error&&!!data;
 }
+async function sendAdminPushNotification(db,values){
+ if(values.audience!=="admin"||!process.env.VAPID_PUBLIC_KEY||!process.env.VAPID_PRIVATE_KEY||!process.env.VAPID_SUBJECT)return;
+ try{
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT,process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
+  const {data:subs,error}=await db.from("cch_push_subscriptions").select("id,subscription").limit(500);
+  if(error){console.warn("Push subscriptions unavailable:",error.message);return;}
+  const payload=JSON.stringify({title:values.title||"Canta con el corazón",body:values.body||"Tienes una nueva notificación.",url:"/admin.html",tag:values.event_type||"cch-admin"});
+  await Promise.all((subs||[]).map(async row=>{try{await webpush.sendNotification(row.subscription,payload,{TTL:60,urgency:"high"});}catch(e){if(e.statusCode===404||e.statusCode===410){await db.from("cch_push_subscriptions").delete().eq("id",row.id);}else console.warn("Push delivery:",e.statusCode||e.message);}}));
+ }catch(e){console.warn("Push notification error:",e?.message||e);}
+}
 async function createSystemNotification(db,values){
- try{const {error}=await db.from("system_notifications").insert(values);if(error)console.warn("Notification not stored (run messaging migration):",error.message);}
- catch(e){console.warn("Notification unavailable:",e?.message||e);}
+ try{
+  const {error}=await db.from("system_notifications").insert(values);
+  if(error)console.warn("Notification not stored (run messaging migration):",error.message);
+  else if(["new_order","voucher_received","new_message","payment_approved"].includes(values.event_type))await sendAdminPushNotification(db,values);
+ }catch(e){console.warn("Notification unavailable:",e?.message||e);}
 }
 app.post("/api/orders/:id/messages",async(req,res)=>{
  try{
@@ -1247,6 +1261,15 @@ app.post("/api/admin/orders/:id/messages",async(req,res)=>{
   await createSystemNotification(db,{order_id:id,event_type:"new_message",audience:"customer",title:"Respuesta de Canta con el corazón",body:"Tienes una nueva respuesta sobre tu pedido."});
   res.status(201).json({ok:true,message:data});
  }catch(e){console.error("Admin send message:",e?.message||e);res.status(500).json({error:"No se pudo enviar la respuesta."});}
+});
+app.get("/api/admin/push/public-key",async(req,res)=>{
+ try{if(!ready())return res.status(503).json({error:"Supabase no está configurado."});const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});if(!process.env.VAPID_PUBLIC_KEY||!process.env.VAPID_PRIVATE_KEY||!process.env.VAPID_SUBJECT)return res.status(503).json({error:"Las notificaciones Push aún no están configuradas en el servidor."});res.set("Cache-Control","no-store").json({ok:true,publicKey:process.env.VAPID_PUBLIC_KEY});}catch(e){res.status(500).json({error:"No se pudo preparar la suscripción Push."});}
+});
+app.post("/api/admin/push/subscribe",async(req,res)=>{
+ try{if(!ready())return res.status(503).json({error:"Supabase no está configurado."});const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});const sub=req.body?.subscription;if(!sub?.endpoint||!sub?.keys?.p256dh||!sub?.keys?.auth)return res.status(400).json({error:"Suscripción del navegador incompleta."});const db=admin();const {error}=await db.from("cch_push_subscriptions").upsert({user_id:user.id,endpoint:sub.endpoint,subscription:sub,updated_at:new Date().toISOString()},{onConflict:"endpoint"});if(error)throw error;res.status(201).json({ok:true});}catch(e){console.error("Save push subscription:",e?.message||e);res.status(500).json({error:"No se pudo guardar este dispositivo."});}
+});
+app.delete("/api/admin/push/subscribe",async(req,res)=>{
+ try{const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});const endpoint=String(req.body?.endpoint||"");if(!endpoint)return res.status(400).json({error:"Falta el dispositivo."});const {error}=await admin().from("cch_push_subscriptions").delete().eq("user_id",user.id).eq("endpoint",endpoint);if(error)throw error;res.json({ok:true});}catch(e){res.status(500).json({error:"No se pudo desactivar este dispositivo."});}
 });
 app.get("/api/admin/notifications",async(req,res)=>{
  try{
