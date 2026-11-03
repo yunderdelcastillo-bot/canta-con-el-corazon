@@ -573,14 +573,14 @@ app.post("/api/video/design",async(req,res)=>{
   const recipient=String(body.recipient||"").slice(0,100);
   const dedication=String(body.dedication||"").slice(0,300);
   const occasion=String(body.occasion||"").slice(0,60);
-  const prompt="Actúa como director/a de arte de videoclips verticales de canciones personalizadas. A partir de la letra y dedicatoria, elige una decoración delicada, emotiva y elegante. Responde SOLO JSON válido con claves theme, accent, stickers. theme debe ser romantic, celebration, elegant, family o inspirational. accent debe ser uno de #f6d78c, #ffc1d6, #b9dcff, #d8b5ff, #c8f0d0. stickers debe ser un arreglo de 3 elementos elegidos solo entre heart, sparkle, star. Evita sobrecargar; la letra y los rostros deben seguir siendo protagonistas. No incluyas texto ni nombres en los stickers.\nOcasión: "+occasion+"\nDestinatario: "+recipient+"\nDedicatoria: "+dedication+"\nLetra:\n"+lyrics;
+  const prompt="Eres director creativo audiovisual de videoclips verticales profesionales para canciones personalizadas. Analiza letra, ocasión, destinatario y dedicatoria; crea un plan visual coherente con la historia y el sentimiento. Responde SOLO JSON válido con claves theme, accent, stickers, visualConcept, sceneSequence, lyricStyle, transitionStyle, endingPhrase, imageSearchTerms. theme: romantic, celebration, elegant, family o inspirational. accent: #f6d78c, #ffc1d6, #b9dcff, #d8b5ff o #c8f0d0. stickers: hasta 3 de heart, sparkle, star. visualConcept: frase breve en español, máximo 90 caracteres. sceneSequence: arreglo de 3 objetos {part,visual}; part solo intro, verse, chorus o ending; visual es una escena genérica, máximo 100 caracteres. lyricStyle: elegant, cinematic o bold. transitionStyle: dissolve, soft_glow o fade. endingPhrase: frase breve basada solo en la dedicatoria, máximo 90 caracteres; si no hay datos usa Hecho con amor. imageSearchTerms: arreglo de 3 descripciones visuales genéricas en español, máximo 70 caracteres. No inventes nombres, lugares, sucesos ni parentescos; no afirmes que existen fotos reales. Conserva legibilidad y protagonismo de rostros y letras.\\nOcasión: "+occasion+"\\nDestinatario: "+recipient+"\\nDedicatoria: "+dedication+"\\nLetra:\\n"+lyrics
   const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
   const candidates=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];
   let payload=null,lastStatus=0;
   for(const model of candidates){
    const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
     method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.35,maxOutputTokens:180}}),
+    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.35,maxOutputTokens:650}}),
     signal:AbortSignal.timeout(12000)
    });
    const data=await response.json().catch(()=>({}));
@@ -594,10 +594,18 @@ app.post("/api/video/design",async(req,res)=>{
   const themes=new Set(["romantic","celebration","elegant","family","inspirational"]);
   const colors=new Set(["#f6d78c","#ffc1d6","#b9dcff","#d8b5ff","#c8f0d0"]);
   const stickers=new Set(["heart","sparkle","star"]);
+  const safeText=(value,max,fallback="")=>String(value||"").replace(/[<>\\u0000-\\u001F]/g," ").replace(/\\s+/g," ").trim().slice(0,max)||fallback;
+  const parts=new Set(["intro","verse","chorus","ending"]);
   const design={
    theme:themes.has(parsed.theme)?parsed.theme:"romantic",
    accent:colors.has(String(parsed.accent).toLowerCase())?String(parsed.accent).toLowerCase():"#f6d78c",
-   stickers:Array.isArray(parsed.stickers)?parsed.stickers.filter(x=>stickers.has(x)).slice(0,3):["heart","sparkle","star"]
+   stickers:Array.isArray(parsed.stickers)?parsed.stickers.filter(x=>stickers.has(x)).slice(0,3):["heart","sparkle","star"],
+   visualConcept:safeText(parsed.visualConcept,90,"Un videoclip creado para esta historia"),
+   sceneSequence:Array.isArray(parsed.sceneSequence)?parsed.sceneSequence.slice(0,4).filter(x=>x&&parts.has(x.part)).map(x=>({part:x.part,visual:safeText(x.visual,100,"")})).filter(x=>x.visual):[],
+   lyricStyle:["elegant","cinematic","bold"].includes(parsed.lyricStyle)?parsed.lyricStyle:"cinematic",
+   transitionStyle:["dissolve","soft_glow","fade"].includes(parsed.transitionStyle)?parsed.transitionStyle:"dissolve",
+   endingPhrase:safeText(parsed.endingPhrase,90,"Hecho con amor"),
+   imageSearchTerms:Array.isArray(parsed.imageSearchTerms)?parsed.imageSearchTerms.slice(0,3).map(x=>safeText(x,70)).filter(Boolean):[]
   };
   while(design.stickers.length<3)design.stickers.push("sparkle");
   res.set("Cache-Control","no-store").json({ok:true,design});
