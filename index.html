@@ -306,12 +306,30 @@ function showPaymentCta(){
  let box=document.getElementById('previewPaymentCta');
  if(!box){
   box=document.createElement('section');box.id='previewPaymentCta';box.className='payment';box.style.cssText='display:block;margin:18px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:#ffffff0b;text-align:center';
-  box.innerHTML='<h3 style="color:#ffe5ee;margin:0 0 8px">💖 ¡Me encantó! Quiero mi canción completa</h3><p style="color:#f1d9e3;line-height:1.5">La canción personalizada cuesta:</p><p style="color:#f6d78c;font-weight:900;font-size:2rem;margin:4px 0 10px">S/20 SOLES</p><p style="color:#f1d9e3;line-height:1.5">Escanea este código QR con Yape para pagar tu canción. Verifica el nombre del destinatario antes de confirmar.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar S/20 a Canta con el corazón" style="display:block;width:min(100%,280px);max-height:320px;object-fit:contain;margin:14px auto;background:#fff;border-radius:14px;padding:10px"><p style="color:#f6d78c;font-weight:800;font-size:1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p style="color:#f1d9e3;font-size:.86rem;line-height:1.5">Después de pagar, pulsa el botón y envía tu comprobante por WhatsApp. La descarga se habilita cuando revisemos el pago. Este precio corresponde a la canción personalizada; portada, fotovideo o express pueden tener un costo adicional.</p><a id="previewSendVoucher" class="btn secondary" target="_blank" rel="noopener" style="display:flex;text-decoration:none;margin-top:12px">📲 Ya pagué S/20: enviar mi voucher</a>';
+  const amount=Number(packagePrice)||20;
+  box.innerHTML='<h3 style="color:#ffe5ee;margin:0 0 8px">💖 ¡Me encantó! Ahora realiza tu pago</h3><p id="previewPackageLabel" style="color:#f1d9e3;line-height:1.5"></p><p id="previewPackageAmount" style="color:#f6d78c;font-weight:900;font-size:2rem;margin:4px 0 10px"></p><p style="color:#f1d9e3;line-height:1.5">Escanea este código QR con Yape y realiza el pago indicado. Verifica el nombre del destinatario antes de confirmar.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar Canta con el corazón" style="display:block;width:min(100%,280px);max-height:320px;object-fit:contain;margin:14px auto;background:#fff;border-radius:14px;padding:10px"><p style="color:#f6d78c;font-weight:800;font-size:1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p style="color:#f1d9e3;font-size:.86rem;line-height:1.5">Después de pagar, adjunta aquí la captura o foto de tu voucher. El sistema revisará el importe y el código de operación.</p><div id="previewVoucherUpload" style="margin-top:14px;text-align:left"><label for="previewVoucherFile">Comprobante de pago (JPG, PNG o WEBP; máximo 8 MB)</label><input id="previewVoucherFile" type="file" accept="image/jpeg,image/png,image/webp"><button id="previewUploadVoucher" class="btn secondary" type="button" style="margin-top:12px">📤 Subir voucher al sistema</button><p id="previewVoucherStatus" class="microcopy" role="status" aria-live="polite"></p></div>';
   audioNote.after(box);
+  const label=document.getElementById('previewPackageLabel'),price=document.getElementById('previewPackageAmount');
+  if(label)label.textContent=packageName||'Tu paquete personalizado';
+  if(price)price.textContent='S/'+amount+' SOLES';
+  document.getElementById('previewUploadVoucher').addEventListener('click',async()=>{
+   const file=document.getElementById('previewVoucherFile').files[0],status=document.getElementById('previewVoucherStatus'),button=document.getElementById('previewUploadVoucher');
+   const ctx={orderId:params.get('pedido')||'',accessToken:params.get('acceso')||''};
+   if(!ctx.orderId||!ctx.accessToken){status.textContent='No encontramos el acceso seguro de tu pedido. Regresa a la página donde registraste tu pedido y abre nuevamente la muestra.';return;}
+   if(!file){status.textContent='Selecciona primero la captura de tu voucher.';return;}
+   if(file.size>8*1024*1024){status.textContent='El comprobante debe pesar máximo 8 MB.';return;}
+   button.disabled=true;status.textContent='Subiendo tu comprobante de forma segura…';
+   try{
+    const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer el archivo.'));reader.readAsDataURL(file);});
+    const response=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64})});
+    const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'No se pudo enviar el comprobante.');
+    status.textContent=result.status==='approved'?'✅ ¡Pago validado! Tu paquete quedó aprobado.':result.status==='rejected'?'⚠️ El voucher no coincide o no se pudo leer. Sube una captura más clara.':'📩 Voucher recibido. Quedó pendiente de revisión por seguridad.';
+    button.textContent='Voucher enviado';
+   }catch(error){status.textContent='No se pudo enviar: '+error.message;}
+   finally{button.disabled=false;}
+  });
  }
- const text='Hola, escuché la vista previa de mi canción para '+(name||'mi dedicatoria')+'. Quiero comprar la canción personalizada por S/20. Ya realicé el pago y adjunto mi voucher para que lo revisen. Enlace del regalo: '+location.href;
- const cta=document.getElementById('previewSendVoucher');
- cta.href='https://wa.me/51977974730?text='+encodeURIComponent(text);box.classList.remove('hidden');
+ box.classList.remove('hidden');
 }
 function lockPreview(message){
  audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
@@ -1015,7 +1033,13 @@ async function watchCustomerOrderAudio(orderId){
       setProgress(100,labels.ready);
       let link=document.getElementById('customerAutomaticPreviewLink');
       if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_blank';link.rel='noopener';link.textContent='🎁 Toca aquí para escuchar tu muestra';progress.after(link);}
-      link.href=data.previewUrl;link.classList.remove('hidden');
+      const previewUrl=new URL(data.previewUrl);
+      const paymentContext=window.cchPaymentContext;
+      if(paymentContext?.orderId===orderId&&paymentContext?.accessToken){
+       previewUrl.searchParams.set('pedido',paymentContext.orderId);
+       previewUrl.searchParams.set('acceso',paymentContext.accessToken);
+      }
+      link.href=previewUrl.toString();link.classList.remove('hidden');
       return;
      }
      if(data.status==='cancelled'){setProgress(0,'Este pedido fue cancelado. Si necesitas ayuda, escríbenos por WhatsApp.');return;}
@@ -1060,12 +1084,8 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
     window.cchPaymentContext={orderId:saved.orderId,accessToken:saved.paymentAccessToken};
     try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
     mountCustomerOrderChat();
-    document.getElementById('orderPaymentUpload').classList.remove('hidden');
-    document.getElementById('orderPaymentStatus').textContent='Pedido registrado correctamente. Si ya pagaste por Yape, adjunta aquí tu comprobante para revisarlo.';
-   }else{
-    document.getElementById('orderPaymentUpload').classList.remove('hidden');
-    document.getElementById('orderPaymentStatus').textContent='Tu pedido está registrado. Puedes pagar con Yape y enviar tu comprobante por WhatsApp; la carga segura de voucher requiere completar la configuración de pagos.';
    }
+   // El pago se solicita únicamente después de que el cliente escuche la muestra completa.
   }
   if(!window.cchAutoSavedOrderId)throw new Error('No se recibió el número del pedido.');
   status.textContent='💗 ¡Tu pedido llegó a nuestra plataforma! Mantente en espera hasta que la barra complete el 100 %. En ese momento aparecerá tu muestra para escucharla.';
