@@ -319,7 +319,16 @@ async function loadCustomerOrders(){
    const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
    const p=document.createElement('p');p.textContent='Cliente: '+o.buyer+' · WhatsApp: '+o.contact+' · '+new Date(o.created_at).toLocaleString('es-PE');card.appendChild(p);
    const infoDetails=document.createElement('details');infoDetails.className='order-info-details';const infoSummary=document.createElement('summary');infoSummary.textContent='Ver historia y detalles del pedido';infoDetails.appendChild(infoSummary);const story=document.createElement('p');story.textContent='Historia: '+o.story;infoDetails.appendChild(story);
-   const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;infoDetails.appendChild(detail);card.appendChild(infoDetails);
+   const detail=document.createElement('p');detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency;infoDetails.appendChild(detail);
+   const lyricsBox=document.createElement('div');lyricsBox.className='order-info-details';lyricsBox.style.background='#fff';lyricsBox.style.marginTop='10px';
+   const lyricsTitle=document.createElement('strong');lyricsTitle.textContent='🎵 Letra generada por el cliente';lyricsTitle.style.color='#681b43';lyricsBox.appendChild(lyricsTitle);
+   const lyricsText=document.createElement('p');lyricsText.style.whiteSpace='pre-wrap';lyricsText.style.overflowWrap='anywhere';lyricsText.style.margin='8px 0';lyricsText.textContent=String(o.lyrics||'').trim()||'Este pedido no recibió una letra. Solo se registró la historia y los datos del cliente.';lyricsBox.appendChild(lyricsText);
+   if(String(o.lyrics||'').trim()){
+    const copyOriginal=document.createElement('button');copyOriginal.type='button';copyOriginal.className='btn alt';copyOriginal.textContent='📋 Copiar letra original';
+    copyOriginal.onclick=async()=>{try{await navigator.clipboard.writeText(String(o.lyrics));copyOriginal.textContent='✓ Letra copiada';setTimeout(()=>copyOriginal.textContent='📋 Copiar letra original',2200);}catch{const area=document.createElement('textarea');area.value=String(o.lyrics);document.body.appendChild(area);area.select();try{document.execCommand('copy');copyOriginal.textContent='✓ Letra copiada';}catch{alert('No se pudo copiar automáticamente. Selecciona la letra y cópiala manualmente.');}area.remove();}};
+    lyricsBox.appendChild(copyOriginal);
+   }
+   card.appendChild(lyricsBox);card.appendChild(infoDetails);
    if(o.payment){
     const pay=document.createElement('div');pay.className='status';
     const labels={pending:'Pendiente de comprobante',voucher_submitted:'Voucher recibido · pendiente de revisión',approved:'Pago confirmado',rejected:'Voucher rechazado'};
