@@ -439,7 +439,7 @@ if(downloadAllowed){downloadButton.textContent='⬇️ Crear y descargar mi rega
 downloadMp3Button.addEventListener('click',async()=>{
  if(!downloadAllowed||!canDownloadMp3){mp3Notice.textContent='🔒 Tu paquete no tiene habilitada la descarga MP3 o el pago aún no está confirmado.';return}
  if(!audio||!resolvedAudioUrl){mp3Notice.textContent='Todavía no hay una canción disponible para descargar.';return}
- try{downloadMp3Button.disabled=true;mp3Notice.textContent='Preparando tu archivo MP3…';const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio.');const blob=await response.blob();if(!blob.size)throw new Error('El archivo MP3 está vacío.');const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=((name||'mi-regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()||'mi-regalo-musical')+'-canta-con-el-corazon.mp3';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);mp3Notice.textContent='¡Tu canción en MP3 está lista! Revisa la carpeta Descargas de tu celular.'}catch(err){mp3Notice.textContent='No se pudo descargar el MP3: '+(err.message||'inténtalo de nuevo')+'. Prueba con Chrome actualizado.'}finally{downloadMp3Button.disabled=false}
+ try{downloadMp3Button.disabled=true;mp3Notice.textContent='Preparando tu archivo MP3…';const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio.');const blob=await response.blob();if(!blob.size)throw new Error('El archivo MP3 está vacío.');const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=((name||'mi-regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()||'mi-regalo-musical')+'-canta-con-el-corazon.mp3';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);mp3Notice.textContent='¡Tu canción en MP3 está lista! Revisa la carpeta Descargas de tu celular.';if(previewLinkToken&&audio){const orderId=audio.split('/').pop().replace(/\\.mp3$/i,'');if(/^[0-9a-f-]{36}$/i.test(orderId)){try{const done=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/download-completed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({previewToken:previewLinkToken})});const result=await done.json().catch(()=>({}));if(done.ok&&result.completed){const notice=document.getElementById('mp3Notice');if(notice)notice.textContent='🎉 ¡Descarga completada! Tu pedido llegó al 100%. Gracias por confiar en Canta con el corazón.';}}catch(confirmError){console.warn('No se pudo confirmar la descarga:',confirmError?.message||confirmError);}}}}catch(err){mp3Notice.textContent='No se pudo descargar el MP3: '+(err.message||'inténtalo de nuevo')+'. Prueba con Chrome actualizado.'}finally{downloadMp3Button.disabled=false}
 });
 
 let generationWarningAccepted=false;
@@ -1021,7 +1021,7 @@ async function watchCustomerOrderAudio(orderId){
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
  const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';if(stage)stage.textContent=message;if(value>=100){const heading=progress.querySelector('div strong');if(heading)heading.textContent='🎉 ¡Tu muestra está lista!';progress.style.borderColor='#e6b85c';}};
  const deadline=Date.now()+7*24*60*60*1000;
- const labels={received:'💗 Tu pedido llegó correctamente a nuestra plataforma. Pronto comenzaremos a preparar tu canción.',creating:'🎼 Estamos trabajando en tu canción.',uploading:'☁️ Estamos subiendo el audio a la plataforma.',saving:'🎁 Audio recibido. Estamos preparando tu muestra privada.',ready:'🎉 ¡Tu muestra ya está disponible! Toca el botón «ESCUCHAR MI MUESTRA» para abrirla y escucharla.'};
+ const labels={received:'💗 Tu pedido llegó correctamente a nuestra plataforma. Pronto comenzaremos a preparar tu canción.',creating:'🎼 Estamos trabajando en tu canción.',uploading:'☁️ Estamos subiendo el audio a la plataforma.',saving:'🎁 Audio recibido. Estamos preparando tu muestra privada.',ready:'🎵 ¡Tu canción está lista! Ya puedes descargarla desde el regalo.'};
  try{
   while(Date.now()<deadline){
    try{
@@ -1030,10 +1030,14 @@ async function watchCustomerOrderAudio(orderId){
     if(check.ok){
      const value=Number(data.progress)||15;
      setProgress(value,labels[data.status]||data.message||'💗 Tu pedido está registrado y en seguimiento.');
+     if(data.status==='downloaded'||Number(data.progress)>=100){
+      setProgress(100,'🎉 ¡Pedido completado! Tu canción se descargó correctamente. ¡Gracias por confiar en Canta con el corazón!');
+      return;
+     }
      if(data.status==='ready'&&data.previewUrl){
-      setProgress(100,labels.ready);
+      setProgress(90,'🎵 ¡Tu canción está lista! Ya puedes descargarla.');
       let link=document.getElementById('customerAutomaticPreviewLink');
-      if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_self';link.rel='';link.textContent='🎧 ESCUCHAR MI MUESTRA';link.setAttribute('aria-label','La muestra de tu canción está lista. Toca para escucharla.');progress.after(link);}
+      if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_self';link.rel='';link.textContent='⬇️ DESCARGAR MI CANCIÓN';link.setAttribute('aria-label','Tu canción está lista. Toca para abrir el regalo y descargarla.');progress.after(link);}
       const previewUrl=new URL(data.previewUrl);
       const paymentContext=window.cchPaymentContext;
       if(paymentContext?.orderId===orderId&&paymentContext?.accessToken){
@@ -1131,7 +1135,7 @@ async function restoreCustomerOrderProgress(orderId){
   if(!restoredProgress){
    restoredProgress=document.createElement('section');restoredProgress.id='customerAudioProgress';
    restoredProgress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
-   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Pedido verificado. Consultando su estado…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 100% aparecerá cuando la muestra esté guardada y el enlace esté listo.</p>';
+   restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Pedido verificado. Consultando su estado…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 90% indica que tu canción está lista para descargar. El 100% aparecerá cuando completes la descarga.</p>';
    const lyricsResult=document.getElementById('customerLyricsResult');
    (lyricsResult||document.getElementById('sendCustomerLyrics')?.parentElement||document.body).appendChild(restoredProgress);
   }
