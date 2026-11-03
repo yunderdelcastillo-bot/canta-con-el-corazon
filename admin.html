@@ -247,13 +247,26 @@ async function activateAdminSession(adminUser,{restored=false}={}){
  await cchRefreshPushStatus();
 }
 $('login').onclick=async()=>{
- if(!db){msg('authStatus','Primero conecta Supabase.');return}
  const button=$('login');button.disabled=true;
  try{
-  const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+  // Recupera la configuración guardada aunque la conexión no se haya inicializado aún.
+  if(!db){
+   let saved={};try{saved=JSON.parse(localStorage.getItem('cc_config')||'{}')}catch{}
+   const savedUrl=String(saved.url||$('url')?.value||'').trim();
+   const savedKey=String(saved.key||$('key')?.value||'').trim();
+   if(!savedUrl||!savedKey)throw new Error('No encuentro la configuración de Supabase en este navegador. Abre Configuración de almacenamiento y guarda la URL y la clave pública.');
+   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la librería de Supabase. Actualiza la página con internet.');
+   const parsed=new URL(savedUrl);
+   if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co'))throw new Error('La URL guardada de Supabase no es válida. Revisa la Project URL.');
+   if(!(savedKey.startsWith('sb_publishable_')||savedKey.startsWith('eyJ')))throw new Error('La clave guardada no parece ser una clave pública anon/publishable. No uses service_role.');
+   db=window.supabase.createClient(parsed.origin,savedKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  }
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password)throw new Error('Escribe el correo y la contraseña del administrador.');
+  const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error)throw error;
   await activateAdminSession(data.user);
- }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa tus datos.'))}
+ }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa la configuración de Supabase y tus datos.'))}
  finally{button.disabled=false}
 };
 
