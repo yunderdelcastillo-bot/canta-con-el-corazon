@@ -1428,6 +1428,21 @@ app.get("/api/admin/orders",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
 });
+app.get("/api/admin/orders/:id/voucher",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();
+  const {data:payment,error}=await db.from("payment_submissions").select("voucher_path").eq("order_id",id).maybeSingle();
+  if(error)throw error;
+  if(!payment?.voucher_path)return res.status(404).json({error:"Este pedido todavía no tiene un comprobante guardado."});
+  const {data,error:signedError}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);
+  if(signedError||!data?.signedUrl)throw signedError||new Error("No se pudo crear el enlace privado.");
+  res.set("Cache-Control","no-store").json({ok:true,url:data.signedUrl});
+ }catch(e){console.error("Admin voucher link:",e?.message||e);res.status(500).json({error:"No se pudo abrir el comprobante privado."});}
+});
+
 app.get("/api/admin/orders/:id/audio",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
