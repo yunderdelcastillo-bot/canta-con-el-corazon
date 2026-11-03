@@ -457,10 +457,12 @@ async function cchLoadNotifications(){
   }
   cchSyncOrderRepeatAlerts(notifications);
   notifications.forEach(n=>{
-   const p=document.createElement('p');p.style.cssText='padding:8px;border-bottom:1px solid #ead8e1';
+   const p=document.createElement('div');p.style.cssText='padding:12px 8px;border-bottom:1px solid #ead8e1;cursor:pointer;border-radius:10px';p.setAttribute('role','button');p.tabIndex=0;p.setAttribute('aria-label','Abrir pedidos: '+(n.title||'nueva notificación'));
+   const openRelatedOrder=()=>{if(typeof window.cchShowAdminPanel==='function')window.cchShowAdminPanel('customerOrders');else document.getElementById('customerOrders')?.scrollIntoView({behavior:'smooth',block:'start'});};
+   p.addEventListener('click',openRelatedOrder);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openRelatedOrder();}});
    const strong=document.createElement('b');strong.textContent=n.title+' ';
    const span=document.createElement('span');span.textContent=n.body+' · '+new Date(n.created_at).toLocaleString('es-PE');p.append(strong,span);
-   if(!n.is_read){const b=document.createElement('button');b.className='btn alt';b.textContent='Marcar atendida';b.onclick=async()=>{b.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/notifications/'+n.id+'/read',{method:'PATCH',headers:{Authorization:'Bearer '+token}});if(!rr.ok)throw new Error('No se pudo marcar como atendida.');const timer=cchOrderRepeatTimers.get(n.id);if(timer)clearInterval(timer);cchOrderRepeatTimers.delete(n.id);await cchLoadNotifications();}catch(e){b.disabled=false;alert(e.message)}};p.appendChild(b);}
+   if(!n.is_read){const b=document.createElement('button');b.className='btn alt';b.textContent='Marcar atendida';b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/notifications/'+n.id+'/read',{method:'PATCH',headers:{Authorization:'Bearer '+token}});if(!rr.ok)throw new Error('No se pudo marcar como atendida.');const timer=cchOrderRepeatTimers.get(n.id);if(timer)clearInterval(timer);cchOrderRepeatTimers.delete(n.id);await cchLoadNotifications();}catch(e){b.disabled=false;alert(e.message)}};p.appendChild(b);}
    box.appendChild(p);
   });
   if(!notifications.length)box.textContent='No hay notificaciones todavía.';
