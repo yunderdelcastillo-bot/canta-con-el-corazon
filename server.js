@@ -1056,9 +1056,9 @@ async function analyzeYapeVoucher(buffer,mime,expectedAmount){
  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
  if(!apiKey)return {status:"manual",reason:"No está configurada la IA de revisión."};
  const prompt="Analiza esta captura o PDF de un comprobante de pago peruano Yape o Plin. Extrae únicamente datos claramente visibles. Devuelve SOLO JSON válido con: is_payment_receipt (boolean), amount (number o null), operation_id (string o null), transaction_date (string o null), payment_app (Yape o Plin o null), confidence (number entre 0 y 1), notes (string). No inventes ni completes datos borrosos. No confundas saldo, número telefónico, hora ni fecha con el código de operación. Acepta únicamente comprobantes identificables claramente como Yape o Plin. Si no es claramente un comprobante Yape o Plin, is_payment_receipt=false. Importe esperado: S/"+Number(expectedAmount).toFixed(2)+".";
- const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(apiKey),{
+ const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key="+encodeURIComponent(apiKey),{
   method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:mime,data:buffer.toString("base64")}}]}],generationConfig:{temperature:0,responseMimeType:"application/json"}}),
+  body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:mime,data:buffer.toString("base64")}}]}],generationConfig:{responseMimeType:"application/json"}}),
   signal:AbortSignal.timeout(45000)
  });
  const payload=await response.json().catch(()=>({}));
