@@ -418,7 +418,7 @@ async function cchLoadAdminInbox(){
    const title=document.createElement('strong');title.textContent=(o.buyer||'Cliente')+' · '+(o.recipient||'Pedido');
    const detail=document.createElement('small');detail.textContent=(o.status==='nuevo'?'🆕 Pedido nuevo · ':'')+(o.unread_count?o.unread_count+' mensaje(s) sin leer · ':'')+(o.last_message?.message||'Aún no hay mensajes');
    const when=document.createElement('small');when.textContent=new Date(o.last_message?.created_at||o.created_at).toLocaleString('es-PE');
-   b.append(title,detail,when);b.onclick=()=>cchOpenMessengerConversation(o.id,o);list.appendChild(b);
+   b.append(title,detail,when);b.onclick=()=>cchOpenMessengerConversation(o.id,o);const openOrder=document.createElement('span');openOrder.textContent='📥 Abrir en Pedidos automáticos';openOrder.style.cssText='display:inline-block;margin-top:8px;padding:6px 9px;border-radius:99px;background:#681b43;color:white;font-size:.78rem;font-weight:750';openOrder.setAttribute('role','button');openOrder.tabIndex=0;openOrder.onclick=e=>{e.stopPropagation();window.cchOpenOrder(o.id);};openOrder.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.cchOpenOrder(o.id);}};b.appendChild(openOrder);list.appendChild(b);
   });
  }catch(e){list.textContent=e.message;}
 }
