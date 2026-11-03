@@ -624,7 +624,7 @@ async function cchEnablePushAlerts(){
  }catch(e){status.textContent='No se pudo activar: '+e.message;console.warn('Push setup:',e);}
 }
 $('enablePushAlerts').onclick=cchEnablePushAlerts;
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){if(window.cchSelectingOrderAudio){setTimeout(()=>{if(window.cchSelectingOrderAudio){const picker=document.querySelector('#ordersList input[type="file"]');if(!picker||!picker.files||!picker.files.length)window.cchSelectingOrderAudio=false;}},1800);cchLoadNotifications();return;}db.auth.getSession().then(({data})=>{if(data.session?.user){loadCustomerOrders();cchLoadNotifications();}}).catch(error=>console.warn('Session refresh on return:',error));}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){/* No reconstruir las tarjetas al volver de Archivos de Android: podría borrar el File seleccionado. Los pedidos se actualizan con el botón manual. */cchLoadNotifications();}});
 $('testPushAlerts').onclick=async()=>{const b=$('testPushAlerts'),status=$('pushAlertStatus');b.disabled=true;b.textContent='Enviando prueba…';try{const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión como administradora.');const r=await fetch(API_BASE+'/api/admin/push/test',{method:'POST',headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');status.textContent='✅ Notificación de prueba enviada al dispositivo registrado. Bloquea la pantalla para comprobar la recepción.';}catch(e){status.textContent='No se pudo enviar la prueba: '+e.message;}finally{b.disabled=false;b.textContent='🧪 Enviar notificación de prueba';}};
 
 
