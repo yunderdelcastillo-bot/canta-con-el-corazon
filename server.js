@@ -1230,7 +1230,7 @@ async function createSystemNotification(db,values){
  try{
   const {error}=await db.from("system_notifications").insert(values);
   if(error)console.warn("Notification not stored (run messaging migration):",error.message);
-  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished"].includes(values.event_type))await sendAdminPushNotification(db,values);
+  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished","preview_ready"].includes(values.event_type))await sendAdminPushNotification(db,values);
  }catch(e){console.warn("Notification unavailable:",e?.message||e);}
 }
 app.post("/api/orders/:id/messages",async(req,res)=>{
@@ -1621,7 +1621,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
 });
 
 // Recordatorios persistentes: vuelve a avisar cada minuto de notificaciones admin sin atender.
-const reminderEventTypes=["new_order","voucher_received","new_message","preview_finished"];
+const reminderEventTypes=["new_order","voucher_received","new_message","preview_finished","preview_ready"];
 let reminderCheckRunning=false;
 async function remindPendingAdminNotifications(){
  if(reminderCheckRunning||!ready())return;
