@@ -1129,7 +1129,13 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
    if(ownerId){
     const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
     if(songLookupError)throw songLookupError;
-    if(existingSong)benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
+    if(existingSong){
+     benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
+     if(benefitsActivated){
+      const {error:linksError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",existingSong.id);
+      if(linksError)throw linksError;
+     }
+    }
    }
    const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);
    if(orderError)throw orderError;
@@ -1190,9 +1196,9 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
     song={id,owner_id:ownerId,audio_path:path};
    }
   }
-  await syncApprovedOrderBenefits(db,id,song,song.owner_id||"");
+  const benefitsActivated=await syncApprovedOrderBenefits(db,id,song,song.owner_id||"");
   const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
-  const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:song.owner_id,download_enabled:false});
+  const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:song.owner_id,download_enabled:benefitsActivated});
   if(linkError)throw linkError;
   const packageText=String(order.package_name||"").toLowerCase();
   const packageLabel=packageText.includes("completo")?"REGALO COMPLETO":packageText.includes("detalle")?"DETALLE ESPECIAL":"ESENCIAL";
