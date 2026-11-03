@@ -522,7 +522,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
 
 /* Menú sencillo para evitar una página interminable */
 (function(){
- const ids=['customerOrders','whatsappManualOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
+ const ids=['mobileDashboard','customerOrders','whatsappManualOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
  const nav=document.querySelector('.panel-nav');
  const menuToggle=document.getElementById('panelMenuToggle');
  if(!nav)return;
@@ -545,8 +545,8 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
    e.preventDefault();showPanel(id);nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}
  }));
  // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
- showPanel('customerOrders');
- window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('customerOrders');});
+ showPanel('mobileDashboard');
+ window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('mobileDashboard');});
 })();
 
 </script><script>
