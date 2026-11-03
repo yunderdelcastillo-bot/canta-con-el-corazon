@@ -1148,6 +1148,30 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
+app.post("/api/orders/:id/download-completed",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
+  const id=String(req.params.id||""),token=String(req.body?.previewToken||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Datos de descarga no válidos."});
+  const db=admin(),hash=crypto.createHash("sha256").update(token).digest("hex");
+  const {data:order,error:orderError}=await db.from("customer_orders").select("id,status").eq("id",id).maybeSingle();
+  if(orderError||!order)return res.status(404).json({error:"Pedido no encontrado."});
+  if(order.status==="entregado")return res.set("Cache-Control","no-store").json({ok:true,completed:true,progress:100});
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status").eq("order_id",id).maybeSingle();
+  if(paymentError)throw paymentError;
+  if(payment?.payment_status!=="approved")return res.status(403).json({error:"El pago todavía no está aprobado."});
+  const {data:link,error:linkError}=await db.from("song_preview_links").select("id,song_id,download_enabled").eq("token_hash",hash).maybeSingle();
+  if(linkError||!link||!link.download_enabled)return res.status(403).json({error:"Este enlace no tiene permiso de descarga."});
+  const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",link.song_id).maybeSingle();
+  if(songError||!song||song.id!==id||!song.audio_path||!song.audio_path.endsWith("/"+id+".mp3"))return res.status(403).json({error:"La canción no corresponde a este pedido."});
+  const {error:updateError}=await db.from("customer_orders").update({status:"entregado",updated_at:new Date().toISOString()}).eq("id",id);
+  if(updateError)throw updateError;
+  orderAudioStatus.set(id,{status:"downloaded",progress:100,updatedAt:Date.now()});
+  await createSystemNotification(db,{order_id:id,event_type:"download_completed",audience:"admin",title:"Cliente descargó su canción",body:"El cliente completó la descarga del archivo MP3."});
+  await createSystemNotification(db,{order_id:id,event_type:"download_completed",audience:"customer",title:"¡Pedido completado!",body:"Tu canción se descargó correctamente. ¡Gracias por confiar en Canta con el corazón!"});
+  return res.set("Cache-Control","no-store").json({ok:true,completed:true,progress:100});
+ }catch(e){console.error("Download completion:",e?.message||e);res.status(500).json({error:"No se pudo confirmar la descarga."});}
+});
 app.get("/api/orders/:id/audio-status",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado."});
@@ -1159,10 +1183,10 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   if(paymentError)throw paymentError;
   const state=orderAudioStatus.get(id);
   // Si ya se preparó la muestra en esta instancia, devolver el mismo enlace y no crear enlaces duplicados en cada consulta.
-  if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:state.previewUrl});
+  if(order.status==="entregado")return res.set("Cache-Control","no-store").json({ok:true,status:"downloaded",progress:100,message:"🎉 ¡Pedido completado! Tu canción se descargó correctamente."});\n  if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla.",previewUrl:state.previewUrl});
   const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
   if(error)throw error;
-  const stageMap={nuevo:{status:"received",progress:10,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Estamos revisando los datos de tu pedido."},pago_verificado:{status:"received",progress:30,message:"¡Pago confirmado! Tu pedido está listo para producción."},en_proceso:{status:"creating",progress:45,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:70,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."},muestra_lista:{status:"ready",progress:100,message:"¡Tu muestra está lista!"},entregado:{status:"ready",progress:100,message:"¡Tu canción está lista!"},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
+  const stageMap={nuevo:{status:"received",progress:10,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Estamos revisando los datos de tu pedido."},pago_verificado:{status:"received",progress:30,message:"¡Pago confirmado! Tu pedido está listo para producción."},en_proceso:{status:"creating",progress:45,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:70,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."},muestra_lista:{status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla."},entregado:{status:"downloaded",progress:100,message:"🎉 ¡Pedido completado! Tu canción se descargó correctamente."},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
   let stage=stageMap[order.status]||stageMap.nuevo;
   // La muestra debe estar disponible antes del pago; los beneficios descargables siguen protegidos por la aprobación del voucher.
   if(!(files||[]).some(file=>file.name===id+".mp3")){
@@ -1209,10 +1233,10 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   giftUrl.search=new URLSearchParams({para:order.recipient||"",mensaje:order.special_phrase||order.story||"",audio:song.audio_path,letra:String(order.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:themeKey,paquete:packageLabel,precio:String(price),surprise:"1",previewLink:token}).toString();
   // La muestra lista se refleja en orderAudioStatus sin cambiar el estado restringido del pedido.
   const previewUrl=giftUrl.toString();
-  orderAudioStatus.set(id,{status:"ready",progress:100,previewUrl,updatedAt:Date.now()});
+  orderAudioStatus.set(id,{status:"ready",progress:90,previewUrl,updatedAt:Date.now()});
   await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"admin",title:"Muestra lista para el cliente",body:"La canción está guardada y el enlace privado de muestra ya está preparado."});
-  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"customer",title:"¡Tu muestra está lista!",body:"Tu barra llegó al 100 %. Ya puedes abrir y escuchar tu muestra."});
-  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl});
+  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"customer",title:"¡Tu canción está lista!",body:"Tu canción está lista y la descarga está habilitada. El pedido llegará al 100 % cuando completes la descarga."});
+  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla.",previewUrl});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
