@@ -1039,8 +1039,8 @@ app.post("/api/orders",async(req,res)=>{
   let paymentAccessToken=null,paymentReady=false;
   try{
    const rawPackage=String(order.package_name||"").toLowerCase();
-   const baseAmount=rawPackage.includes("s/25")||rawPackage.includes("25")?25:rawPackage.includes("s/30")||rawPackage.includes("30")?30:20;
-   const amount=baseAmount+(String(order.urgency||"").toLowerCase().includes("30 minutos")?5:0);
+   const baseAmount=rawPackage.includes("completo")||rawPackage.includes("s/30")||rawPackage.includes("30")?30:rawPackage.includes("detalle")||rawPackage.includes("s/25")||rawPackage.includes("25")?25:20;
+   const amount=baseAmount+(/express|expres|30 minutos|media hora/.test(String(order.urgency||"").toLowerCase())?5:0);
    paymentAccessToken=crypto.randomBytes(32).toString("base64url");
    const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
    const {error:paymentError}=await admin().from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
@@ -1095,7 +1095,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
   const packageLabel=String(payment.package_name||order.package_name||"").toLowerCase();
   const expectedBase=packageLabel.includes("completo")||packageLabel.includes("30")?30:packageLabel.includes("detalle")||packageLabel.includes("25")?25:20;
-  const expectedTotal=expectedBase+(String(order.urgency||"").toLowerCase().includes("30 minutos")?5:0);
+  const expectedTotal=expectedBase+(/express|expres|30 minutos|media hora/.test(String(order.urgency||"").toLowerCase())?5:0);
   if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe registrado para este pedido no coincide con el precio de su paquete. Revisa la configuración antes de recibir el voucher."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
   if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
@@ -1399,8 +1399,8 @@ app.post("/api/admin/orders/manual-whatsapp",async(req,res)=>{
   let paymentAccessToken=null,paymentReady=false;
   try{
    const rawPackage=String(order.package_name||"").toLowerCase();
-   const baseAmount=rawPackage.includes("s/25")||rawPackage.includes("25")?25:rawPackage.includes("s/30")||rawPackage.includes("30")?30:20;
-   const amount=baseAmount+(String(order.urgency||"").toLowerCase().includes("30 minutos")?5:0);
+   const baseAmount=rawPackage.includes("completo")||rawPackage.includes("s/30")||rawPackage.includes("30")?30:rawPackage.includes("detalle")||rawPackage.includes("s/25")||rawPackage.includes("25")?25:20;
+   const amount=baseAmount+(/express|expres|30 minutos|media hora/.test(String(order.urgency||"").toLowerCase())?5:0);
    paymentAccessToken=crypto.randomBytes(32).toString("base64url");
    const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
    const {error:paymentError}=await db.from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
@@ -1443,7 +1443,7 @@ app.get("/api/admin/orders",async(req,res)=>{
      if(!linkError){
       const labels={esencial:"ESENCIAL",detalle:"DETALLE ESPECIAL",completo:"REGALO COMPLETO"};
       const u=new URL("https://canta-con-el-corazon.onrender.com/");
-      u.search=new URLSearchParams({para:song.recipient||order.recipient||"",mensaje:song.dedication||order.story||"",audio:song.audio_path,letra:String(song.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:song.theme||"romantico",paquete:labels[song.package_key]||"ESENCIAL",precio:String(song.package_price||20),surprise:"1",previewLink:token}).toString();
+      u.search=new URLSearchParams({para:song.recipient||order.recipient||"",mensaje:song.dedication||order.story||"",audio:song.audio_path,letra:String(song.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:song.theme||"romantico",paquete:labels[song.package_key]||"ESENCIAL",precio:String(song.package_price||20),precioTotal:String(payment?.amount||song.package_price||20),express:/express|expres|30 minutos|media hora/i.test(String(order.urgency||""))?"1":"0",surprise:"1",previewLink:token}).toString();
       previewUrl=u.toString();
      }
     }
