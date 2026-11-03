@@ -483,7 +483,7 @@ app.post("/api/convert-video",async(req,res)=>{
   }
   const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
   if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
-  const chunks=[];let total=0;const maxBytes=45*1024*1024;
+  const chunks=[];let total=0;const maxBytes=90*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
   const jobId=crypto.randomUUID();
@@ -501,16 +501,19 @@ app.post("/api/convert-video",async(req,res)=>{
     await writeFile(input,Buffer.concat(chunks));chunks.length=0;
     await writeFile(audioInput,originalAudioBuffer);
     const conversionStartedAt=Date.now();
-    console.log("Starting asynchronous full-song MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:480,fps:15});
-    await execFileAsync(ffmpegPath,["-y","-threads","1","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale='trunc(min(480,iw)/2)*2':'trunc(ih*min(480,iw)/iw/2)*2'","-c:v","libx264","-threads","1","-preset","ultrafast","-tune","fastdecode","-crf","30","-maxrate","800k","-bufsize","1600k","-pix_fmt","yuv420p","-r","15","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:600000,maxBuffer:2*1024*1024});
+    console.log("Starting asynchronous Full HD MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:1080,targetHeight:1920,fps:30});
+    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30","-c:v","libx264","-threads","2","-preset","medium","-crf","21","-maxrate","4M","-bufsize","8M","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
-    if(mp4.length>30*1024*1024)throw new Error("El MP4 supera el límite seguro de 30 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB).");
+    if(mp4.length>100*1024*1024)throw new Error("El MP4 supera el límite seguro de 100 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB).");
     const {data:buckets,error:listError}=await db.storage.listBuckets();
     if(listError)throw listError;
     if(!(buckets||[]).some(b=>b.name==="shared-videos")){
-     const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"30MB",allowedMimeTypes:["video/mp4"]});
+     const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
      if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+    }else{
+     const {error:updateError}=await db.storage.updateBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+     if(updateError)throw updateError;
     }
     const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
     const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
