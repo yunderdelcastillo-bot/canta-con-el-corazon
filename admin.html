@@ -89,7 +89,7 @@ body{background:#f7f2fb;color:#29113c;font-family:Inter,system-ui,-apple-system,
 
 /* Evita que el navegador ancle y desplace la vista cuando el contenido del panel cambia. */
 html,body{overflow-anchor:none;scroll-behavior:auto;overscroll-behavior-y:none;}
-</style><meta name="cch-app-version" content="2026-11-03-disable-pull-refresh-v1"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+</style><meta name="cch-app-version" content="2026-11-03-no-login-scroll-v1"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
  <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
  <div class="mobile-shortcuts" aria-label="Accesos principales">
   <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
@@ -625,7 +625,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  }));
  // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
  showPanel('mobileDashboard',false);
- window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('mobileDashboard');});
+ window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('mobileDashboard',false);});
 })();
 
 </script><script>
