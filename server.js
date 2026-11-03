@@ -441,14 +441,17 @@ app.post("/api/share-video",async(req,res)=>{
   }
   const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
   if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
-  const chunks=[];let total=0;const maxBytes=30*1024*1024;
-  for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 30 MB."});chunks.push(chunk);}
+  const chunks=[];let total=0;const maxBytes=100*1024*1024;
+  for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 100 MB."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió el MP4."});
   const {data:buckets,error:listError}=await db.storage.listBuckets();
   if(listError)throw listError;
   if(!(buckets||[]).some(b=>b.name==="shared-videos")){
-   const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"30MB",allowedMimeTypes:["video/mp4"]});
+   const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+  }else{
+   const {error:updateError}=await db.storage.updateBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+   if(updateError)throw updateError;
   }
   const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
   const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,Buffer.concat(chunks),{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
