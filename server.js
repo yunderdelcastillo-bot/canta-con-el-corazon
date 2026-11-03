@@ -1087,9 +1087,15 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(!raw||raw.length>11*1024*1024)return res.status(413).json({error:"El comprobante está vacío o supera 8 MB."});
   const buffer=Buffer.from(raw,"base64");if(!buffer.length||buffer.length>8*1024*1024)return res.status(413).json({error:"El comprobante supera 8 MB."});
   const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
-  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status,amount,provider_payment_id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status,amount,package_name,provider_payment_id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
   if(paymentError||!payment)return res.status(403).json({error:"No se pudo validar el acceso a este pedido."});
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
+  const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
+  if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
+  const packageLabel=String(payment.package_name||order.package_name||"").toLowerCase();
+  const expectedBase=packageLabel.includes("completo")||packageLabel.includes("30")?30:packageLabel.includes("detalle")||packageLabel.includes("25")?25:20;
+  const expectedTotal=expectedBase+(String(order.urgency||"").toLowerCase().includes("30 minutos")?5:0);
+  if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe registrado para este pedido no coincide con el precio de su paquete. Revisa la configuración antes de recibir el voucher."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
   if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
    const {error:createError}=await db.storage.createBucket("payment-vouchers",{public:false,fileSizeLimit:"8MB",allowedMimeTypes:[...allowed.keys()]});
@@ -1113,24 +1119,25 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
     return res.status(409).json({error:"El código de operación de este comprobante ya fue utilizado."});
    }
   }
-  const nextStatus=review.status==="rejected"?"rejected":"voucher_submitted";
+  const nextStatus=review.status==="approved"?"approved":review.status==="rejected"?"rejected":"voucher_submitted";
   const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:nextStatus,provider_payment_id:operationKey,updated_at:new Date().toISOString(),...(nextStatus==="approved"?{reviewed_at:new Date().toISOString()}: {})}).eq("id",payment.id);
   if(updateError)throw updateError;
   if(nextStatus==="approved"){
    const ownerId=String(process.env.ADMIN_OWNER_ID||"");
+   let benefitsActivated=false;
    if(ownerId){
     const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
     if(songLookupError)throw songLookupError;
-    if(existingSong)await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
+    if(existingSong)benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
    }
    const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);
    if(orderError)throw orderError;
-   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:"Voucher revisado automáticamente",body:"La IA leyó el comprobante y el importe coincide. El permiso de la canción se activará al guardar/vincular el MP3 del pedido."});
-   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:"Comprobante aceptado",body:"Tu comprobante fue procesado automáticamente. Tu canción se habilitará cuando esté lista."});
+   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:benefitsActivated?"Paquete desbloqueado automáticamente":"Pago aprobado automáticamente",body:"La IA validó el voucher Yape/Plin, el importe coincide con el paquete y el código de operación no está repetido."});
+   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:benefitsActivated?"¡Tu paquete está desbloqueado!":"¡Tu pago fue aprobado!",body:benefitsActivated?"Tu pago fue validado y los beneficios de tu paquete ya están habilitados.":"Tu pago fue validado. Los beneficios se habilitarán automáticamente cuando la canción esté lista."});
   }else{
    await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:nextStatus==="rejected"?"Comprobante no válido":"Comprobante requiere revisión",body:review.reason||"Revisa el comprobante desde el panel privado."});
   }
-  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":review.status==="approved"?"Comprobante legible. Falta confirmar el ingreso real del dinero antes de activar los beneficios.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
+  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="approved"?"Voucher validado automáticamente. El paquete quedó aprobado y sus beneficios se activaron si la canción ya está guardada.":nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
@@ -1442,6 +1449,9 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   const songRow={id,owner_id:user.id,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:canonicalPath,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
   const {error:songError}=await db.from("songs").upsert(songRow);
   if(songError)throw songError;
+  // Si el voucher ya fue aprobado automáticamente, activar ahora los beneficios del paquete exacto.
+  const benefitsActivated=await syncApprovedOrderBenefits(db,id,{id,owner_id:user.id,audio_path:canonicalPath},user.id);
+  if(benefitsActivated)await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:"Paquete desbloqueado automáticamente",body:"El MP3 quedó guardado y los beneficios del paquete pagado ya están activos."});
   // El estado del pedido no se modifica: audio_subido no está permitido por la restricción de la BD.
   orderAudioStatus.set(id,{status:"uploaded",songId:id,progress:90,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").json({ok:true,audio_ready:true,songId:id,progress:90});
