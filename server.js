@@ -1237,6 +1237,27 @@ app.get("/api/orders/:id/messages",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,messages:data||[]});
  }catch(e){console.error("Customer order messages:",e?.message||e);res.status(500).json({error:"No se pudo cargar la conversación."});}
 });
+app.get("/api/admin/messages/inbox",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const db=admin();
+  const {data:orders,error:ordersError}=await db.from("customer_orders").select("id,buyer,contact,recipient,occasion,status,created_at,story").order("created_at",{ascending:false}).limit(100);
+  if(ordersError)throw ordersError;
+  const ids=(orders||[]).map(o=>o.id);
+  const {data:messages,error:messagesError}=ids.length?await db.from("order_messages").select("id,order_id,sender_role,message,created_at,read_at").in("order_id",ids).order("created_at",{ascending:false}).limit(1000):{data:[],error:null};
+  if(messagesError)throw messagesError;
+  const byOrder=new Map();
+  for(const m of messages||[]){
+   const entry=byOrder.get(m.order_id)||{unread:0,lastMessage:null};
+   if(m.sender_role==="customer"&&!m.read_at)entry.unread++;
+   if(!entry.lastMessage)entry.lastMessage={message:m.message,sender_role:m.sender_role,created_at:m.created_at};
+   byOrder.set(m.order_id,entry);
+  }
+  const conversations=(orders||[]).map(o=>({...o,unread_count:byOrder.get(o.id)?.unread||0,last_message:byOrder.get(o.id)?.lastMessage||null}));
+  res.set("Cache-Control","no-store").json({ok:true,conversations});
+ }catch(e){console.error("Admin message inbox:",e?.message||e);res.status(500).json({error:"No se pudo cargar el centro de mensajería."});}
+});
 app.get("/api/admin/orders/:id/messages",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
