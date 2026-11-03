@@ -1019,7 +1019,7 @@ async function watchCustomerOrderAudio(orderId){
  const progress=document.getElementById('customerAudioProgress');
  if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
- const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';if(stage)stage.textContent=message;};
+ const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';if(stage)stage.textContent=message;if(value>=100){const heading=progress.querySelector('div strong');if(heading)heading.textContent='🎉 ¡Tu muestra está lista!';progress.style.borderColor='#e6b85c';}};
  const deadline=Date.now()+7*24*60*60*1000;
  const labels={received:'💗 Tu pedido llegó correctamente a nuestra plataforma. Pronto comenzaremos a preparar tu canción.',creating:'🎼 Estamos trabajando en tu canción.',uploading:'☁️ Estamos subiendo el audio a la plataforma.',saving:'🎁 Audio recibido. Estamos preparando tu muestra privada.',ready:'🎉 ¡Tu muestra ya está disponible! Toca el botón «ESCUCHAR MI MUESTRA» para abrirla y escucharla.'};
  try{
@@ -1041,6 +1041,8 @@ async function watchCustomerOrderAudio(orderId){
        previewUrl.searchParams.set('acceso',paymentContext.accessToken);
       }
       link.href=previewUrl.toString();link.classList.remove('hidden');
+      /* Cuando la muestra está lista, el acceso para escucharla pasa arriba del progreso. */
+      progress.before(link);
       return;
      }
      if(data.status==='cancelled'){setProgress(0,'Este pedido fue cancelado. Si necesitas ayuda, escríbenos por WhatsApp.');return;}
