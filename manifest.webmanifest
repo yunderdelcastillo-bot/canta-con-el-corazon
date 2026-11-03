@@ -1,0 +1,21 @@
+{
+  "id": "/admin.html",
+  "name": "Canta con el corazón - Panel administrativo",
+  "short_name": "Canta corazón",
+  "description": "Panel administrativo de Canta con el corazón.",
+  "start_url": "/admin.html",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#fbf7ff",
+  "theme_color": "#3a075f",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
