@@ -615,6 +615,96 @@ app.post("/api/video/design",async(req,res)=>{
  }
 });
 
+
+/**
+ * Genera hasta tres fondos originales con Gemini Image para un videoclip.
+ * Requiere enlace de descarga autorizado y permiso de video del paquete.
+ * Reutiliza las imágenes ya generadas para la misma canción.
+ */
+const videoSceneGenerationLimits=new Map();
+app.post("/api/video/generate-scenes",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El almacenamiento no está configurado."});
+  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"Gemini no está conectado."});
+  const audioPath=String(req.query.path||"");
+  const previewLinkToken=String(req.query.previewLink||"");
+  const grantToken=String(req.query.grant||"");
+  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+  const db=admin();
+  const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
+  if(!song)return res.status(404).json({error:"No se encontró la canción."});
+  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();
+  if(!packageGate?.can_video)return res.status(403).json({error:"Este paquete no incluye la creación de video."});
+  let tokenAuthorized=false;
+  if(previewLinkToken&&/^[A-Za-z0-9_-]{40,100}$/.test(previewLinkToken)){
+   const hash=crypto.createHash("sha256").update(previewLinkToken).digest("hex");
+   const {data:link}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",hash).eq("download_enabled",true).maybeSingle();
+   tokenAuthorized=!!link;
+  }
+  if(!tokenAuthorized&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
+   const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
+   const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
+   tokenAuthorized=!!grant?.can_video;
+  }
+  if(!tokenAuthorized)return res.status(403).json({error:"El enlace no está autorizado para generar imágenes de video."});
+  const category=String(req.body?.occasion||"romantico");
+  if(!MEDIA_CATEGORIES.has(category))return res.status(400).json({error:"Ocasión no válida."});
+  const now=Date.now(),limitKey=song.id,record=videoSceneGenerationLimits.get(limitKey)||{start:now,count:0};
+  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  const dbStorage=admin();
+  await ensureMediaBucket();
+  const folder=category;
+  const {data:existing,error:listError}=await dbStorage.storage.from(MEDIA_BUCKET).list(folder,{limit:100,search:song.id});
+  if(listError)throw listError;
+  const saved=(existing||[]).filter(x=>x.name&&x.name.startsWith(song.id+"-ai-")&&x.name.endsWith(".png"));
+  if(saved.length>=3){
+   const items=saved.sort((a,b)=>a.name.localeCompare(b.name)).slice(0,3).map(x=>({url:dbStorage.storage.from(MEDIA_BUCKET).getPublicUrl(folder+"/"+x.name).data.publicUrl,name:x.name}));
+   return res.set("Cache-Control","no-store").json({ok:true,generated:false,reused:true,images:items});
+  }
+  if(record.count>=3)return res.status(429).json({error:"Ya se alcanzó el límite de generación de imágenes para esta canción."});
+  record.count++;videoSceneGenerationLimits.set(limitKey,record);
+  const design=req.body?.design||{};
+  const scenes=Array.isArray(design.sceneSequence)?design.sceneSequence:[];
+  const searchTerms=Array.isArray(design.imageSearchTerms)?design.imageSearchTerms:[];
+  const concept=String(design.visualConcept||"Videoclip emotivo y cinematográfico").slice(0,180);
+  const occasion=category;
+  const prompts=Array.from({length:3},(_,i)=>{
+   const scene=scenes[i]?.visual||searchTerms[i]||concept;
+   const part=scenes[i]?.part||["intro","verse","chorus"][i];
+   return "Create one premium cinematic background image for a vertical 9:16 personalized music video. Scene: "+scene+". Overall art direction: "+concept+". Occasion: "+occasion+". Section: "+part+". Photorealistic, emotionally expressive, tasteful lighting, rich detail, professional music-video cinematography, beautiful composition with clear negative space in the lower third for subtitles. No words, no letters, no typography, no logos, no watermark, no collage, no borders. Do not depict identifiable real people; use generic fictional subjects or atmospheric scenery. Output a single image.";
+  });
+  const model=String(process.env.GEMINI_IMAGE_MODEL||"gemini-3.1-flash-image").trim();
+  const generated=[];
+  for(let i=0;i<prompts.length;i++){
+   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
+    method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
+    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompts[i]}]}],generationConfig:{responseModalities:["IMAGE"],responseFormat:{image:{aspectRatio:"9:16",imageSize:"1K"}}}}),
+    signal:AbortSignal.timeout(120000)
+   });
+   const payload=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error("Gemini Image respondió "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,240));
+   const imagePart=(payload?.candidates?.[0]?.content?.parts||[]).find(p=>p.inlineData?.data&&String(p.inlineData.mimeType||"").startsWith("image/"));
+   if(!imagePart)throw new Error("Gemini no devolvió la imagen "+(i+1)+".");
+   const mime=String(imagePart.inlineData.mimeType||"image/png").toLowerCase();
+   const extension=mime.includes("jpeg")?"jpg":mime.includes("webp")?"webp":"png";
+   const filename=song.id+"-ai-"+String(i+1)+"-"+crypto.randomBytes(3).toString("hex")+"."+extension;
+   const objectPath=folder+"/"+filename;
+   const buffer=Buffer.from(imagePart.inlineData.data,"base64");
+   if(!buffer.length||buffer.length>12*1024*1024)throw new Error("La imagen generada supera el tamaño permitido.");
+   const {error:uploadError}=await dbStorage.storage.from(MEDIA_BUCKET).upload(objectPath,buffer,{contentType:mime,upsert:false,cacheControl:"31536000"});
+   if(uploadError)throw uploadError;
+   const {data:{publicUrl}}=dbStorage.storage.from(MEDIA_BUCKET).getPublicUrl(objectPath);
+   generated.push({url:publicUrl,name:filename});
+  }
+  console.log("Gemini video scenes generated:",{songId:song.id,count:generated.length,model});
+  res.set("Cache-Control","no-store").json({ok:true,generated:true,reused:false,images:generated});
+ }catch(e){
+  console.error("Gemini video scene generation:",e?.message||e);
+  res.status(502).json({error:"No se pudieron crear los fondos con Gemini: "+String(e?.message||"error").slice(0,260)});
+ }
+});
+
 // Diagnóstico de errores del flujo de video. Gemini solo recomienda acciones seguras; nunca ejecuta código.
 const supportDiagnosisLimits=new Map();
 app.post("/api/support/diagnose",async(req,res)=>{
