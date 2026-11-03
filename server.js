@@ -1420,17 +1420,33 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
-  const audioBase64=String(req.body?.audioBase64||"").replace(/^data:audio\/[^;]+;base64,/i,"");
+  const audioBase64=String(req.body?.audioBase64||"").replace(/^data:audio\\/[^;]+;base64,/i,"");
   if(!audioBase64||audioBase64.length>35*1024*1024)return res.status(400).json({error:"El audio está vacío o supera el límite permitido."});
-  const db=admin();const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
-  if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
-  const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
-  const {error}=await db.storage.from("songs-audio").upload("orders/"+id+".mp3",buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
-  if(error)throw error;
-  await db.from("customer_orders").update({status:"audio_subido",updated_at:new Date().toISOString()}).eq("id",id);
-  orderAudioStatus.set(id,{status:"uploaded",progress:90,updatedAt:Date.now()});
-  res.set("Cache-Control","no-store").json({ok:true,audio_ready:true,progress:90});
- }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el audio en el pedido."});}
+  const db=admin();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
+  if(orderError)throw orderError;
+  if(!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const buffer=Buffer.from(audioBase64,"base64");
+  if(!buffer.length||buffer.length>25*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 25 MB."});
+  const orderPath="orders/"+id+".mp3";
+  const canonicalPath=user.id+"/"+id+".mp3";
+  const {error:orderUploadError}=await db.storage.from("songs-audio").upload(orderPath,buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(orderUploadError)throw orderUploadError;
+  const {error:canonicalUploadError}=await db.storage.from("songs-audio").upload(canonicalPath,buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
+  if(canonicalUploadError)throw canonicalUploadError;
+  const packageText=String(order.package_name||"").toLowerCase();
+  const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
+  const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+  const occasion=String(order.occasion||"").toLowerCase();
+  const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
+  const songRow={id,owner_id:user.id,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:canonicalPath,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
+  const {error:songError}=await db.from("songs").upsert(songRow);
+  if(songError)throw songError;
+  const {error:orderUpdateError}=await db.from("customer_orders").update({status:"audio_subido",updated_at:new Date().toISOString()}).eq("id",id);
+  if(orderUpdateError)throw orderUpdateError;
+  orderAudioStatus.set(id,{status:"uploaded",songId:id,progress:90,updatedAt:Date.now()});
+  res.set("Cache-Control","no-store").json({ok:true,audio_ready:true,songId:id,progress:90});
+ }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el MP3 o registrar la canción: "+(e?.message||"Error interno.")});}
 });
 app.patch("/api/admin/orders/:id/payment",async(req,res)=>{
  try{
