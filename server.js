@@ -657,7 +657,7 @@ app.post("/api/video/generate-scenes",async(req,res)=>{
   const folder=category;
   const {data:existing,error:listError}=await dbStorage.storage.from(MEDIA_BUCKET).list(folder,{limit:100,search:song.id});
   if(listError)throw listError;
-  const saved=(existing||[]).filter(x=>x.name&&x.name.startsWith(song.id+"-ai-")&&x.name.endsWith(".png"));
+  const saved=(existing||[]).filter(x=>x.name&&x.name.startsWith(song.id+"-ai-")&&/\\.(png|jpe?g|webp)$/i.test(x.name));
   if(saved.length>=3){
    const items=saved.sort((a,b)=>a.name.localeCompare(b.name)).slice(0,3).map(x=>({url:dbStorage.storage.from(MEDIA_BUCKET).getPublicUrl(folder+"/"+x.name).data.publicUrl,name:x.name}));
    return res.set("Cache-Control","no-store").json({ok:true,generated:false,reused:true,images:items});
