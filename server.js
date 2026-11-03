@@ -1420,7 +1420,7 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
   const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
-  const audioBase64=String(req.body?.audioBase64||"").replace(/^data:audio\\/[^;]+;base64,/i,"");
+  const audioBase64=String(req.body?.audioBase64||"").replace(/^data:[^,]*;base64,/i,"");
   if(!audioBase64||audioBase64.length>35*1024*1024)return res.status(400).json({error:"El audio está vacío o supera el límite permitido."});
   const db=admin();
   const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
