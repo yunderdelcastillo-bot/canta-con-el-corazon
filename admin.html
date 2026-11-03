@@ -417,7 +417,6 @@ async function loadCustomerOrders(){
      prepare.style.background='#24734b';
      setTimeout(()=>{prepare.textContent='📋 Copiar letra para pegar';prepare.style.background='';},3500);
     }catch(e){alert('No se pudo copiar automáticamente. Mantén pulsada la letra visible en el pedido y selecciona Copiar. Detalle: '+e.message);}
-   };
     $('aiBuyer').value=o.buyer||'';$('aiRecipient').value=o.recipient||'';selectByText('aiOccasion',o.occasion||'');selectByText('aiStyle',o.style||'');selectByText('aiVoice',o.voice||'');$('aiStory').value=String(o.story||'').replace(/^PEDIDO POR WHATSAPP\n/,'');$('aiPhrase').value=o.special_phrase||'';$('aiCustomGenre').value=o.custom_genre||'';selectByText('aiTone',o.lyric_tone||'Según la historia');selectByText('aiDuration',String(o.lyric_duration||'3 minutos'));$('adminLyricsText').value='';msg('adminLyricsStatus','Pedido cargado. La letra original se copiará a Gemini; no se modificará.');$('lyricsStudio').scrollIntoView({behavior:'smooth',block:'start'});
    };
    const sel=document.createElement('select');[['nuevo','Nuevo'],['contactado','Contactado'],['pago_verificado','Pago verificado'],['en_proceso','En proceso'],['audio_subiendo','Subiendo audio'],['audio_subido','Audio guardado'],['muestra_lista','Muestra lista'],['entregado','Entregado'],['cancelado','Cancelado']].forEach(([v,t])=>{const op=document.createElement('option');op.value=v;op.textContent=t;sel.appendChild(op)});sel.value=o.status;
