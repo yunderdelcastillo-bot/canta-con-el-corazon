@@ -1230,7 +1230,7 @@ async function createSystemNotification(db,values){
  try{
   const {error}=await db.from("system_notifications").insert(values);
   if(error)console.warn("Notification not stored (run messaging migration):",error.message);
-  else if(["new_order","voucher_received","new_message","payment_approved"].includes(values.event_type))await sendAdminPushNotification(db,values);
+  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished"].includes(values.event_type))await sendAdminPushNotification(db,values);
  }catch(e){console.warn("Notification unavailable:",e?.message||e);}
 }
 app.post("/api/orders/:id/messages",async(req,res)=>{
@@ -1619,5 +1619,28 @@ app.post("/api/lyrics/generate",async(req,res)=>{
   res.status(e?.status===429?429:(e?.status===503?503:502)).json({error:e?.status===429?"Groq alcanzó temporalmente su límite de uso. Inténtalo más tarde.":"Groq no pudo generar la letra. Inténtalo nuevamente."});
  }
 });
+
+// Recordatorios persistentes: vuelve a avisar cada minuto de notificaciones admin sin atender.
+const reminderEventTypes=["new_order","voucher_received","new_message","preview_finished"];
+let reminderCheckRunning=false;
+async function remindPendingAdminNotifications(){
+ if(reminderCheckRunning||!ready())return;
+ reminderCheckRunning=true;
+ try{
+  const db=admin();
+  const {data:pending,error}=await db.from("system_notifications")
+   .select("id,order_id,event_type,title,body,created_at")
+   .eq("audience","admin").eq("is_read",false)
+   .in("event_type",reminderEventTypes)
+   .order("created_at",{ascending:true}).limit(100);
+  if(error)throw error;
+  for(const n of pending||[]){
+   await sendAdminPushNotification(db,{...n,audience:"admin",title:n.title||"Pedido pendiente",body:n.body||"Tienes un pedido pendiente de atender."});
+  }
+ }catch(e){console.warn("Pending order reminders:",e?.message||e);}
+ finally{reminderCheckRunning=false;}
+}
+setInterval(remindPendingAdminNotifications,60000);
+setTimeout(remindPendingAdminNotifications,10000);
 
 app.listen(port,"0.0.0.0",()=>console.log("Private storage API listening on "+port));
