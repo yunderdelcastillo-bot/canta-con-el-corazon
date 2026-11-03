@@ -422,6 +422,7 @@ async function loadCustomerOrders(){
     }
     if(o.payment.voucher_url){const voucher=document.createElement('a');voucher.className='btn alt';voucher.href=o.payment.voucher_url;voucher.target='_blank';voucher.rel='noopener';voucher.textContent='📎 Ver comprobante privado';card.appendChild(voucher);}
     if(o.payment.payment_status!=='approved'){
+     const fallback=document.createElement('p');fallback.className='muted';fallback.textContent='🛡️ Respaldo manual: si la IA no está disponible o no puede validar el voucher, revisa el comprobante y confirma el ingreso del dinero en tu cuenta. Luego pulsa “Confirmar pago”.';card.appendChild(fallback);
      const songSelect=document.createElement('select');songSelect.style.margin='8px 0';const empty=document.createElement('option');empty.value='';empty.textContent='Vincular canción de la biblioteca para activar beneficios (opcional)';songSelect.appendChild(empty);
      (mySongs||[]).forEach(song=>{const op=document.createElement('option');op.value=song.id;op.textContent=song.title+' — '+song.recipient+' · '+(song.package_key||'esencial');songSelect.appendChild(op);});
      const approve=document.createElement('button');approve.className='btn';approve.type='button';approve.textContent='✅ Confirmar pago';
