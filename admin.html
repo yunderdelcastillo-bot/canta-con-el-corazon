@@ -514,6 +514,36 @@ function cchSyncOrderRepeatAlerts(notifications){
   cchOrderRepeatTimers.set(n.id,timer);
  });
 }
+const cchAutoCopiedOrderIds=new Set();
+function cchShowAutoCopyToast(message,lyrics){
+ let toast=document.getElementById('cchAutoCopyToast');
+ if(!toast){toast=document.createElement('div');toast.id='cchAutoCopyToast';toast.style.cssText='position:fixed;z-index:99999;left:12px;right:12px;bottom:18px;max-width:520px;margin:auto;padding:13px 14px;border-radius:14px;background:#681b43;color:#fff;box-shadow:0 8px 28px #0004;font-size:14px';document.body.appendChild(toast);}
+ toast.replaceChildren();const label=document.createElement('div');label.textContent=message;label.style.cssText='font-weight:700;margin-bottom:9px';toast.appendChild(label);
+ if(lyrics){const copy=document.createElement('button');copy.type='button';copy.textContent='📋 Copiar letra ahora';copy.style.cssText='border:0;border-radius:9px;padding:9px 13px;background:#fff;color:#681b43;font-weight:700';copy.onclick=async()=>{try{await navigator.clipboard.writeText(lyrics);label.textContent='✓ Letra copiada. Ya puedes pegarla en Gemini.';copy.remove();}catch(e){label.textContent='El navegador bloqueó la copia. Mantén pulsada la letra del pedido para copiarla.';}};toast.appendChild(copy);}
+ const close=document.createElement('button');close.type='button';close.textContent='×';close.setAttribute('aria-label','Cerrar aviso');close.style.cssText='float:right;border:0;background:transparent;color:#fff;font-size:22px;margin-top:-5px';close.onclick=()=>toast.remove();toast.prepend(close);
+}
+async function cchAutoCopyNewOrderLyrics(freshNotifications,token){
+ const freshOrders=(freshNotifications||[]).filter(n=>n.event_type==='new_order'&&n.order_id&&!cchAutoCopiedOrderIds.has(String(n.order_id)));
+ if(!freshOrders.length)return;
+ for(const notice of freshOrders){
+  const orderId=String(notice.order_id);cchAutoCopiedOrderIds.add(orderId);
+  try{
+   const response=await fetch(API_BASE+'/api/admin/orders',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+   const data=await response.json();if(!response.ok)throw new Error(data.error||'No se pudieron consultar los pedidos.');
+   const order=(data.orders||[]).find(item=>String(item.id)===orderId);
+   if(!order)continue;
+   const lyrics=String(order.lyrics||'').trim();
+   if(!lyrics){cchShowAutoCopyToast('📥 Llegó un pedido nuevo, pero todavía no tiene una letra escrita por el cliente.',null);continue;}
+   try{
+    if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(lyrics);cchShowAutoCopyToast('✓ Pedido nuevo: la letra original se copió automáticamente. Ya puedes pegarla en Gemini.',null);}
+    else throw new Error('Portapapeles no disponible en segundo plano.');
+   }catch(copyError){
+    cchShowAutoCopyToast('📥 Pedido nuevo detectado. El navegador no permitió copiar sin tocar la pantalla.',lyrics);
+   }
+   loadCustomerOrders().catch(error=>console.warn('No se pudo actualizar la lista de pedidos:',error));
+  }catch(error){console.warn('Copia automática de letra:',error);cchShowAutoCopyToast('📥 Llegó un pedido nuevo. No se pudo preparar la copia automática.',null);}
+ }
+}
 async function cchLoadNotifications(){
  try{
   const token=await window.cchAdminGetToken();if(!token)return;
@@ -527,6 +557,7 @@ async function cchLoadNotifications(){
    const fresh=notifications.filter(n=>!cchKnownNotifications.has(n.id));
    notifications.forEach(n=>cchKnownNotifications.add(n.id));
    if(fresh.length&&cchAlertSoundEnabled&&cchAudioUnlocked)await cchSpeakAlert(cchAlertText(fresh[0]));
+   if(fresh.length)await cchAutoCopyNewOrderLyrics(fresh,token);
    if(fresh.length&&$('alertSoundStatus'))$('alertSoundStatus').textContent=fresh.length+' nueva(s) notificación(es) detectada(s).';
   }
   cchSyncOrderRepeatAlerts(notifications);
