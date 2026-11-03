@@ -624,7 +624,7 @@ downloadButton.addEventListener('click',async()=>{
    const sceneResponse=await fetchWithSafeRetry(sceneUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({occasion:theme||'romantico',design:visualDesign})},1);
    const sceneData=await sceneResponse.json().catch(()=>({}));
    if(sceneResponse.ok&&sceneData.ok&&Array.isArray(sceneData.images)){
-    window.aiSceneImages=sceneData.images.map(x=>x.url).filter(Boolean);
+    window.aiSceneImages=sceneData.images.filter(x=>x&&x.url).map(x=>({url:x.url,image:null}));
     downloadNotice.textContent=sceneData.reused?'Usando las escenas originales ya preparadas para esta canción…':'¡Gemini creó escenas originales! Preparando tu videoclip…';
    }else if(sceneData.error){console.warn('Gemini Image no disponible; se usará la biblioteca:',sceneData.error);}
   }catch(sceneError){console.warn('No se pudieron crear escenas IA; se usará la biblioteca:',sceneError?.message||sceneError);}
@@ -660,7 +660,7 @@ downloadButton.addEventListener('click',async()=>{
    const photoSlot=photoCount?Math.min(photoCount-1,Math.floor((motionTime/Math.max(0.001,audioEl.duration))*photoCount)):-1;
    const photoProgress=photoCount?((motionTime/Math.max(0.001,audioEl.duration))*photoCount)-photoSlot:1;
    const showCustomerPhoto=photoCount>0&&photoProgress<1;
-   const aiStills=(window.aiSceneImages||[]).map(url=>({url}));
+   const aiStills=window.aiSceneImages||[];
    const aiSceneIndex=aiStills.length?Math.min(aiStills.length-1,Math.floor(progress*aiStills.length)):0;
    const showAiScene=!photoCount&&aiStills.length>0;
    const platformStills=(window.platformVideoImages||[]).map(url=>({url}));
