@@ -1230,7 +1230,7 @@ async function createSystemNotification(db,values){
  try{
   const {error}=await db.from("system_notifications").insert(values);
   if(error)console.warn("Notification not stored (run messaging migration):",error.message);
-  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished","preview_ready"].includes(values.event_type))await sendAdminPushNotification(db,values);
+  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished","preview_ready","lyrics_ready","order_contacted","production_started","audio_uploading","song_ready","package_delivered"].includes(values.event_type))await sendAdminPushNotification(db,values);
  }catch(e){console.warn("Notification unavailable:",e?.message||e);}
 }
 app.post("/api/orders/:id/messages",async(req,res)=>{
@@ -1532,6 +1532,9 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
   const status=req.body?.status===undefined?null:String(req.body.status);
   const allowed=["nuevo","contactado","pago_verificado","en_proceso","audio_subiendo","audio_subido","muestra_lista","entregado","cancelado"];
   if(status!==null&&!allowed.includes(status))return res.status(400).json({error:"Estado no válido."});
+  const db=admin();
+  const {data:previous,error:previousError}=await db.from("customer_orders").select("id,status,lyrics").eq("id",id).single();
+  if(previousError)throw previousError;
   const updates={updated_at:new Date().toISOString()};
   if(status!==null)updates.status=status;
   if(req.body?.lyrics!==undefined){
@@ -1539,8 +1542,25 @@ app.patch("/api/admin/orders/:id",async(req,res)=>{
    if(lyrics.length<40)return res.status(400).json({error:"La letra debe contener al menos 40 caracteres."});
    updates.lyrics=lyrics;
   }
-  const {data,error}=await admin().from("customer_orders").update(updates).eq("id",id).select("id,status,lyrics").single();
+  const {data,error}=await db.from("customer_orders").update(updates).eq("id",id).select("id,status,lyrics").single();
   if(error)throw error;
+  const statusEvents={
+   contactado:["order_contacted","Pedido contactado","El pedido ya fue revisado y se inició el contacto con el cliente."],
+   pago_verificado:["payment_approved","Pago aprobado","El pago del pedido ha sido confirmado."],
+   en_proceso:["production_started","Preparación iniciada","La canción de este pedido entró en preparación."],
+   audio_subiendo:["audio_uploading","Audio en preparación","Se está subiendo el audio de la canción."],
+   audio_subido:["song_ready","Canción completa lista","La canción completa ya fue subida y está lista para preparar la entrega."],
+   muestra_lista:["preview_ready","Muestra lista para el cliente","La muestra de la canción ya está disponible para el cliente."],
+   entregado:["package_delivered","Pedido entregado","El cliente recibió su paquete. El pedido ha finalizado."]
+  };
+  if(previous.status!==data.status&&statusEvents[data.status]){
+   const [event_type,title,body]=statusEvents[data.status];
+   await createSystemNotification(db,{order_id:id,event_type,audience:"admin",title,body});
+   await createSystemNotification(db,{order_id:id,event_type,audience:"customer",title,body});
+  }
+  if(req.body?.lyrics!==undefined&&String(previous.lyrics||"")!==String(data.lyrics||"")&&data.lyrics){
+   await createSystemNotification(db,{order_id:id,event_type:"lyrics_ready",audience:"admin",title:"Letra generada o actualizada",body:"La letra del pedido ya está lista para revisión."});
+  }
   res.set("Cache-Control","no-store").json({ok:true,order:data});
  }catch(e){console.error("Update customer order:",e?.message||e);res.status(500).json({error:"No se pudo actualizar el pedido."});}
 });
@@ -1621,7 +1641,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
 });
 
 // Recordatorios persistentes: vuelve a avisar cada minuto de notificaciones admin sin atender.
-const reminderEventTypes=["new_order","voucher_received","new_message","preview_finished","preview_ready"];
+const reminderEventTypes=["new_order","voucher_received","new_message","preview_finished","preview_ready","lyrics_ready","order_contacted","production_started","audio_uploading","song_ready","package_delivered","payment_approved"];
 let reminderCheckRunning=false;
 async function remindPendingAdminNotifications(){
  if(reminderCheckRunning||!ready())return;
