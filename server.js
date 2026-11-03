@@ -1409,8 +1409,12 @@ app.get("/api/admin/orders",async(req,res)=>{
    if(audioReady){
     const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
     if(song?.audio_path){
+     const payment=paymentByOrder.get(order.id)||null;
+     const benefitsEnabled=payment?.payment_status==="approved"
+      ? await syncApprovedOrderBenefits(db,order.id,song,user.id)
+      : false;
      const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
-     const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:false});
+     const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:benefitsEnabled});
      if(!linkError){
       const labels={esencial:"ESENCIAL",detalle:"DETALLE ESPECIAL",completo:"REGALO COMPLETO"};
       const u=new URL("https://canta-con-el-corazon.onrender.com/");
