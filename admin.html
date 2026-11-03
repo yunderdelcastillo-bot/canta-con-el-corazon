@@ -118,7 +118,7 @@ html,body{overflow-anchor:none;scroll-behavior:auto;overscroll-behavior-y:none;}
 button:focus-visible,a:focus-visible{outline:3px solid #ed168d66;outline-offset:2px}
 @media(max-width:420px){#panelToolbar{gap:6px!important;padding:8px!important}#panelToolbar .btn{flex:1 1 130px;font-size:.8rem;padding:10px 8px}.mobile-stat{gap:5px;padding:8px 6px}.stat-icon{width:27px;height:27px;flex-basis:27px}.mobile-stat strong{font-size:1.1rem!important}}
 @media(prefers-reduced-motion:reduce){.shortcut{transition:none!important;scroll-behavior:auto!important}}
-</style><meta name="cch-app-version" content="2026-11-03-admin-refresh-button-v1"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+</style><meta name="cch-app-version" content="2026-11-03-stop-auto-scroll-v1"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
  <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
  <div class="mobile-shortcuts" aria-label="Accesos principales">
   <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
@@ -730,5 +730,17 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   url.searchParams.set('actualizar',String(Date.now()));
   window.location.replace(url.toString());
  });
+})();
+</script><script>
+/* Evita que Android/PWA restaure o desplace automáticamente la vista al abrir el panel. */
+(function(){
+ try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch{}
+ const keepTop=()=>{if(window.scrollY>0)window.scrollTo(0,0);};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',keepTop,{once:true});
+ else keepTop();
+ window.addEventListener('load',()=>{
+  keepTop();
+  [150,500,1000,1600].forEach(ms=>setTimeout(keepTop,ms));
+ },{once:true});
 })();
 </script></body></html>
