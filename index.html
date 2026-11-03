@@ -615,6 +615,19 @@ downloadButton.addEventListener('click',async()=>{
    const designData=await designResponse.json().catch(()=>({}));
    if(designResponse.ok&&designData.ok&&designData.design)visualDesign=designData.design;
   }catch(designError){console.warn('Diseño Gemini no disponible; se usará el estilo integrado:',designError?.message||designError);}
+  // Generación de tres fondos originales según las escenas elegidas por Gemini.
+  window.aiSceneImages=[];
+  try{
+   videoStage='creación de escenas originales con Gemini';
+   downloadNotice.textContent='Gemini está creando imágenes originales para las escenas de tu videoclip. Esto puede tardar un poco…';
+   const sceneUrl=API_BASE+'/api/video/generate-scenes?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewLink='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grant='+encodeURIComponent(grantToken):'');
+   const sceneResponse=await fetchWithSafeRetry(sceneUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({occasion:theme||'romantico',design:visualDesign})},1);
+   const sceneData=await sceneResponse.json().catch(()=>({}));
+   if(sceneResponse.ok&&sceneData.ok&&Array.isArray(sceneData.images)){
+    window.aiSceneImages=sceneData.images.map(x=>x.url).filter(Boolean);
+    downloadNotice.textContent=sceneData.reused?'Usando las escenas originales ya preparadas para esta canción…':'¡Gemini creó escenas originales! Preparando tu videoclip…';
+   }else if(sceneData.error){console.warn('Gemini Image no disponible; se usará la biblioteca:',sceneData.error);}
+  }catch(sceneError){console.warn('No se pudieron crear escenas IA; se usará la biblioteca:',sceneError?.message||sceneError);}
   videoStage='grabación HD en el celular';
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
@@ -647,11 +660,14 @@ downloadButton.addEventListener('click',async()=>{
    const photoSlot=photoCount?Math.min(photoCount-1,Math.floor((motionTime/Math.max(0.001,audioEl.duration))*photoCount)):-1;
    const photoProgress=photoCount?((motionTime/Math.max(0.001,audioEl.duration))*photoCount)-photoSlot:1;
    const showCustomerPhoto=photoCount>0&&photoProgress<1;
+   const aiStills=(window.aiSceneImages||[]).map(url=>({url}));
+   const aiSceneIndex=aiStills.length?Math.min(aiStills.length-1,Math.floor(progress*aiStills.length)):0;
+   const showAiScene=!photoCount&&aiStills.length>0;
    const platformStills=(window.platformVideoImages||[]).map(url=>({url}));
-   const showPlatformStill=!photoCount&&platformStills.length>0&&Math.floor(motionTime/24)%3===2;
-   const showStill=showCustomerPhoto||showPlatformStill;
+   const showPlatformStill=!photoCount&&!showAiScene&&platformStills.length>0&&Math.floor(motionTime/24)%3===2;
+   const showStill=showCustomerPhoto||showAiScene||showPlatformStill;
    if(showStill){
-    const item=showCustomerPhoto?customerImages[photoSlot]:platformStills[Math.floor(motionTime/24)%platformStills.length];
+    const item=showCustomerPhoto?customerImages[photoSlot]:showAiScene?aiStills[aiSceneIndex]:platformStills[Math.floor(motionTime/24)%platformStills.length];
     let img=item.image;if(!img){img=new Image();img.crossOrigin='anonymous';img.src=item.url;item.image=img;}
     if(img.complete&&img.naturalWidth){
      const iw=img.naturalWidth,ih=img.naturalHeight,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;
