@@ -535,7 +535,7 @@ $('form').onsubmit=async e=>{e.preventDefault();if(!db||!user){msg('saveStatus',
 $('copyOrderLink').onclick=async()=>{const link=$('orderLink').value;try{await navigator.clipboard.writeText(link);msg('copyOrderLink','¡Enlace copiado!')}catch{prompt('Copia este enlace para tu cliente:',link)}};$('sendOrderLink').onclick=()=>{const link=$('orderLink').value;const text='¡Hola! 💗 Gracias por contactar a Canta con el corazón. Para pedir tu canción personalizada, llena tus datos en este enlace y sigue las instrucciones de pago con Yape: '+link;window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};$('refresh').onclick=load;init();
 
 let cchAlertSoundEnabled=localStorage.getItem('cch_alert_sound')==='on',cchKnownNotifications=new Set(),cchAudioUnlocked=false,cchNotificationsInitialized=false,cchAudioContext=null,cchOrderRepeatTimers=new Map();
-function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',new_message:'Tienes un nuevo mensaje de un cliente.',preview_ready:'La muestra de un pedido ya está lista para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede pagar y subir su voucher.',payment_approved:'El pago de un pedido ha sido confirmado.'})[n.event_type]||'Tienes una nueva notificación.'}
+function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
 async function cchSpeakAlert(message){
  if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
  try{
@@ -556,15 +556,16 @@ async function cchSpeakAlert(message){
  }catch(e){console.warn('Alert sound:',e);$('alertSoundStatus').textContent='No se pudo reproducir el aviso. Revisa el volumen multimedia del celular.'}
 }
 function cchSyncOrderRepeatAlerts(notifications){
- const active=new Set(notifications.filter(n=>n.event_type==='new_order'&&!n.is_read).map(n=>n.id));
+ const repeatable=notifications.filter(n=>!n.is_read);
+ const active=new Set(repeatable.map(n=>n.id));
  for(const [id,timer] of cchOrderRepeatTimers){if(!active.has(id)){clearInterval(timer);cchOrderRepeatTimers.delete(id);}}
  if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
- notifications.filter(n=>n.event_type==='new_order'&&!n.is_read).forEach(n=>{
+ repeatable.forEach((n,index)=>{
   if(cchOrderRepeatTimers.has(n.id))return;
   const timer=setInterval(()=>{
    if(!cchAlertSoundEnabled||!cchAudioUnlocked){clearInterval(timer);cchOrderRepeatTimers.delete(n.id);return;}
-   cchSpeakAlert('Atención. Tienes un nuevo pedido en Canta con el corazón. Aún está pendiente de atender.');
-  },30000);
+   cchSpeakAlert('Recordatorio de pedido pendiente. '+cchAlertText(n)+' Para detener este aviso, marca la notificación como atendida en el centro de notificaciones.');
+  },30000+(index*2500));
   cchOrderRepeatTimers.set(n.id,timer);
  });
 }
@@ -580,7 +581,10 @@ async function cchLoadNotifications(){
   }else{
    const fresh=notifications.filter(n=>!cchKnownNotifications.has(n.id));
    notifications.forEach(n=>cchKnownNotifications.add(n.id));
-   if(fresh.length&&cchAlertSoundEnabled&&cchAudioUnlocked)await cchSpeakAlert(cchAlertText(fresh[0]));
+   if(fresh.length&&cchAlertSoundEnabled&&cchAudioUnlocked){
+    const spoken=fresh.slice().reverse().map(cchAlertText).join(' Siguiente aviso. ');
+    await cchSpeakAlert(spoken);
+   }
    if(fresh.length&&$('alertSoundStatus'))$('alertSoundStatus').textContent=fresh.length+' nueva(s) notificación(es) detectada(s).';
   }
   cchSyncOrderRepeatAlerts(notifications);
