@@ -412,7 +412,7 @@ async function loadCustomerOrders(){
      try{
       const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(new Error("No se pudo leer el MP3."));reader.readAsDataURL(audioFile);});
       const audioBase64=dataUrl.split(",")[1];if(!audioBase64)throw new Error("El archivo no se pudo preparar.");
-      await fetch(API_BASE+"/api/admin/orders/"+encodeURIComponent(o.id),{method:"PATCH",headers:{"Content-Type":"application/json",Authorization:"Bearer "+token},body:JSON.stringify({status:"audio_subiendo"})});
+      // No cambiar el estado del pedido durante la subida; la BD restringe los estados permitidos.
       uploadStatus.textContent="Subiendo el audio a Supabase…";
       await new Promise((resolve,reject)=>{
        const xhr=new XMLHttpRequest();xhr.open("POST",API_BASE+"/api/admin/orders/"+encodeURIComponent(o.id)+"/audio");
