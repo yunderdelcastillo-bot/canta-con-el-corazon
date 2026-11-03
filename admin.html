@@ -404,20 +404,20 @@ async function loadCustomerOrders(){
    }
    if(o.lyrics){const l=document.createElement('details');const sm=document.createElement('summary');sm.textContent='Ver letra aportada';const pre=document.createElement('p');pre.textContent=o.lyrics;l.append(sm,pre);const copyLyrics=document.createElement('button');copyLyrics.type='button';copyLyrics.className='btn alt';copyLyrics.textContent='📋 Copiar solo la letra';copyLyrics.onclick=async()=>{try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(o.lyrics);else{const ta=document.createElement('textarea');ta.value=o.lyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('No se pudo copiar');}copyLyrics.textContent='✓ Solo la letra copiada';setTimeout(()=>copyLyrics.textContent='📋 Copiar solo la letra',1600);}catch(e){alert('No se pudo copiar. Mantén pulsada la letra para copiarla.');}};l.append(sm,pre);card.appendChild(l);const quickActions=document.createElement('div');quickActions.className='order-quick-actions';quickActions.append(copyLyrics);card.appendChild(quickActions);}
    cchAddOrderChat(card,o,token);
-   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent='📋 Copiar letra para pegar';prepare.title='Copia únicamente la letra original del cliente al portapapeles';prepare.onclick=async()=>{
-    activeCustomerOrder=o;
+   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent='🎵 Crear canción en Flow Music';prepare.title='Copia únicamente la letra original y abre Google Flow Music en otra pestaña';prepare.onclick=async()=>{
     const customerLyrics=String(o.lyrics||'').trim();
     if(!customerLyrics){alert('Este pedido todavía no contiene la letra de la canción. No se copiará la historia ni se inventará una letra.');return;}
+    const flowTab=window.open('https://flowmusic.google/','_blank','noopener');
     try{
      if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(customerLyrics);
      else{
       const ta=document.createElement('textarea');ta.value=customerLyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('El navegador no permitió copiar automáticamente.');
      }
-     prepare.textContent='✓ Letra copiada · ya puedes pegarla';
+     prepare.textContent='✓ Letra copiada · pega en Flow Music';
      prepare.style.background='#24734b';
-     setTimeout(()=>{prepare.textContent='📋 Copiar letra para pegar';prepare.style.background='';},3500);
-    }catch(e){alert('No se pudo copiar automáticamente. Mantén pulsada la letra visible en el pedido y selecciona Copiar. Detalle: '+e.message);}
-    $('aiBuyer').value=o.buyer||'';$('aiRecipient').value=o.recipient||'';selectByText('aiOccasion',o.occasion||'');selectByText('aiStyle',o.style||'');selectByText('aiVoice',o.voice||'');$('aiStory').value=String(o.story||'').replace(/^PEDIDO POR WHATSAPP\n/,'');$('aiPhrase').value=o.special_phrase||'';$('aiCustomGenre').value=o.custom_genre||'';selectByText('aiTone',o.lyric_tone||'Según la historia');selectByText('aiDuration',String(o.lyric_duration||'3 minutos'));$('adminLyricsText').value='';msg('adminLyricsStatus','Pedido cargado. La letra original se copiará a Gemini; no se modificará.');$('lyricsStudio').scrollIntoView({behavior:'smooth',block:'start'});
+     setTimeout(()=>{prepare.textContent='🎵 Crear canción en Flow Music';prepare.style.background='';},3500);
+     if(!flowTab)alert('La letra se copió. El navegador bloqueó la pestaña: abre Flow Music desde https://flowmusic.google/');
+    }catch(e){alert('Flow Music se abrió, pero no se pudo copiar automáticamente. Vuelve al pedido y mantén pulsada la letra para copiarla. Detalle: '+e.message);}
    };
    const sel=document.createElement('select');[['nuevo','Nuevo'],['contactado','Contactado'],['pago_verificado','Pago verificado'],['en_proceso','En proceso'],['audio_subiendo','Subiendo audio'],['audio_subido','Audio guardado'],['muestra_lista','Muestra lista'],['entregado','Entregado'],['cancelado','Cancelado']].forEach(([v,t])=>{const op=document.createElement('option');op.value=v;op.textContent=t;sel.appendChild(op)});sel.value=o.status;
    const save=document.createElement('button');save.className='btn';save.textContent='Guardar estado';save.onclick=async()=>{save.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/orders/'+o.id,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status:sel.value})});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo guardar');save.textContent='Guardado';}catch(e){alert(e.message);save.disabled=false}};
