@@ -1148,12 +1148,25 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const db=admin();
   const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
   if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status").eq("order_id",id).maybeSingle();
+  if(paymentError)throw paymentError;
+  const paymentApproved=payment?.payment_status==="approved";
+  const state=orderAudioStatus.get(id);
+  // Si ya se preparó la muestra en esta instancia, devolver el mismo enlace y no crear enlaces duplicados en cada consulta.
+  if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:state.previewUrl});
   const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
   if(error)throw error;
-  const state=orderAudioStatus.get(id);
-  const stageMap={nuevo:{status:"received",progress:15,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Pedido recibido. Estamos revisando tus datos."},pago_verificado:{status:"received",progress:15,message:"Pedido recibido y pago verificado."},en_proceso:{status:"creating",progress:40,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:75,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra."},muestra_lista:{status:"ready",progress:100,message:"¡Tu muestra está lista!"},entregado:{status:"ready",progress:100,message:"¡Tu canción está lista!"},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
-  const stage=stageMap[order.status]||stageMap.nuevo;
-  if(!(files||[]).some(file=>file.name===id+".mp3"))return res.set("Cache-Control","no-store").json({ok:true,...stage,status:state?.status==="failed"?"failed":stage.status});
+  const stageMap={nuevo:{status:"received",progress:10,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Estamos revisando los datos de tu pedido."},pago_verificado:{status:"received",progress:30,message:"¡Pago confirmado! Tu pedido está listo para producción."},en_proceso:{status:"creating",progress:45,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:70,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."},muestra_lista:{status:"ready",progress:100,message:"¡Tu muestra está lista!"},entregado:{status:"ready",progress:100,message:"¡Tu canción está lista!"},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
+  let stage=stageMap[order.status]||stageMap.nuevo;
+  // El progreso no avanza por pago ni se publica la muestra hasta que el comprobante figure aprobado.
+  if(!paymentApproved){
+   stage={status:"received",progress:15,message:"Tu pedido está registrado. Estamos esperando la confirmación de tu pago."};
+   return res.set("Cache-Control","no-store").json({ok:true,...stage});
+  }
+  if(!(files||[]).some(file=>file.name===id+".mp3")){
+   if(order.status==="pago_verificado"&&state?.status==="uploaded")stage={status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."};
+   return res.set("Cache-Control","no-store").json({ok:true,...stage,status:state?.status==="failed"?"failed":stage.status});
+  }
   let song=null;
   if(state?.songId){const found=await db.from("songs").select("id,owner_id,audio_path").eq("id",state.songId).maybeSingle();song=found.data;}
   if(!song){
@@ -1193,8 +1206,11 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const giftUrl=new URL("https://canta-con-el-corazon.onrender.com/");
   giftUrl.search=new URLSearchParams({para:order.recipient||"",mensaje:order.special_phrase||order.story||"",audio:song.audio_path,letra:String(order.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:themeKey,paquete:packageLabel,precio:String(price),surprise:"1",previewLink:token}).toString();
   // La muestra lista se refleja en orderAudioStatus sin cambiar el estado restringido del pedido.
-  orderAudioStatus.set(id,{status:"ready",progress:100,updatedAt:Date.now()});
-  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:giftUrl.toString()});
+  const previewUrl=giftUrl.toString();
+  orderAudioStatus.set(id,{status:"ready",progress:100,previewUrl,updatedAt:Date.now()});
+  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"admin",title:"Muestra lista para el cliente",body:"La canción está guardada y el enlace privado de muestra ya está preparado."});
+  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"customer",title:"¡Tu muestra está lista!",body:"Tu barra llegó al 100 %. Ya puedes abrir y escuchar tu muestra."});
+  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
