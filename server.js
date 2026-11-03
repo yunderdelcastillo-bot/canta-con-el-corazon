@@ -1148,9 +1148,8 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const db=admin();
   const {data:order,error:orderError}=await db.from("customer_orders").select("*").eq("id",id).maybeSingle();
   if(orderError||!order)return res.status(404).json({error:"No se encontró el pedido."});
-  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status").eq("order_id",id).maybeSingle();
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("amount,package_name,payment_status").eq("order_id",id).maybeSingle();
   if(paymentError)throw paymentError;
-  const paymentApproved=payment?.payment_status==="approved";
   const state=orderAudioStatus.get(id);
   // Si ya se preparó la muestra en esta instancia, devolver el mismo enlace y no crear enlaces duplicados en cada consulta.
   if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:state.previewUrl});
@@ -1158,11 +1157,7 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   if(error)throw error;
   const stageMap={nuevo:{status:"received",progress:10,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Estamos revisando los datos de tu pedido."},pago_verificado:{status:"received",progress:30,message:"¡Pago confirmado! Tu pedido está listo para producción."},en_proceso:{status:"creating",progress:45,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:70,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."},muestra_lista:{status:"ready",progress:100,message:"¡Tu muestra está lista!"},entregado:{status:"ready",progress:100,message:"¡Tu canción está lista!"},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
   let stage=stageMap[order.status]||stageMap.nuevo;
-  // El progreso no avanza por pago ni se publica la muestra hasta que el comprobante figure aprobado.
-  if(!paymentApproved){
-   stage={status:"received",progress:15,message:"Tu pedido está registrado. Estamos esperando la confirmación de tu pago."};
-   return res.set("Cache-Control","no-store").json({ok:true,...stage});
-  }
+  // La muestra debe estar disponible antes del pago; los beneficios descargables siguen protegidos por la aprobación del voucher.
   if(!(files||[]).some(file=>file.name===id+".mp3")){
    if(order.status==="pago_verificado"&&state?.status==="uploaded")stage={status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."};
    return res.set("Cache-Control","no-store").json({ok:true,...stage,status:state?.status==="failed"?"failed":stage.status});
@@ -1200,7 +1195,7 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   if(linkError)throw linkError;
   const packageText=String(order.package_name||"").toLowerCase();
   const packageLabel=packageText.includes("completo")?"REGALO COMPLETO":packageText.includes("detalle")?"DETALLE ESPECIAL":"ESENCIAL";
-  const price=packageLabel==="REGALO COMPLETO"?30:packageLabel==="DETALLE ESPECIAL"?25:20;
+  const price=Number(payment?.amount)||(packageLabel==="REGALO COMPLETO"?30:packageLabel==="DETALLE ESPECIAL"?25:20);
   const occasion=String(order.occasion||"").toLowerCase();
   const themeKey=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
   const giftUrl=new URL("https://canta-con-el-corazon.onrender.com/");
