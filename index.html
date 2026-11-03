@@ -148,7 +148,7 @@ const lyricText=params.get('letra');
 const previewLinkToken=params.get('previewLink')||'';
 const theme=params.get('tema')||'romantico';
 const packageName=params.get('paquete')||'';const packagePrice=params.get('precio')||'';
-if(packageName){const info=document.getElementById('packageInfo');document.getElementById('packageName').textContent=packageName;document.getElementById('packagePrice').textContent=packagePrice?'Precio acordado: S/'+packagePrice:'';info.classList.remove('hidden');}
+if(packageName){const info=document.getElementById('packageInfo');document.getElementById('packageName').textContent=packageName;document.getElementById('packagePrice').textContent=packagePrice?'Precio acordado: S/'+packagePrice:'';if(previewLinkToken)info.classList.add('hidden');else info.classList.remove('hidden');}
 const allowedThemes=['romantico','cumpleanos','aniversario','serenata','homenaje','amistad'];
 document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 
@@ -434,6 +434,7 @@ const videoNotice=document.getElementById('videoNotice');
 const voucherLink=document.getElementById('sendVoucher');
 const voucherMessage='Hola, ya realicé el pago de mi regalo musical en Canta con el corazón.\\nNombre del destinatario: '+(name||'No indicado')+'\\nEnlace del regalo: '+location.href+'\\nVoy a adjuntar mi voucher para que lo revisen y activen mi descarga.';
 voucherLink.href='https://wa.me/51977974730?text='+encodeURIComponent(voucherMessage);
+if(previewLinkToken){voucherLink.classList.add('hidden');document.getElementById('voucherNote').classList.add('hidden');}
 if(downloadAllowed){downloadButton.textContent='⬇️ Crear y descargar mi regalo en video';downloadNotice.textContent='Tu descarga está habilitada. Pulsa para crear tu video.';voucherLink.classList.add('hidden');document.getElementById('voucherNote').classList.add('hidden')}
 downloadMp3Button.addEventListener('click',async()=>{
  if(!downloadAllowed||!canDownloadMp3){mp3Notice.textContent='🔒 Tu paquete no tiene habilitada la descarga MP3 o el pago aún no está confirmado.';return}
