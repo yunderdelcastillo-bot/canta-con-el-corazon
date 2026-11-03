@@ -12,19 +12,23 @@ self.addEventListener('notificationclick',event=>{
  }));
 });
 
-/* Instalación PWA y recuperación del panel: nunca intercepta ni almacena respuestas de API. */
-const CCH_SHELL_CACHE='cch-admin-shell-v2';
+/* Recuperación de navegación: cache independiente para tienda y administración. */
+const CCH_SHELL_CACHE='cch-shell-v3';
+const CCH_NAV_PATHS=['/','/admin.html'];
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
   const cache=await caches.open(CCH_SHELL_CACHE);
-  try{await cache.add('/admin.html');}catch(error){console.warn('No se pudo precargar el panel:',error);}
+  await Promise.all(CCH_NAV_PATHS.map(async path=>{
+   try{const response=await fetch(path,{cache:'reload'});if(response.ok)await cache.put(path,response);}
+   catch(error){console.warn('Precarga pendiente para '+path,error);}
+  }));
   await self.skipWaiting();
  })());
 });
 self.addEventListener('activate',event=>{
  event.waitUntil((async()=>{
   const keys=await caches.keys();
-  await Promise.all(keys.filter(key=>key.startsWith('cch-admin-shell-')&&key!==CCH_SHELL_CACHE).map(key=>caches.delete(key)));
+  await Promise.all(keys.filter(key=>key.startsWith('cch-')&&key!==CCH_SHELL_CACHE).map(key=>caches.delete(key)));
   await self.clients.claim();
  })());
 });
@@ -33,18 +37,20 @@ self.addEventListener('fetch',event=>{
  if(request.method!=='GET'||request.mode!=='navigate')return;
  const url=new URL(request.url);
  if(url.origin!==self.location.origin)return;
- if(url.pathname!=='/admin.html'&&url.pathname!=='/')return;
+ const path=url.pathname==='/'?'/':url.pathname==='/admin.html'?'/admin.html':null;
+ if(!path)return;
  event.respondWith((async()=>{
+  const cache=await caches.open(CCH_SHELL_CACHE);
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),8000);
   try{
-   const response=await fetch(request);
-   if(response&&response.ok){
-    const cache=await caches.open(CCH_SHELL_CACHE);
-    await cache.put('/admin.html',response.clone());
-   }
+   const response=await fetch(request,{signal:controller.signal,cache:'no-store'});
+   if(response&&response.ok)await cache.put(path,response.clone());
    return response;
   }catch(error){
-   const cache=await caches.open(CCH_SHELL_CACHE);
-   return (await cache.match('/admin.html'))||new Response('El panel no está disponible sin conexión. Recupera internet y vuelve a intentarlo.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8'}});
-  }
+   const saved=await cache.match(path);
+   if(saved)return saved;
+   return new Response('<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conexión pendiente</title><body style="font-family:system-ui;text-align:center;padding:12vh 24px;background:#fbf7ff;color:#29113c"><h2>💗 Canta con el corazón</h2><p>No pudimos conectar en este momento.</p><p>Comprueba tu internet y vuelve a cargar la página.</p><button onclick="location.reload()" style="padding:12px 20px;border:0;border-radius:24px;background:#681b43;color:white;font-weight:700">Volver a intentar</button></body></html>',{status:503,headers:{'Content-Type':'text/html; charset=utf-8'}});
+  }finally{clearTimeout(timeout);}
  })());
 });
