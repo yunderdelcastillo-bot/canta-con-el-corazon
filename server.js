@@ -1185,7 +1185,7 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const themeKey=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
   const giftUrl=new URL("https://canta-con-el-corazon.onrender.com/");
   giftUrl.search=new URLSearchParams({para:order.recipient||"",mensaje:order.special_phrase||order.story||"",audio:song.audio_path,letra:String(order.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:themeKey,paquete:packageLabel,precio:String(price),surprise:"1",previewLink:token}).toString();
-  await db.from("customer_orders").update({status:"muestra_lista",updated_at:new Date().toISOString()}).eq("id",id);
+  // La muestra lista se refleja en orderAudioStatus sin cambiar el estado restringido del pedido.
   orderAudioStatus.set(id,{status:"ready",progress:100,updatedAt:Date.now()});
   return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:100,message:"¡Tu muestra está lista!",previewUrl:giftUrl.toString()});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
@@ -1442,8 +1442,7 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   const songRow={id,owner_id:user.id,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:canonicalPath,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
   const {error:songError}=await db.from("songs").upsert(songRow);
   if(songError)throw songError;
-  const {error:orderUpdateError}=await db.from("customer_orders").update({status:"audio_subido",updated_at:new Date().toISOString()}).eq("id",id);
-  if(orderUpdateError)throw orderUpdateError;
+  // El estado del pedido no se modifica: audio_subido no está permitido por la restricción de la BD.
   orderAudioStatus.set(id,{status:"uploaded",songId:id,progress:90,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").json({ok:true,audio_ready:true,songId:id,progress:90});
  }catch(e){console.error("Save manual customer audio:",e?.message||e);res.status(500).json({error:"No se pudo guardar el MP3 o registrar la canción: "+(e?.message||"Error interno.")});}
