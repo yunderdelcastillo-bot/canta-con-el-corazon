@@ -1428,6 +1428,34 @@ app.get("/api/admin/orders",async(req,res)=>{
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
 });
+app.post("/api/admin/orders/:id/simulate-approval",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("id,buyer,recipient,occasion,package_name").eq("id",id).maybeSingle();
+  if(orderError)throw orderError;if(!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,amount,package_name,payment_status,voucher_path").eq("order_id",id).maybeSingle();
+  if(paymentError)throw paymentError;
+  const isExactTest=String(order.buyer||"").trim().toLowerCase()==="yunder"&&String(order.recipient||"").trim().toLowerCase()==="diana"&&String(order.occasion||"").toLowerCase().includes("sorpresa")&&Number(payment?.amount)===30;
+  if(!isExactTest)return res.status(403).json({error:"La simulación está limitada al pedido de prueba Yunder/Diana, S/30 y ocasión Sorpresa."});
+  if(!payment?.voucher_path)return res.status(409).json({error:"Este pedido no tiene un voucher guardado; no se puede simular el recorrido completo."});
+  if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya figura aprobado."});
+  let songId=String(req.body?.songId||"");
+  let song=null;
+  if(songId){const {data,error}=await db.from("songs").select("id,owner_id").eq("id",songId).maybeSingle();if(error)throw error;if(!data||data.owner_id!==user.id)return res.status(403).json({error:"La canción seleccionada no pertenece a esta administradora."});song=data;}
+  if(!song){const ownerId=String(process.env.ADMIN_OWNER_ID||user.id);const {data,error}=await db.from("songs").select("id,owner_id").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();if(error)throw error;song=data;}
+  const now=new Date().toISOString();
+  const {error:updatePaymentError}=await db.from("payment_submissions").update({payment_status:"approved",provider_payment_id:"TEST-SIMULATION:"+id,reviewed_at:now,updated_at:now,...(song?{song_id:song.id}:{})}).eq("id",payment.id);
+  if(updatePaymentError)throw updatePaymentError;
+  let benefitsActivated=false;
+  if(song){benefitsActivated=await syncApprovedOrderBenefits(db,id,song,song.owner_id);const {error:linksError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",song.id);if(linksError)throw linksError;}
+  const {error:orderUpdateError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);if(orderUpdateError)throw orderUpdateError;
+  res.set("Cache-Control","no-store").json({ok:true,simulated:true,benefitsActivated,message:benefitsActivated?"Simulación completada: pedido de prueba aprobado y beneficios del paquete activados.":"Simulación completada: pedido de prueba aprobado. Los permisos se activarán cuando se vincule o esté disponible el MP3."});
+ }catch(e){console.error("Simulate test order approval:",e?.message||e);res.status(500).json({error:"No se pudo completar la simulación del pedido de prueba."});}
+});
+
 app.get("/api/admin/orders/:id/voucher",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
