@@ -721,7 +721,8 @@ downloadButton.addEventListener('click',async()=>{
    }else if(theme==='amistad'){
     for(let k=0;k<14;k++){const x=(k*109+40)%w,y=(k*79+120)%490;ctx.fillStyle=['#f6d78c','#a6e3d0','#f2b7d1'][k%3];ctx.font='25px sans-serif';ctx.fillText(k%2?'✦':'♥',x,y)}
    }
-   ctx.fillStyle='#f6d78c';ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillText(occasionLabel,w/2,150);
+   ctx.fillStyle=visualDesign.accent||'#f6d78c';ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillText(occasionLabel,w/2,150);
+   if(visualDesign.visualConcept){ctx.save();ctx.fillStyle='rgba(255,240,232,.92)';ctx.font='italic 20px Georgia,serif';wrapText(ctx,visualDesign.visualConcept,w/2,190,600,28);ctx.restore();}
    ctx.restore();
    const shade=ctx.createLinearGradient(0,440,0,h);shade.addColorStop(0,'rgba(24,10,24,.02)');shade.addColorStop(.48,'rgba(24,10,24,.20)');shade.addColorStop(1,'rgba(14,7,18,.68)');ctx.fillStyle=shade;ctx.fillRect(0,420,w,h-420);
    ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 24px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,90);
@@ -733,6 +734,15 @@ downloadButton.addEventListener('click',async()=>{
     ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
     const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
     ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
+    ctx.restore();
+   }
+   // Cierre breve preparado por Gemini, visible únicamente al final de la canción.
+   if(audioEl.duration&&motionTime>audioEl.duration-4.5){
+    const endingAlpha=Math.min(1,(motionTime-(audioEl.duration-4.5))/.8);
+    ctx.save();ctx.globalAlpha=endingAlpha;ctx.textAlign='center';
+    ctx.fillStyle='rgba(12,5,15,.48)';ctx.fillRect(38,1010,644,150);
+    ctx.fillStyle=visualDesign.accent||'#f6d78c';ctx.font='italic 30px Georgia,serif';
+    wrapText(ctx,visualDesign.endingPhrase||'Hecho con amor',w/2,1070,590,38);
     ctx.restore();
    }
    // Capa de acabado cinematográfico: luz ambiental, partículas y stickers animados.
