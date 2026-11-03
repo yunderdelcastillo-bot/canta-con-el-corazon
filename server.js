@@ -215,6 +215,7 @@ app.post("/api/preview/complete",async(req,res)=>{
   if(!song)return res.status(404).json({error:"Canción no encontrada."});
   const {data:updated,error:updateError}=await db.from("song_preview_links").update({completed_at:new Date().toISOString()}).eq("id",link.id).not("started_at","is",null).is("completed_at",null).select("id").maybeSingle();
   if(updateError||!updated)return res.status(409).json({error:"No se pudo registrar el final de la muestra."});
+  await createSystemNotification(db,{order_id:link.song_id,event_type:"preview_finished",audience:"admin",title:"El cliente terminó de escuchar la muestra",body:"El cliente terminó la reproducción de su muestra. Ya puede realizar el pago y subir el voucher."});
   res.set("Cache-Control","no-store").json({ok:true,completed:true});
  }catch(e){console.error("preview complete:",e?.message||e);res.status(500).json({error:"No se pudo finalizar la muestra."});}
 });
