@@ -382,14 +382,23 @@ async function loadCustomerOrders(){
    }
    if(o.lyrics){const l=document.createElement('details');const sm=document.createElement('summary');sm.textContent='Ver letra aportada';const pre=document.createElement('p');pre.textContent=o.lyrics;l.append(sm,pre);const copyLyrics=document.createElement('button');copyLyrics.type='button';copyLyrics.className='btn alt';copyLyrics.textContent='📋 Copiar solo la letra';copyLyrics.onclick=async()=>{try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(o.lyrics);else{const ta=document.createElement('textarea');ta.value=o.lyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('No se pudo copiar');}copyLyrics.textContent='✓ Solo la letra copiada';setTimeout(()=>copyLyrics.textContent='📋 Copiar solo la letra',1600);}catch(e){alert('No se pudo copiar. Mantén pulsada la letra para copiarla.');}};l.append(sm,pre);card.appendChild(l);const quickActions=document.createElement('div');quickActions.className='order-quick-actions';quickActions.append(copyLyrics);card.appendChild(quickActions);}
    cchAddOrderChat(card,o,token);
-   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent=o.lyrics?'🎶 Preparar letra en Gemini (1 clic)':'✍️ Crear letra con IA';prepare.onclick=async()=>{
+   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent='🎶 Enviar letra del pedido a Gemini';prepare.title='Extrae únicamente la letra original enviada por el cliente';prepare.onclick=async()=>{
     activeCustomerOrder=o;
-    try{await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id),{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status:'en_proceso'})});}catch(e){}
-    if(o.lyrics){
-     const copied=async()=>{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(o.lyrics);}else{const ta=document.createElement('textarea');ta.value=o.lyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('No se pudo copiar la letra.');}};
-     try{const tab=window.open('https://gemini.google.com/app','_blank');if(!tab)throw new Error('Permite ventanas emergentes para abrir Gemini.');await copied();prepare.textContent='✓ Letra copiada · pégala en Gemini';setTimeout(()=>prepare.textContent='🎶 Preparar letra en Gemini (1 clic)',2500);}catch(e){alert(e.message+' Puedes usar el botón “Copiar solo la letra” de la tarjeta.');}
-     return;
-    }
+    const customerLyrics=String(o.lyrics||'').trim();
+    if(!customerLyrics){alert('Este pedido todavía no contiene la letra de la canción. No se generará ni modificará ninguna letra.');return;}
+    const tab=window.open('https://gemini.google.com/app','_blank');
+    if(!tab){alert('Permite las ventanas emergentes para abrir Gemini.');return;}
+    try{
+     if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(customerLyrics);
+     else{
+      const ta=document.createElement('textarea');ta.value=customerLyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('No se pudo copiar la letra.');
+     }
+     prepare.textContent='✓ Letra original copiada · pegar en Gemini';
+     alert('Se extrajo únicamente la letra original de este pedido y se copió. En Gemini, pega el texto en el campo de escritura.');
+     setTimeout(()=>prepare.textContent='🎶 Enviar letra del pedido a Gemini',3000);
+    }catch(e){alert('Gemini se abrió, pero no se pudo copiar automáticamente la letra. Usa “Copiar solo la letra” en esta tarjeta. Detalle: '+e.message);}
+   };
+   card.appendChild(prepare);
     $('aiBuyer').value=o.buyer||'';$('aiRecipient').value=o.recipient||'';selectByText('aiOccasion',o.occasion||'');selectByText('aiStyle',o.style||'');selectByText('aiVoice',o.voice||'');$('aiStory').value=String(o.story||'').replace(/^PEDIDO POR WHATSAPP\n/,'');$('aiPhrase').value=o.special_phrase||'';$('aiCustomGenre').value=o.custom_genre||'';selectByText('aiTone',o.lyric_tone||'Según la historia');selectByText('aiDuration',String(o.lyric_duration||'3 minutos'));$('adminLyricsText').value='';msg('adminLyricsStatus','Pedido de WhatsApp cargado. Genera la letra con IA; se guardará directamente en este pedido.');$('lyricsStudio').scrollIntoView({behavior:'smooth',block:'start'});
    };
    const sel=document.createElement('select');[['nuevo','Nuevo'],['contactado','Contactado'],['pago_verificado','Pago verificado'],['en_proceso','En proceso'],['audio_subiendo','Subiendo audio'],['audio_subido','Audio guardado'],['muestra_lista','Muestra lista'],['entregado','Entregado'],['cancelado','Cancelado']].forEach(([v,t])=>{const op=document.createElement('option');op.value=v;op.textContent=t;sel.appendChild(op)});sel.value=o.status;
