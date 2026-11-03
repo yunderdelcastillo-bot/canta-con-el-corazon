@@ -409,7 +409,7 @@ async function cchLoadAdminInbox(){
   const token=await window.cchAdminGetToken();if(!token)return;
   const r=await fetch(API_BASE+'/api/admin/messages/inbox',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
   const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo cargar la mensajería.');
-  const items=d.conversations||[],unread=items.reduce((sum,o)=>sum+(Number(o.unread_count)||0),0);
+  const items=d.conversations||[],unread=items.filter(o=>o.status==='nuevo'||Number(o.unread_count)>0).length;
   const badge=$('messengerUnreadBadge');if(badge){badge.textContent=unread>99?'99+':String(unread);badge.classList.toggle('hidden',unread===0);}
   list.replaceChildren();
   if(!items.length){list.textContent='Todavía no hay pedidos ni conversaciones.';return;}
