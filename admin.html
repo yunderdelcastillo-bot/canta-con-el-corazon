@@ -671,58 +671,6 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  configBtn?.addEventListener('click',()=>show('config'));
 })();
 
-/* Recuperación independiente del botón de conexión Supabase.
-   Evita que un error previo del panel deje el botón sin respuesta. */
-(function(){
- const bindSupabaseRecovery=()=>{
-  const btn=document.getElementById('connect');
-  const status=document.getElementById('connStatus');
-  const urlInput=document.getElementById('url');
-  const keyInput=document.getElementById('key');
-  if(!btn||!status||!urlInput||!keyInput)return;
-  const saved=(()=>{try{return JSON.parse(localStorage.getItem('cc_config')||'{}')}catch{return {}}})();
-  if(saved.url&&!urlInput.value)urlInput.value=saved.url;
-  if(saved.key&&!keyInput.value)keyInput.value=saved.key;
-  btn.onclick=async function(){
-   const rawUrl=String(urlInput.value||'').trim();
-   const publicKey=String(keyInput.value||'').trim();
-   if(!rawUrl||!publicKey){status.textContent='Completa la URL y la clave pública de Supabase.';return;}
-   let parsed;
-   try{parsed=new URL(rawUrl)}catch{status.textContent='La URL no es válida. Debe ser la Project URL completa de Supabase.';return;}
-   if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co')||parsed.pathname!=='/'||parsed.search||parsed.hash){
-    status.textContent='La URL debe tener el formato https://tu-proyecto.supabase.co, sin rutas adicionales.';return;
-   }
-   if(!(publicKey.startsWith('sb_publishable_')||publicKey.startsWith('eyJ'))){
-    status.textContent='La clave debe ser anon o sb_publishable_. No uses service_role ni una clave secreta.';return;
-   }
-   if(!window.supabase||typeof window.supabase.createClient!=='function'){
-    status.textContent='No cargó la librería de Supabase. Comprueba internet y vuelve a actualizar el panel.';return;
-   }
-   btn.disabled=true;status.textContent='Comprobando conexión con Supabase…';
-   try{
-    const client=window.supabase.createClient(parsed.origin,publicKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    const {error:healthError}=await client.from('songs').select('id',{head:true}).limit(1);
-    localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key:publicKey}));
-    if(healthError){
-     const detail=String(healthError.message||'Error desconocido');
-     if(/failed to fetch|network|timeout|load failed/i.test(detail)){
-      status.textContent='No se pudo alcanzar Supabase. Revisa internet y que la URL y clave pertenezcan al mismo proyecto. Detalle: '+detail;
-     }else{
-      status.textContent='Supabase respondió, pero la tabla songs o sus permisos necesitan revisión. La configuración sí quedó guardada. Detalle: '+detail;
-     }
-     return;
-    }
-    if(typeof db!=='undefined')db=client;
-    status.textContent='¡Conexión correcta! Configuración guardada en este navegador. Ahora inicia sesión si el panel lo solicita.';
-   }catch(error){
-    status.textContent='Error al conectar: '+String(error&&error.message||error);
-   }finally{btn.disabled=false;}
-  };
- };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bindSupabaseRecovery,{once:true});
- else bindSupabaseRecovery();
-})();
-
 /* PWA Canta con el corazón: registro persistente del Service Worker sin bloquear el panel. */
 (function(){
  if(!('serviceWorker' in navigator))return;
