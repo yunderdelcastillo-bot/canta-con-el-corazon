@@ -74,7 +74,7 @@ textarea{min-height:100px}
 #ordersList{background:transparent;padding:0}
 #refreshOrders:disabled{opacity:.65;cursor:wait}
 @media(max-width:560px){.order-card{padding:11px!important}.order-card h3{font-size:1rem}.order-toolbar{top:52px}.order-card .order-quick-actions .btn{flex:1 1 44%}}
-</style><meta name="cch-app-version" content="2026-11-02-1320-tokenfix"></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
+</style><meta name="cch-app-version" content="2026-11-02-session-background-v1"></head><body><header class="hero"><div><h1>💗 Canta con el corazón</h1><p>Panel de administración de canciones-regalo</p><a href="/">Ver web pública</a><a href="/supabase-setup.sql">Ver configuración técnica</a></div></header><main>
 <div style="max-width:980px;margin:10px auto;padding:0 14px"><button class="btn alt" id="panelMenuToggle" type="button" aria-expanded="false" aria-controls="panelMenu">☰ Menú del panel</button></div><nav class="panel-nav menu-collapsed" id="panelMenu" aria-label="Secciones del panel"><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
 <section class="card"><h2>1. Conectar almacenamiento en la nube</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
@@ -131,8 +131,11 @@ $('connect').onclick=async()=>{
  }
  const url=parsed.origin,btn=$('connect');btn.disabled=true;msg('connStatus','Guardando la configuración y comprobando Supabase…');
  try{
-  const client=window.supabase.createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true}});
+  const client=window.supabase.createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
   localStorage.setItem('cc_config',JSON.stringify({url,key}));db=client;
+  const {data:{session:restoredSession},error:sessionError}=await client.auth.getSession();
+  if(sessionError)console.warn('No se pudo recuperar la sesión guardada:',sessionError.message);
+  if(restoredSession?.user)await activateAdminSession(restoredSession.user,{restored:true});
   msg('connStatus','Configuración guardada. Comprobando acceso a la tabla songs…');
   const {error}=await client.from('songs').select('id',{head:true}).limit(1);
   if(error){
@@ -189,7 +192,29 @@ $('adminCopyLyrics').onclick=async()=>{try{await navigator.clipboard.writeText(a
 $('adminUseLyrics').onclick=()=>{if(!aiVal('adminLyricsText')){msg('adminLyricsStatus','Primero genera una letra.');return}const recipient=aiVal('aiRecipient'),occasion=aiVal('aiOccasion');$('lyrics').value=aiVal('adminLyricsText');$('recipient').value=recipient;$('title').value=(occasion?occasion+' - ':'')+'Canción para '+recipient;$('dedication').value=[aiVal('aiStory'),aiVal('aiPhrase')?'Frase especial: '+aiVal('aiPhrase'):''].filter(Boolean).join('\n\n');$('theme').value=themeForOccasion(occasion);msg('saveStatus','Datos y letra trasladados al editor. Cuando generes el MP3, el archivo también quedará seleccionado automáticamente.');$('editor').scrollIntoView({behavior:'smooth'});};
 $('adminSendLyrics').onclick=()=>{const lyrics=aiVal('adminLyricsText');if(!lyrics){msg('adminLyricsStatus','Primero genera una letra.');return}const text='Hola, '+(aiVal('aiBuyer')||'te comparto')+'. 💗\nTe envío la letra personalizada para '+aiVal('aiRecipient')+'.\nOcasión: '+aiVal('aiOccasion')+'\nGénero: '+aiVal('aiStyle')+' · '+aiVal('aiVoice')+'\n\n'+lyrics+'\n\nRevísala y dime si deseas algún cambio. — Canta con el corazón';window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};
 
-$('login').onclick=async()=>{if(!db){msg('authStatus','Primero conecta Supabase.');return}let {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){msg('authStatus','Error de acceso: '+error.message);return}user=data.user;window.cchAdminGetToken=async()=>{const {data:{session}}=await db.auth.getSession();return session?.access_token||''};window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:true}}));msg('authStatus','Sesión iniciada: '+user.email+' · ID administrador: '+user.id);$('editor').classList.remove('hidden');$('library').classList.remove('hidden');$('mediaLibrary').classList.remove('hidden');$('lyricsStudio').classList.remove('hidden');$('customerOrders').classList.remove('hidden');await load();await loadMedia();await loadCustomerOrders();$('systemAlerts').classList.remove('hidden');$('integrationStatus').classList.remove('hidden');await cchLoadNotifications();await cchLoadIntegrationStatus();if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);window.cchNotificationTimer=setInterval(cchLoadNotifications,10000)}
+async function activateAdminSession(adminUser,{restored=false}={}){
+ if(!adminUser)return;
+ if(user?.id===adminUser.id)return;
+ user=adminUser;
+ window.cchAdminGetToken=async()=>{if(!db)return '';const {data:{session}}=await db.auth.getSession();return session?.access_token||''};
+ window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:true}}));
+ msg('authStatus',(restored?'Sesión recuperada automáticamente: ':'Sesión iniciada: ')+user.email+' · Tu acceso se conservará en este navegador.');
+ ['editor','library','mediaLibrary','lyricsStudio','customerOrders','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.remove('hidden'));
+ await Promise.allSettled([load(),loadMedia(),loadCustomerOrders(),cchLoadNotifications(),cchLoadIntegrationStatus()]);
+ if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);
+ window.cchNotificationTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadNotifications()},15000);
+ await cchRefreshPushStatus();
+}
+$('login').onclick=async()=>{
+ if(!db){msg('authStatus','Primero conecta Supabase.');return}
+ const button=$('login');button.disabled=true;
+ try{
+  const {data,error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});
+  if(error)throw error;
+  await activateAdminSession(data.user);
+ }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa tus datos.'))}
+ finally{button.disabled=false}
+};
 
 
 document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',async()=>{
@@ -338,7 +363,7 @@ async function loadCustomerOrders(){
 }
 $('refreshOrders').onclick=async()=>{const b=$('refreshOrders');if(b.disabled)return;b.disabled=true;const label=b.textContent;b.textContent='Actualizando…';try{await loadCustomerOrders();}finally{b.disabled=false;b.textContent=label;}};
 
-$('logout').onclick=async()=>{if(db)await db.auth.signOut();user=null;window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:false}}));$('editor').classList.add('hidden');$('library').classList.add('hidden');$('mediaLibrary').classList.add('hidden');$('lyricsStudio').classList.add('hidden');$('customerOrders').classList.add('hidden');msg('authStatus','Sesión cerrada.')};
+$('logout').onclick=async()=>{if(db)await db.auth.signOut();user=null;if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);window.cchNotificationTimer=null;window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:false}}));['editor','library','mediaLibrary','lyricsStudio','customerOrders','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.add('hidden'));msg('authStatus','Sesión cerrada manualmente.')};
 $('giftPackage').onchange=()=>{const prices={esencial:20,detalle:25,completo:30};$('giftPrice').value=prices[$('giftPackage').value]||20};$('file').onchange=()=>{file=$('file').files[0]||null;if(!file){msg('fileInfo','Selecciona un MP3 de tu celular.');return}if(file.size>25*1024*1024||!(file.type==='audio/mpeg'||file.name.toLowerCase().endsWith('.mp3'))){file=null;$('file').value='';msg('fileInfo','El archivo debe ser MP3 y pesar máximo 25 MB.');return}msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB');$('preview').src=URL.createObjectURL(file);$('previewWrap').classList.remove('hidden')};
 $('clear').onclick=()=>{$('form').reset();$('sid').value='';file=null;$('previewWrap').classList.add('hidden');msg('fileInfo','Selecciona un MP3 de tu celular.');msg('saveStatus','Formulario limpio.');$('giftPreviewWrap').classList.add('hidden');$('giftPreview').src='';$('openGiftPreview').href='#'};
 $('form').onsubmit=async e=>{e.preventDefault();if(!db||!user){msg('saveStatus','Inicia sesión primero.');return}let id=$('sid').value||crypto.randomUUID();$('save').disabled=true;msg('saveStatus','Subiendo y guardando… no cierres esta página.');try{let audioBase64=null;if(file){const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se pudo leer el MP3 del celular.'));reader.readAsDataURL(file)});audioBase64=dataUrl.split(',')[1]}const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Tu sesión expiró. Inicia sesión nuevamente.');const response=await fetch(API_BASE+'/api/songs',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({id,title:$('title').value.trim(),recipient:$('recipient').value.trim(),dedication:$('dedication').value.trim(),lyrics:$('lyrics').value.trim(),theme:$('theme').value,packageKey:$('giftPackage').value,packagePrice:Number($('giftPrice').value)||20,orderId:activeCustomerOrder?.id||null,audioBase64})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo guardar.');const row=result.song;const packageNames={esencial:'ESENCIAL',detalle:'DETALLE ESPECIAL',completo:'REGALO COMPLETO'};const packageMap=packageStore();packageMap[id]={key:$('giftPackage').value,name:packageNames[$('giftPackage').value],price:Number($('giftPrice').value)||20};localStorage.setItem('cc_song_packages',JSON.stringify(packageMap));row.package_key=result.song?.package_key||$('giftPackage').value;row.package_price=Number(result.song?.package_price||$('giftPrice').value)||20;let link=makeLink(row);msg('saveStatus',result.benefitsActivated?'¡Canción guardada y beneficios activados automáticamente según el pago del pedido! Enlace: '+link:'¡Guardada! Enlace para compartir: '+link);if(result.benefitsActivated)activeCustomerOrder=null;$('sid').value=id;$('giftPreview').src=link;$('openGiftPreview').href=link;$('giftPreviewWrap').classList.remove('hidden');file=null;$('file').value='';msg('fileInfo','MP3 guardado en la nube.');await load()}catch(err){msg('saveStatus','No se pudo guardar: '+err.message)}finally{$('save').disabled=false}};
@@ -418,6 +443,21 @@ $('testAlertSound').onclick=async()=>{
  await cchSpeakAlert('Atención. Tienes un nuevo pedido en Canta con el corazón.');
 };
 $('toggleAlertSound').onclick=()=>{cchAlertSoundEnabled=!cchAlertSoundEnabled;localStorage.setItem('cch_alert_sound',cchAlertSoundEnabled?'on':'off');if(!cchAlertSoundEnabled){for(const timer of cchOrderRepeatTimers.values())clearInterval(timer);cchOrderRepeatTimers.clear();}else{cchLoadNotifications();}$('alertSoundStatus').textContent=cchAlertSoundEnabled?'Sonido activado. Pulsa “Probar voz y sonido” para habilitarlo en este celular.':'Sonido silenciado.';};
+async function cchRefreshPushStatus(){
+ const status=$('pushAlertStatus');if(!status)return;
+ try{
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)){status.textContent='Este navegador no admite avisos Push. Usa Chrome actualizado.';return;}
+  const registration=await navigator.serviceWorker.getRegistration('/');
+  const subscription=registration?await registration.pushManager.getSubscription():null;
+  if(subscription&&Notification.permission==='granted'){
+   status.textContent='✅ Este celular tiene avisos en segundo plano registrados. Puedes probarlos con “Enviar notificación de prueba”.';
+   $('enablePushAlerts').textContent='✅ Avisos en segundo plano registrados';
+  }else{
+   status.textContent='Para recibir avisos cuando salgas del panel, activa una vez “Avisos con pantalla apagada”.';
+   $('enablePushAlerts').textContent='📲 Activar avisos con pantalla apagada';
+  }
+ }catch(error){status.textContent='No se pudo comprobar el registro de avisos: '+error.message;}
+}
 async function cchEnablePushAlerts(){
  const status=$('pushAlertStatus'),button=$('enablePushAlerts');
  try{
@@ -438,6 +478,7 @@ async function cchEnablePushAlerts(){
  }catch(e){status.textContent='No se pudo activar: '+e.message;console.warn('Push setup:',e);}
 }
 $('enablePushAlerts').onclick=cchEnablePushAlerts;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){db.auth.getSession().then(({data})=>{if(data.session?.user){loadCustomerOrders();cchLoadNotifications();}}).catch(error=>console.warn('Session refresh on return:',error));}});
 $('testPushAlerts').onclick=async()=>{const b=$('testPushAlerts'),status=$('pushAlertStatus');b.disabled=true;b.textContent='Enviando prueba…';try{const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión como administradora.');const r=await fetch(API_BASE+'/api/admin/push/test',{method:'POST',headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');status.textContent='✅ Notificación de prueba enviada al dispositivo registrado. Bloquea la pantalla para comprobar la recepción.';}catch(e){status.textContent='No se pudo enviar la prueba: '+e.message;}finally{b.disabled=false;b.textContent='🧪 Enviar notificación de prueba';}};
 
 
