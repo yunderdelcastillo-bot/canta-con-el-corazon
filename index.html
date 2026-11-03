@@ -620,14 +620,14 @@ downloadButton.addEventListener('click',async()=>{
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
   // 18 FPS estables para reducir saltos en Android sin perder nitidez HD 720p.
-  const stream=canvas.captureStream(18);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  const stream=canvas.captureStream(30);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
-  const recorderOptions={videoBitsPerSecond:1600000,audioBitsPerSecond:64000};if(mime)recorderOptions.mimeType=mime;
+  const recorderOptions={videoBitsPerSecond:6000000,audioBitsPerSecond:128000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   let lastDrawAt=0,lastStockTime=-1,stockStallSince=0,useAnimatedFallback=false;
   const draw=(frameTime=0)=>{
-   if(frameTime-lastDrawAt<54){if(recorder.state==='recording')requestAnimationFrame(draw);return}
+   if(frameTime-lastDrawAt<33){if(recorder.state==='recording')requestAnimationFrame(draw);return}
    lastDrawAt=frameTime;
    // Si el clip externo se congela o deja de avanzar, cambiar al fondo animado integrado.
    if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){
