@@ -647,26 +647,26 @@ downloadButton.addEventListener('click',async()=>{
   const visualDesign=window.videoDirectorPlan||{theme:theme||'romantic',accent:'#f6d78c',stickers:['heart','sparkle','star'],visualConcept:'Una historia contada con imágenes y música',lyricStyle:'cinematic',transitionStyle:'dissolve',endingPhrase:'Hecho con amor',sceneSequence:[]};
   window.aiSceneImages=[];
   downloadNotice.textContent='Preparando tus fondos cinematográficos y la letra sincronizada…';
-  videoStage='grabación de video en el celular (modo ligero)';
-  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
+  videoStage='grabación vertical Full HD 1080p';
+  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
-  // 18 FPS estables para reducir saltos en Android sin perder nitidez HD 720p.
-  const stream=canvas.captureStream(20);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  // Full HD vertical 1080x1920 a 24 FPS; la compresión final se realiza en el servidor.
+  const stream=canvas.captureStream(24);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
-  const recorderOptions={videoBitsPerSecond:2500000,audioBitsPerSecond:96000};if(mime)recorderOptions.mimeType=mime;
+  const recorderOptions={videoBitsPerSecond:3500000,audioBitsPerSecond:128000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   let lastDrawAt=0,lastStockTime=-1,stockStallSince=0,useAnimatedFallback=false;
   const draw=(frameTime=0)=>{
-   if(frameTime-lastDrawAt<50){if(recorder.state==='recording')requestAnimationFrame(draw);return}
+   if(frameTime-lastDrawAt<41){if(recorder.state==='recording')requestAnimationFrame(draw);return}
    lastDrawAt=frameTime;
    // Si el clip externo se congela o deja de avanzar, cambiar al fondo animado integrado.
    if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){
     if(Math.abs(stockVideo.currentTime-lastStockTime)>0.015){lastStockTime=stockVideo.currentTime;stockStallSince=frameTime}
     else if(stockStallSince&&frameTime-stockStallSince>1800)useAnimatedFallback=true;
    }else if(stockVideo&&!stockVideo.paused){useAnimatedFallback=true}
-   // Lienzo HD vertical 720x1280.
+   // Lienzo Full HD vertical 1080x1920.
    ctx.setTransform(canvas.width/720,0,0,canvas.height/1280,0,0);
    const w=720,h=1280;
    const motionTime=audioEl.currentTime||0;
