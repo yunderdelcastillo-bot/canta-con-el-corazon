@@ -557,61 +557,48 @@ function tokenEditDistance(a,b){
  }
  return prev[b.length];
 }
-// Dirección artística breve con Gemini para decorar cada videoclip. Devuelve solo opciones permitidas.
+// Director audiovisual con Groq: convierte la letra en un plan de escenas y selección de biblioteca.
 const videoDesignLimits=new Map();
 app.post("/api/video/design",async(req,res)=>{
  try{
-  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-  if(!apiKey)return res.status(503).json({error:"Gemini no está conectado."});
   const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
   const now=Date.now(),record=videoDesignLimits.get(ip)||{start:now,count:0};
   if(now-record.start>60*60*1000){record.start=now;record.count=0;}
-  if(record.count>=20)return res.status(429).json({error:"Límite temporal de diseños visuales alcanzado."});
+  if(record.count>=20)return res.status(429).json({error:"Límite temporal de direcciones audiovisuales alcanzado."});
   record.count++;videoDesignLimits.set(ip,record);
   const body=req.body||{};
   const lyrics=String(body.lyrics||"").slice(0,5000);
   const recipient=String(body.recipient||"").slice(0,100);
   const dedication=String(body.dedication||"").slice(0,300);
-  const occasion=String(body.occasion||"").slice(0,60);
-  const prompt="Eres director creativo audiovisual de videoclips verticales profesionales para canciones personalizadas. Analiza letra, ocasión, destinatario y dedicatoria; crea un plan visual coherente con la historia y el sentimiento. Responde SOLO JSON válido con claves theme, accent, stickers, visualConcept, sceneSequence, lyricStyle, transitionStyle, endingPhrase, imageSearchTerms. theme: romantic, celebration, elegant, family o inspirational. accent: #f6d78c, #ffc1d6, #b9dcff, #d8b5ff o #c8f0d0. stickers: hasta 3 de heart, sparkle, star. visualConcept: frase breve en español, máximo 90 caracteres. sceneSequence: arreglo de 3 objetos {part,visual}; part solo intro, verse, chorus o ending; visual es una escena genérica, máximo 100 caracteres. lyricStyle: elegant, cinematic o bold. transitionStyle: dissolve, soft_glow o fade. endingPhrase: frase breve basada solo en la dedicatoria, máximo 90 caracteres; si no hay datos usa Hecho con amor. imageSearchTerms: arreglo de 3 descripciones visuales genéricas en español, máximo 70 caracteres. No inventes nombres, lugares, sucesos ni parentescos; no afirmes que existen fotos reales. Conserva legibilidad y protagonismo de rostros y letras.\\nOcasión: "+occasion+"\\nDestinatario: "+recipient+"\\nDedicatoria: "+dedication+"\\nLetra:\\n"+lyrics
-  const preferred=String(process.env.GEMINI_MODEL||"gemini-3.8-flash").trim();
-  const candidates=[...new Set([preferred,"gemini-3.7-flash","gemini-3.6-flash"])];
-  let payload=null,lastStatus=0;
-  for(const model of candidates){
-   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent",{
-    method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-    body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",temperature:.35,maxOutputTokens:650}}),
-    signal:AbortSignal.timeout(30000)
-   });
-   const data=await response.json().catch(()=>({}));
-   if(response.ok){payload=data;break;}
-   lastStatus=response.status;
-   if(![404,429,500,502,503,504].includes(response.status))break;
-  }
-  const raw=(payload?.candidates?.[0]?.content?.parts||[]).map(p=>p.text||"").join("").trim();
-  if(!raw)return res.status(lastStatus===429?429:502).json({error:"Gemini no pudo proponer la decoración."});
-  const parsed=JSON.parse(raw.replace(/^```(?:json)?|\```$/g,"").trim());
+  const occasion=String(body.occasion||"romantico").slice(0,60);
+  const assets=Array.isArray(body.assets)?body.assets.slice(0,80).map(x=>({name:String(x.name||"").slice(0,160),type:String(x.type||"").slice(0,30)})).filter(x=>x.name):[];
+  const system="Eres director audiovisual profesional especializado en videoclips verticales de canciones personalizadas. Analiza la letra y dirige el montaje usando EXCLUSIVAMENTE los recursos disponibles en la biblioteca que se te entrega. No inventes archivos. Devuelve únicamente JSON válido. Define un concepto emocional y una secuencia narrativa para intro, versos, coro, puente y final. Selecciona el orden de archivos existentes en assetOrder, usando sus nombres exactos y sin repetirlos. Si no hay recursos adecuados, devuelve assetOrder vacío y describe una alternativa visual animada. No inventes hechos, relaciones ni recuerdos que no aparezcan en la letra. Mantén el nombre del destinatario exacto. JSON: theme (romantic|celebration|elegant|family|inspirational), accent (uno de #f6d78c,#ffc1d6,#b9dcff,#d8b5ff,#c8f0d0), stickers (hasta 3 de heart,sparkle,star), visualConcept (máx 90 caracteres), sceneSequence (3 a 6 objetos con part: intro|verse|chorus|bridge|ending y visual máx 120 caracteres), lyricStyle (elegant|cinematic|bold), transitionStyle (dissolve|soft_glow|fade), endingPhrase (máx 90 caracteres), assetOrder (nombres exactos de archivos disponibles).";
+  const user="Ocasión: "+occasion+"\nDestinatario: "+recipient+"\nDedicatoria: "+dedication+"\nLetra completa:\n"+lyrics+"\nArchivos disponibles en la biblioteca (nombre y tipo):\n"+JSON.stringify(assets);
+  const result=await groqCompletion([{role:"system",content:system},{role:"user",content:user}],{json:true,maxTokens:1400,temperature:.35});
+  let parsed;try{parsed=JSON.parse(result.content)}catch{throw Object.assign(new Error("El director audiovisual devolvió un plan no válido."),{status:502});}
   const themes=new Set(["romantic","celebration","elegant","family","inspirational"]);
   const colors=new Set(["#f6d78c","#ffc1d6","#b9dcff","#d8b5ff","#c8f0d0"]);
-  const stickers=new Set(["heart","sparkle","star"]);
-  const safeText=(value,max,fallback="")=>String(value||"").replace(/[<>\\u0000-\\u001F]/g," ").replace(/\\s+/g," ").trim().slice(0,max)||fallback;
-  const parts=new Set(["intro","verse","chorus","ending"]);
+  const stickerSet=new Set(["heart","sparkle","star"]);
+  const parts=new Set(["intro","verse","chorus","bridge","ending"]);
+  const safeText=(v,max,fallback="")=>String(v||"").replace(/[<>\u0000-\u001F]/g," ").replace(/\s+/g," ").trim().slice(0,max)||fallback;
+  const available=new Set(assets.map(x=>x.name));
   const design={
    theme:themes.has(parsed.theme)?parsed.theme:"romantic",
    accent:colors.has(String(parsed.accent).toLowerCase())?String(parsed.accent).toLowerCase():"#f6d78c",
-   stickers:Array.isArray(parsed.stickers)?parsed.stickers.filter(x=>stickers.has(x)).slice(0,3):["heart","sparkle","star"],
+   stickers:Array.isArray(parsed.stickers)?parsed.stickers.filter(x=>stickerSet.has(x)).slice(0,3):["heart","sparkle"],
    visualConcept:safeText(parsed.visualConcept,90,"Un videoclip creado para esta historia"),
-   sceneSequence:Array.isArray(parsed.sceneSequence)?parsed.sceneSequence.slice(0,4).filter(x=>x&&parts.has(x.part)).map(x=>({part:x.part,visual:safeText(x.visual,100,"")})).filter(x=>x.visual):[],
+   sceneSequence:Array.isArray(parsed.sceneSequence)?parsed.sceneSequence.slice(0,6).filter(x=>x&&parts.has(x.part)).map(x=>({part:x.part,visual:safeText(x.visual,120)})).filter(x=>x.visual):[],
    lyricStyle:["elegant","cinematic","bold"].includes(parsed.lyricStyle)?parsed.lyricStyle:"cinematic",
    transitionStyle:["dissolve","soft_glow","fade"].includes(parsed.transitionStyle)?parsed.transitionStyle:"dissolve",
    endingPhrase:safeText(parsed.endingPhrase,90,"Hecho con amor"),
-   imageSearchTerms:Array.isArray(parsed.imageSearchTerms)?parsed.imageSearchTerms.slice(0,3).map(x=>safeText(x,70)).filter(Boolean):[]
+   assetOrder:Array.isArray(parsed.assetOrder)?parsed.assetOrder.filter(x=>typeof x==="string"&&available.has(x)).slice(0,80):[],
+   model:result.model||"Groq"
   };
-  while(design.stickers.length<3)design.stickers.push("sparkle");
+  if(!design.stickers.length)design.stickers=["heart","sparkle"];
   res.set("Cache-Control","no-store").json({ok:true,design});
  }catch(error){
-  console.error("Gemini video design:",error?.message||error);
-  res.status(502).json({error:"No se pudo preparar el diseño visual con Gemini."});
+  console.error("Groq audiovisual director:",error?.message||error);
+  res.status(error?.status===429?429:502).json({error:error?.status===429?"La IA alcanzó temporalmente su límite. Se usará el montaje automático.":"No se pudo preparar la dirección audiovisual. Se usará el montaje automático."});
  }
 });
 
