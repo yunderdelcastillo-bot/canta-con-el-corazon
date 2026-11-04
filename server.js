@@ -531,6 +531,8 @@ app.post("/api/convert-video",async(req,res)=>{
     const conversionStartedAt=Date.now();
     console.log("Starting asynchronous Full HD 1080p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:1080,targetHeight:1920,fps:24});
     await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24","-c:v","libx264","-threads","1","-preset","veryfast","-crf","28","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
+    console.log("HD render encoding completed:",{jobId,seconds:Number(((Date.now()-started)/1000).toFixed(1))});
+    await persistVideoJob(db,jobId,{status:"processing",progress:95,stage:"Guardando el video MP4",createdAt:Date.now(),songId:song.id});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
     if(mp4.length>45*1024*1024)throw new Error("El MP4 pesa "+(mp4.length/1024/1024).toFixed(1)+" MB y supera el límite de 45 MB del almacenamiento. Se redujo la tasa de bits para evitarlo.");
@@ -632,6 +634,8 @@ app.post("/api/render-video",async(req,res)=>{
     const clipDuration=duration/imagePaths.length;
     const segmentPaths=[];
     for(let i=0;i<imagePaths.length;i++){
+     const segmentStarted=Date.now();
+     console.log("HD render stage started:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length});
      const segment=path.join(dir,"segment-"+String(i).padStart(2,"0")+".mp4");
      const frames=Math.max(1,Math.round(clipDuration*fps));
      const pan=i%2===0
@@ -641,6 +645,8 @@ app.post("/api/render-video",async(req,res)=>{
      const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r","30","-movflags","+faststart",segment];
      await execFileAsync(ffmpegPath,segmentArgs,{timeout:600000,maxBuffer:2*1024*1024});
      segmentPaths.push(segment);
+     console.log("HD render stage completed:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length,seconds:Number(((Date.now()-segmentStarted)/1000).toFixed(1))});
+     await persistVideoJob(db,jobId,{status:"processing",progress:Math.round(((i+1)/(imagePaths.length+1))*80),stage:"Procesando fotografías "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
     }
     const concatPath=path.join(dir,"segments.txt");
     const concatText=segmentPaths.map(p=>"file '"+p.replace(/\\/g,"/").replace(/'/g,"'\\''")+"'").join("\n");
@@ -668,7 +674,8 @@ app.post("/api/render-video",async(req,res)=>{
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
-    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","fast","-crf","22","-maxrate","3200k","-bufsize","6400k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart",output);
+    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
+    await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
     console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"720x1280",fps:30,videoQuality:"HD",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
