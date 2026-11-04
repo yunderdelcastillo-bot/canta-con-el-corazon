@@ -664,7 +664,7 @@ app.post("/api/render-video",async(req,res)=>{
       ass.push("Dialogue: 0,"+assTime(start)+","+assTime(end)+",Karaoke,,0,0,0,,"+karaokeText);
      }
      const assPath=path.join(dir,"karaoke.ass");
-     await writeFile(assPath,ass.join("\\n"),"utf8");
+     await writeFile(assPath,ass.join("\n"),"utf8");
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
