@@ -99,7 +99,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
 <h1 id="giftTitle">Una canción para ti</h1>
 <p class="subtitle" id="giftMessage">Porque tu historia merece convertirse en música.</p>
 <div class="player"><strong>🎵 Tu canción especial</strong><p class="note" id="audioNote">Aquí aparecerá la canción preparada para ti.</p><audio id="audioPlayer" controls controlsList="nodownload noplaybackrate" disablePictureInPicture class="hidden"></audio><button class="btn secondary hidden" id="replayGiftAudio" type="button" style="margin-top:12px">🔁 Volver a escuchar mi canción</button><div id="lyricsBox" class="hidden" style="margin-top:18px;padding:16px 10px;border-top:1px solid #d9a5ba55;text-align:center"><div style="font-size:.75rem;letter-spacing:.16em;color:#f6d78c;text-transform:uppercase;margin-bottom:10px">La letra de tu canción</div><p id="lyricsCurrent" style="font-family:Georgia,serif;font-size:1.5rem;font-weight:700;line-height:1.5;color:#fff7d6;text-shadow:0 0 8px #f6d78c,0 0 20px rgba(246,215,140,.8);min-height:3em;margin:0;transition:opacity .18s,transform .18s;animation:lyricGlow 1.8s ease-in-out infinite alternate">♪</p><p id="lyricsHint" class="note">La letra irá avanzando mientras suena la canción.</p></div></div>
-<button class="btn" id="downloadGift" type="button">🔒 Descargar mi regalo en video</button><p class="note" id="downloadNotice">La descarga del video se habilitará después de confirmar tu pago.</p><p class="note" id="videoNotice">El video se creará con el fondo, la dedicatoria, la letra y la canción. Formato de descarga: MP4, compatible con celulares y redes sociales.</p><button class="btn secondary" id="downloadMp3" type="button">🔒 Descargar mi canción en MP3</button><p class="note" id="mp3Notice">La descarga del MP3 también se habilitará después de confirmar tu pago.</p><a class="btn secondary" id="sendVoucher" href="https://wa.me/51977974730" target="_blank" rel="noopener">📩 Ya pagué: enviar mi voucher</a><p class="note" id="voucherNote">Se abrirá WhatsApp. Adjunta la captura o foto de tu comprobante en el chat y envíala para que podamos revisarla.</p><button class="btn secondary" id="shareGift">Compartir este regalo</button>
+<button class="btn" id="downloadGift" type="button">🔒 Descargar mi regalo en video</button><p class="note" id="downloadNotice">La descarga del video se habilitará después de confirmar tu pago.</p><p class="note" id="videoNotice">El video se renderiza en el servidor con FFmpeg en Full HD, usando las fotografías seleccionadas y la canción original completa. Formato MP4 vertical 1080 × 1920.</p><button class="btn secondary" id="downloadMp3" type="button">🔒 Descargar mi canción en MP3</button><p class="note" id="mp3Notice">La descarga del MP3 también se habilitará después de confirmar tu pago.</p><a class="btn secondary" id="sendVoucher" href="https://wa.me/51977974730" target="_blank" rel="noopener">📩 Ya pagué: enviar mi voucher</a><p class="note" id="voucherNote">Se abrirá WhatsApp. Adjunta la captura o foto de tu comprobante en el chat y envíala para que podamos revisarla.</p><button class="btn secondary" id="shareGift">Compartir este regalo</button>
 </div>
 </section>
 <section class="card section" id="como-funciona"><div class="section-head"><h2>Un regalo creado desde el corazón</h2><p>Tu historia es la inspiración. Nosotros la convertimos en música.</p></div><div class="grid3"><div class="tile"><div style="font-size:1.8rem">💌</div><span class="stepnum">01 · CUÉNTANOS</span><p>Comparte tu historia, nombres y sentimientos.</p></div><div class="tile"><div style="font-size:1.8rem">🎼</div><span class="stepnum">02 · LA CREAMOS</span><p>Preparamos la canción y coordinamos los detalles contigo.</p></div><div class="tile"><div style="font-size:1.8rem">🎁</div><span class="stepnum">03 · SORPRENDE</span><p>Recibe tu regalo musical para compartirlo.</p></div></div></section><section class="card section" id="paquetes"><div class="section-head"><h2>Elige tu regalo musical</h2><p>Precios iniciales sugeridos. Confirmamos el pedido por WhatsApp.</p></div><div class="grid3"><div class="tile"><span class="stepnum">ESENCIAL</span><h3>Solo audio</h3><div class="price">S/20</div><p>Una canción personalizada en audio MP3. No incluye video ni imágenes.</p><button class="btn full choose" data-package="ESENCIAL — Solo audio — S/20">Elegir</button></div><div class="tile"><span class="stepnum">DETALLE ESPECIAL</span><h3>Video + dedicatoria</h3><div class="price">S/25</div><p>Video con tu canción y una dedicatoria, acompañado de imágenes ilustrativas relacionadas con la canción. No incluye fotos reales.</p><button class="btn full choose" data-package="DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas (sin fotos reales) — S/25">Elegir</button></div><div class="tile"><span class="stepnum">REGALO COMPLETO</span><h3>Video con fotos reales</h3><div class="price">Desde S/30</div><p>Canción personalizada y video que incorpora fotografías reales que tú proporcionas. Precio final según el trabajo.</p><button class="btn full choose" data-package="REGALO COMPLETO — Canción + video con fotos reales — desde S/30">Elegir</button></div></div><p class="note">No se realiza ningún cobro dentro de esta página.</p></section><section class="card section" id="order">
@@ -643,318 +643,46 @@ downloadButton.addEventListener('click',async()=>{
    }
    }
 
-  // Videoclip gratuito: diseño local según la ocasión, sin depender de cuotas de IA.
-  const visualDesign=window.videoDirectorPlan||{theme:theme||'romantic',accent:'#f6d78c',stickers:['heart','sparkle','star'],visualConcept:'Una historia contada con imágenes y música',lyricStyle:'cinematic',transitionStyle:'dissolve',endingPhrase:'Hecho con amor',sceneSequence:[]};
-  window.aiSceneImages=[];
-  downloadNotice.textContent='Preparando tus fondos cinematográficos y la letra sincronizada…';
-  videoStage='grabación vertical Full HD 1080p';
-  const canvas=document.createElement('canvas');canvas.width=1080;canvas.height=1920;const ctx=canvas.getContext('2d');
-  const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
-  const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
-  // Full HD vertical 1080x1920 a 24 FPS; la compresión final se realiza en el servidor.
-  const stream=canvas.captureStream(24);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-  const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
-  const recorderOptions={videoBitsPerSecond:3500000,audioBitsPerSecond:128000};if(mime)recorderOptions.mimeType=mime;
-  const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
-  recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-  let lastDrawAt=0,lastStockTime=-1,stockStallSince=0,useAnimatedFallback=false;
-  const draw=(frameTime=0)=>{
-   if(frameTime-lastDrawAt<41){if(recorder.state==='recording')requestAnimationFrame(draw);return}
-   lastDrawAt=frameTime;
-   // Si el clip externo se congela o deja de avanzar, cambiar al fondo animado integrado.
-   if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){
-    if(Math.abs(stockVideo.currentTime-lastStockTime)>0.015){lastStockTime=stockVideo.currentTime;stockStallSince=frameTime}
-    else if(stockStallSince&&frameTime-stockStallSince>1800)useAnimatedFallback=true;
-   }else if(stockVideo&&!stockVideo.paused){useAnimatedFallback=true}
-   // Lienzo Full HD vertical 1080x1920.
-   ctx.setTransform(canvas.width/720,0,0,canvas.height/1280,0,0);
-   const w=720,h=1280;
-   const motionTime=audioEl.currentTime||0;
-   const progress=audioEl.duration&&Number.isFinite(audioEl.duration)?Math.min(1,motionTime/audioEl.duration):0;
-   const directedScenes=Array.isArray(visualDesign.sceneSequence)?visualDesign.sceneSequence:[];
-   const scenePart=progress<.10?"intro":progress<.48?"verse":progress<.76?"chorus":progress<.91?"bridge":"ending";
-   const activeDirectedScene=directedScenes.find(scene=>scene.part===scenePart)||directedScenes[Math.min(directedScenes.length-1,Math.floor(progress*directedScenes.length))]||null;
-   // Movimiento de cámara suave durante toda la canción para que el video no sea una imagen fija.
-   ctx.save(); // Conserva el encuadre y movimiento natural de los videos.
-   // Cada foto personal recibe un espacio propio repartido durante toda la canción.
-   // Se muestra durante el 42% de su intervalo; el resto conserva el video de biblioteca.
-   const photoCount=customerImages.length;
-   const photoSlot=photoCount?Math.min(photoCount-1,Math.floor((motionTime/Math.max(0.001,audioEl.duration))*photoCount)):-1;
-   const photoProgress=photoCount?((motionTime/Math.max(0.001,audioEl.duration))*photoCount)-photoSlot:1;
-   const showCustomerPhoto=photoCount>0&&photoProgress<1;
-   const aiStills=window.aiSceneImages||[];
-   const aiSceneIndex=aiStills.length?Math.min(aiStills.length-1,Math.floor(progress*aiStills.length)):0;
-   const platformStills=(window.platformVideoImages||[]).map(item=>typeof item==="string"?{url:item}:item);
-   // Prioridad visual: fotos del cliente, biblioteca propia y, solo si no hay recursos propios, escenas IA.
-   const hasOwnLibraryVisuals=platformStills.length>0||libraryVideos.length>0;
-   const showPlatformStill=!photoCount&&platformStills.length>0&&(!stockVideo||Math.floor(motionTime/6)%2===1);
-   const showAiScene=!photoCount&&!hasOwnLibraryVisuals&&aiStills.length>0;
-   const showStill=showCustomerPhoto||showPlatformStill||showAiScene;
-   if(showStill){
-    const item=showCustomerPhoto?customerImages[photoSlot]:showPlatformStill?platformStills[Math.floor(motionTime/6)%platformStills.length]:aiStills[aiSceneIndex];
-    let img=item.image;if(!img){img=new Image();img.crossOrigin='anonymous';img.src=item.url;item.image=img;}
-    if(img.complete&&img.naturalWidth){
-     const iw=img.naturalWidth,ih=img.naturalHeight,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;
-     const photoAlpha=showCustomerPhoto?Math.max(0,Math.min(1,Math.min(photoProgress/0.06,(1-photoProgress)/0.06))):1;
-     ctx.save();ctx.globalAlpha=photoAlpha;
-     ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);ctx.restore();
-    }else if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.drawImage(stockVideo,(w-dw)/2,(h-dh)/2,dw,dh);}
-    else{ctx.fillStyle='#33213f';ctx.fillRect(0,0,w,h);}
-   }else if(stockImage){const iw=stockImage.naturalWidth||w,ih=stockImage.naturalHeight||h,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;ctx.drawImage(stockImage,(w-dw)/2,(h-dh)/2,dw,dh)}else if(stockVideo&&!useAnimatedFallback&&stockVideo.readyState>=2&&!stockVideo.paused&&!stockVideo.ended){
-    const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;
-    const offsetX=(w-dw)/2,offsetY=(h-dh)/2;
-    try{ctx.drawImage(stockVideo,offsetX,offsetY,dw,dh)}catch(e){ctx.fillStyle="#33213f";ctx.fillRect(0,0,w,h)}
-    ctx.fillStyle="rgba(20,8,22,.10)";ctx.fillRect(0,0,w,h);
-   }else{
-    const sky=ctx.createLinearGradient(0,0,0,h);sky.addColorStop(0,'#33213f');sky.addColorStop(.42,'#b77b64');sky.addColorStop(.72,'#e0b17b');sky.addColorStop(1,'#211321');ctx.fillStyle=sky;ctx.fillRect(0,0,w,h);
-   }
-   // Transición cinematográfica breve entre clips: fundido oscuro y entrada suave.
-   if(libraryTransitionAt){
-    const elapsed=performance.now()-libraryTransitionAt;
-    if(elapsed<620){
-     const alpha=elapsed<310?Math.min(.72,elapsed/310*.72):Math.max(0,.72-(elapsed-310)/310*.72);
-     ctx.fillStyle='rgba(10,5,14,'+alpha.toFixed(3)+')';ctx.fillRect(0,0,w,h);
-    }else libraryTransitionAt=0;
-   }
-   if((!stockVideo&&!stockImage)||useAnimatedFallback){
-   const sun=ctx.createRadialGradient(w*(.62+Math.sin(motionTime*.45)*.035),h*(.24+Math.sin(motionTime*.52)*.012),8,w*(.62+Math.sin(motionTime*.45)*.035),h*(.24+Math.sin(motionTime*.52)*.012),290);sun.addColorStop(0,'rgba(255,226,157,.9)');sun.addColorStop(1,'rgba(255,218,150,0)');ctx.fillStyle=sun;ctx.fillRect(0,0,w,h);
-   const mountain=(points,color)=>{ctx.beginPath();ctx.moveTo(points[0][0],points[0][1]);for(let i=1;i<points.length;i++)ctx.lineTo(points[i][0],points[i][1]);ctx.lineTo(w,h*.72);ctx.lineTo(0,h*.72);ctx.closePath();ctx.fillStyle=color;ctx.fill()};
-   mountain([[0,390],[95,280],[170,360],[275,220],[370,355],[490,245],[590,335],[720,205]],'#4b3448');
-   mountain([[0,480],[110,345],[200,425],[310,310],[410,430],[530,315],[650,390],[720,340]],'#70505a');
-   mountain([[0,590],[100,470],[190,535],[300,445],[400,555],[520,430],[620,510],[720,455]],'#8d665f');
-   ctx.fillStyle='#c59a6a';ctx.beginPath();ctx.moveTo(0,630);ctx.quadraticCurveTo(170,530,315,650);ctx.quadraticCurveTo(490,730,720,590);ctx.lineTo(720,920);ctx.lineTo(0,920);ctx.closePath();ctx.fill();
-   ctx.fillStyle='#70513f';ctx.beginPath();ctx.moveTo(0,720);ctx.quadraticCurveTo(200,630,370,740);ctx.quadraticCurveTo(540,830,720,700);ctx.lineTo(720,1020);ctx.lineTo(0,1020);ctx.closePath();ctx.fill();
-   ctx.strokeStyle='rgba(246,215,140,.3)';ctx.lineWidth=3;for(let k=0;k<5;k++){ctx.beginPath();ctx.moveTo(0,700+k*38);ctx.quadraticCurveTo(250,650+k*36,720,710+k*38);ctx.stroke()}
-   // Casa acogedora al pie de las montañas
-   ctx.fillStyle='#4b302b';ctx.fillRect(390,535,150,100);ctx.fillStyle='#2c2028';ctx.beginPath();ctx.moveTo(370,540);ctx.lineTo(455,475);ctx.lineTo(560,540);ctx.closePath();ctx.fill();ctx.fillStyle='#f6d78c';ctx.fillRect(420,565,24,28);ctx.fillRect(482,565,24,28);ctx.fillStyle='#21151d';ctx.fillRect(452,585,27,50);
-   // Siluetas de árboles
-   for(const t of [[95,570,1],[155,600,.75],[330,625,.8],[585,605,.85]]){const x=t[0],y=t[1],s=t[2];ctx.fillStyle='#30252b';ctx.fillRect(x-5*s,y,10*s,75*s);ctx.beginPath();ctx.moveTo(x,y-75*s);ctx.lineTo(x-32*s,y-10*s);ctx.lineTo(x+32*s,y-10*s);ctx.closePath();ctx.fill();ctx.beginPath();ctx.moveTo(x,y-48*s);ctx.lineTo(x-27*s,y+5*s);ctx.lineTo(x+27*s,y+5*s);ctx.closePath();ctx.fill()}
-   }
-   if(false){
-    // Portada sorpresa: no revelar nombre, dedicatoria ni letra durante los primeros 3 segundos.
-    ctx.fillStyle='rgba(20,8,22,.28)';ctx.fillRect(0,0,w,h);
-    ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 25px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,145);
-    ctx.fillStyle='#fff0e8';ctx.font='bold 38px Georgia,serif';ctx.fillText('Una sorpresa',w/2,390);ctx.fillText('especial te espera',w/2,440);
-    ctx.beginPath();ctx.arc(w/2,570,82,0,Math.PI*2);ctx.fillStyle='#d41483';ctx.fill();
-    ctx.beginPath();ctx.moveTo(w/2-18,530);ctx.lineTo(w/2+42,570);ctx.lineTo(w/2-18,610);ctx.closePath();ctx.fillStyle='#ffffff';ctx.fill();
-    ctx.fillStyle='#ffffff';ctx.font='bold 27px sans-serif';ctx.fillText('Prepárate para descubrirla',w/2,730);
-    for(let k=0;k<10;k++){const x=(k*67+35+Math.sin(motionTime*2+k)*12)%w,y=210+(k*113)%650;ctx.fillStyle=k%2?'rgba(242,183,209,.9)':'rgba(246,215,140,.9)';ctx.font='30px sans-serif';ctx.fillText(k%2?'♥':'✦',x,y)}
-   }else{
-   const occasionLabels={cumpleanos:'FELIZ CUMPLEAÑOS',aniversario:'FELIZ ANIVERSARIO',serenata:'UNA SERENATA PARA TI',homenaje:'CON TODO MI CARIÑO',amistad:'CELEBRANDO NUESTRA AMISTAD',romantico:'CON AMOR'};
-   const occasionLabel=occasionLabels[theme]||occasionLabels.romantico;
-   ctx.save();
-   if(theme==='cumpleanos'){
-    // Globos y confeti
-    for(const b of [[95,250,'#f2b7d1'],[625,265,'#f6d78c'],[155,365,'#b9a5ee'],[570,390,'#f08c9e']]){ctx.beginPath();ctx.ellipse(b[0],b[1],25,34,.15,0,Math.PI*2);ctx.fillStyle=b[2];ctx.fill();ctx.strokeStyle='rgba(255,255,255,.65)';ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(b[0],b[1]+34);ctx.quadraticCurveTo(b[0]+10,b[1]+65,b[0]+3,b[1]+83);ctx.strokeStyle=b[2];ctx.stroke()}
-    for(let k=0;k<34;k++){ctx.save();ctx.translate((k*83+31+Math.sin(motionTime*1.7+k)*18+w)%w,((k*137+70+motionTime*(18+k%5)*4)%560));ctx.rotate(k*.65);ctx.fillStyle=['#f6d78c','#f2b7d1','#b9a5ee','#a6e3d0'][k%4];ctx.fillRect(-5,-3,10,6);ctx.restore()}
-   }else if(theme==='aniversario'||theme==='romantico'){
-    // Corazones y destellos románticos
-    for(const p of [[105,310,1],[610,300,.9],[170,450,.65],[555,460,.7]]){const x=p[0]+Math.sin(motionTime*1.45+p[0]) * 9,y=p[1]+Math.sin(motionTime*2.1+p[1]) * 13,s=p[2]*(1+Math.sin(motionTime*2.7+p[0])*.06);ctx.save();ctx.translate(x,y);ctx.scale(s,s);ctx.beginPath();ctx.moveTo(0,22);ctx.bezierCurveTo(-55,-10,-28,-38,0,-12);ctx.bezierCurveTo(28,-38,55,-10,0,22);ctx.fillStyle=theme==='aniversario'?'rgba(246,215,140,.8)':'rgba(242,183,209,.85)';ctx.fill();ctx.restore()}
-    if(theme==='aniversario'){ctx.strokeStyle='#f6d78c';ctx.lineWidth=7;ctx.beginPath();ctx.arc(330,300,28,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(370,300,28,0,Math.PI*2);ctx.stroke()}
-   }else if(theme==='serenata'){
-    // Luna, estrellas y notas musicales
-    ctx.beginPath();ctx.arc(590,255,45,0,Math.PI*2);ctx.fillStyle='rgba(255,236,180,.9)';ctx.fill();ctx.beginPath();ctx.arc(610,238,42,0,Math.PI*2);ctx.fillStyle='#4b3448';ctx.fill();
-    for(let k=0;k<18;k++){const x=(k*97+35+Math.sin(motionTime*1.25+k)*16+w)%w,y=(k*61+85+motionTime*(8+k%4))%500;ctx.fillStyle='rgba(255,232,170,.9)';ctx.font=(k%3===0?'26px':'16px')+' Georgia,serif';ctx.fillText(k%4===0?'♫':'✦',x,y)}
-   }else if(theme==='homenaje'){
-    // Luz suave y flores discretas
-    for(const p of [[100,360],[620,350],[160,470],[560,465]]){ctx.beginPath();ctx.arc(p[0],p[1],26,0,Math.PI*2);ctx.fillStyle='rgba(246,215,140,.13)';ctx.fill();ctx.beginPath();ctx.arc(p[0],p[1],9,0,Math.PI*2);ctx.fillStyle='#f6d78c';ctx.fill()}
-   }else if(theme==='amistad'){
-    for(let k=0;k<14;k++){const x=(k*109+40)%w,y=(k*79+120)%490;ctx.fillStyle=['#f6d78c','#a6e3d0','#f2b7d1'][k%3];ctx.font='25px sans-serif';ctx.fillText(k%2?'✦':'♥',x,y)}
-   }
-   ctx.fillStyle=visualDesign.accent||'#f6d78c';ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillText(occasionLabel,w/2,150);
-   // No mostrar descripciones internas del director si vienen en inglés.
-   const sceneCaption="";
-   if(sceneCaption){ctx.save();ctx.fillStyle='rgba(255,240,232,.92)';ctx.font='italic 20px Georgia,serif';wrapText(ctx,sceneCaption,w/2,190,600,28);ctx.restore();}
-   ctx.restore();
-   const shade=ctx.createLinearGradient(0,440,0,h);shade.addColorStop(0,'rgba(24,10,24,.02)');shade.addColorStop(.48,'rgba(24,10,24,.20)');shade.addColorStop(1,'rgba(14,7,18,.68)');ctx.fillStyle=shade;ctx.fillRect(0,420,w,h-420);
-   ctx.textAlign='center';ctx.fillStyle='#f6d78c';ctx.font='bold 24px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN',w/2,90);
-   // La dedicatoria solo acompaña la introducción y desaparece para dejar protagonismo a la letra.
-   const introAlpha=Math.max(0,Math.min(1,(6.5-motionTime)/1.4));
-   if(introAlpha>0){
-    ctx.save();ctx.globalAlpha=introAlpha;
-    ctx.fillStyle='rgba(12,5,15,.34)';ctx.fillRect(45,650,630,270);
-    ctx.fillStyle='#fff0e8';ctx.font='italic 42px Georgia,serif';ctx.fillText('Para',w/2,700);
-    const title=name||'ti';ctx.fillStyle='#f2b7d1';ctx.font='bold 66px Georgia,serif';wrapText(ctx,title,w/2,775,630,72);
-    ctx.fillStyle='#fff0e8';ctx.font='bold 25px sans-serif';wrapText(ctx,message||'Una canción hecha especialmente para ti',w/2,855,620,36);
-    ctx.restore();
-   }
-   // Cierre breve preparado por Gemini, visible únicamente al final de la canción.
-   if(audioEl.duration&&motionTime>audioEl.duration-4.5){
-    const endingAlpha=Math.min(1,(motionTime-(audioEl.duration-4.5))/.8);
-    ctx.save();ctx.globalAlpha=endingAlpha;ctx.textAlign='center';
-    ctx.fillStyle='rgba(12,5,15,.48)';ctx.fillRect(38,1010,644,150);
-    ctx.fillStyle=visualDesign.accent||'#f6d78c';ctx.font='italic 30px Georgia,serif';
-    wrapText(ctx,visualDesign.endingPhrase||'Hecho con amor',w/2,1070,590,38);
-    ctx.restore();
-   }
-   // Capa de acabado cinematográfico: luz ambiental, partículas y stickers animados.
-   const accent=visualDesign.accent||'#f6d78c';
-   const glowX=w*(.18+.64*(.5+.5*Math.sin(motionTime*.19)));
-   const glowY=h*(.16+.09*Math.sin(motionTime*.31));
-   const ambient=ctx.createRadialGradient(glowX,glowY,4,glowX,glowY,390);
-   ambient.addColorStop(0,accent+'30');ambient.addColorStop(1,'rgba(0,0,0,0)');
-   ctx.fillStyle=ambient;ctx.fillRect(0,0,w,h);
-   // Viñeta suave para dar profundidad sin tapar rostros ni fotografías.
-   const vignette=ctx.createRadialGradient(w/2,h*.48,260,w/2,h*.48,790);
-   vignette.addColorStop(0,'rgba(0,0,0,0)');vignette.addColorStop(1,'rgba(12,4,18,.38)');
-   ctx.fillStyle=vignette;ctx.fillRect(0,0,w,h);
-   const stickerTypes=Array.isArray(visualDesign.stickers)?visualDesign.stickers:['heart','sparkle','star'];
-   const drawSparkle=(x,y,size,alpha)=>{
-    ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.rotate(motionTime*.35);
-    ctx.shadowColor=accent;ctx.shadowBlur=18;ctx.strokeStyle=accent;ctx.fillStyle=accent;ctx.lineWidth=2;
-    ctx.beginPath();ctx.moveTo(0,-size);ctx.quadraticCurveTo(size*.12,-size*.12,size,0);ctx.quadraticCurveTo(size*.12,size*.12,0,size);ctx.quadraticCurveTo(-size*.12,size*.12,-size,0);ctx.quadraticCurveTo(-size*.12,-size*.12,0,-size);ctx.fill();ctx.restore();
-   };
-   const drawHeart=(x,y,size,alpha)=>{
-    ctx.save();ctx.globalAlpha=alpha;ctx.translate(x,y);ctx.scale(size/24,size/24);ctx.shadowColor='#ff8db5';ctx.shadowBlur=18;ctx.fillStyle='#ff9cbe';
-    ctx.beginPath();ctx.moveTo(0,20);ctx.bezierCurveTo(-28,2,-18,-14,0,-4);ctx.bezierCurveTo(18,-14,28,2,0,20);ctx.fill();ctx.restore();
-   };
-   for(let particle=0;particle<13;particle++){
-    const seed=particle*91.73+7;
-    const x=(seed*37.17%680)+20;
-    const y=((seed*19.31-motionTime*(12+particle%4)*8)%(h+80)+h+80)%(h+80)-40;
-    const pulse=.35+.45*(.5+.5*Math.sin(motionTime*2+particle));
-    if(particle%4===0)drawSparkle(x,y,4+(particle%3)*2,pulse);
-    else{ctx.save();ctx.globalAlpha=pulse*.72;ctx.fillStyle=accent;ctx.shadowColor=accent;ctx.shadowBlur=12;ctx.beginPath();ctx.arc(x,y,1.5+(particle%3)*.7,0,Math.PI*2);ctx.fill();ctx.restore();}
-   }
-   for(let sticker=0;sticker<3;sticker++){
-    const type=stickerTypes[sticker%stickerTypes.length];
-    const x=sticker===0?88:sticker===1?630:360;
-    const y=180+sticker*125+Math.sin(motionTime*.8+sticker*2)*16;
-    const alpha=.34+.2*(.5+.5*Math.sin(motionTime*1.4+sticker));
-    if(type==='heart')drawHeart(x,y,22,alpha);
-    else if(type==='sparkle'||type==='star')drawSparkle(x,y,8+sticker*2,alpha);
-    else drawSparkle(x,y,7,alpha);
-   }
-   const activeCueIndex=lyricTimeline.findIndex(cue=>motionTime>=cue.start&&motionTime<cue.end);
-   let idx=activeCueIndex;
-   if(idx<0&&lyricTimeline.length){
-    const previous=lyricTimeline.filter(cue=>motionTime>=cue.end).slice(-1)[0];
-    if(previous&&motionTime-previous.end<0.35)idx=previous.index;
-   }
-   // Karaoke cinematográfico: frase actual con palabra activa dorada y próxima frase tenue.
-   if(idx>=0){
-    const cue=lyricTimeline[idx];
-    const makeWords=(lineCue,lineIndex)=>{
-     if(!lineCue)return [];
-     return Array.isArray(lineCue.words)&&lineCue.words.length?lineCue.words:lyricLines[lineIndex].split(/\s+/).map((text,i,all)=>({text,start:lineCue.start+(lineCue.end-lineCue.start)*i/Math.max(1,all.length),end:lineCue.start+(lineCue.end-lineCue.start)*(i+1)/Math.max(1,all.length)}));
-    };
-    const words=makeWords(cue,idx);
-    const activeWord=words.findIndex(word=>motionTime>=word.start&&motionTime<word.end);
-    const nextWords=makeWords(lyricTimeline[idx+1]||null,idx+1);
-    const wrapWords=(items,font,maxWidth)=>{
-     ctx.font=font;const rows=[];let row=[],rowWidth=0;const space=ctx.measureText(' ').width;
-     items.forEach((word,index)=>{const width=ctx.measureText(word.text).width;const gap=row.length?space:0;if(row.length&&rowWidth+gap+width>maxWidth){rows.push({items:row,width:rowWidth});row=[];rowWidth=0;}const itemGap=row.length?space:0;row.push({word,index,width,gap:itemGap});rowWidth+=itemGap+width;});
-     if(row.length)rows.push({items:row,width:rowWidth});return rows;
-    };
-    const currentRows=wrapWords(words,'bold 31px Georgia,serif',570).slice(0,2);
-    const upcomingRows=wrapWords(nextWords,'bold 22px Georgia,serif',560).slice(0,1);
-    const cardTop=925,cardHeight=245;
-    ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=28;
-    const card=ctx.createLinearGradient(0,cardTop,0,cardTop+cardHeight);card.addColorStop(0,'rgba(13,7,18,.92)');card.addColorStop(1,'rgba(24,12,25,.88)');
-    ctx.fillStyle=card;ctx.beginPath();ctx.roundRect(28,cardTop,664,cardHeight,24);ctx.fill();
-    ctx.shadowBlur=0;ctx.strokeStyle='rgba(246,215,140,.82)';ctx.lineWidth=2;ctx.stroke();
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(246,215,140,.82)';ctx.font='bold 13px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN · KARAOKE',w/2,cardTop+25);
-    currentRows.forEach((line,lineNo)=>{
-     let x=(w-line.width)/2;const y=cardTop+75+lineNo*38;
-     line.items.forEach(item=>{x+=item.gap;const isActive=item.index===activeWord;const isPast=activeWord>=0&&item.index<activeWord;
-      ctx.save();ctx.textAlign='left';ctx.font=isActive?'bold 34px Georgia,serif':'bold 31px Georgia,serif';
-      ctx.fillStyle=isActive?'#ffe18a':isPast?'#f5dfb8':'#fff8ef';ctx.shadowColor=isActive?'#ffc94a':'transparent';ctx.shadowBlur=isActive?24:0;
-      ctx.fillText(item.word.text,x,cardTop+75+lineNo*38);x+=item.width;ctx.restore();
-     });
-    });
-    if(upcomingRows.length){
-     const line=upcomingRows[0];let x=(w-line.width)/2;ctx.save();ctx.font='bold 22px Georgia,serif';ctx.textAlign='left';ctx.fillStyle='rgba(255,245,230,.52)';
-     line.items.forEach(item=>{x+=item.gap;ctx.fillText(item.word.text,x,cardTop+178);x+=item.width;});ctx.restore();
-    }
-    const progress=cue?Math.max(0,Math.min(1,(motionTime-cue.start)/Math.max(.1,cue.end-cue.start))):0;
-    ctx.fillStyle='rgba(255,255,255,.16)';ctx.fillRect(72,cardTop+220,576,3);
-    ctx.fillStyle='#f6d78c';ctx.shadowColor='#f6d78c';ctx.shadowBlur=10;ctx.fillRect(72,cardTop+220,576*progress,3);
-    ctx.restore();
-   }
-   ctx.restore();
-   }
-   if(recorder.state==='recording')requestAnimationFrame(draw)
-  };
-  function wrapText(ctx,text,x,y,maxWidth,lineHeight){const words=String(text).split(' ');let line='',yy=y;for(const word of words){const test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,yy);line=word;yy+=lineHeight}else line=test}if(line)ctx.fillText(line,x,yy)}
-  const chunksPromise=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=()=>reject(new Error('Falló la grabación del video'))});
-  let progressTimer=null, endedHandler=null, timeUpdateHandler=null, timeoutId=null;
-  const waitForEnd=new Promise((resolve,reject)=>{
-   let finished=false;
-   const finish=()=>{if(finished)return;finished=true;downloadNotice.textContent='Finalizando el archivo de video…';resolve()};
-   endedHandler=finish;
-   audioEl.addEventListener('ended',finish,{once:true});
-   timeUpdateHandler=()=>{if(finished)return;if(audioEl.duration&&Number.isFinite(audioEl.duration)){const pct=Math.min(100,Math.floor(audioEl.currentTime/audioEl.duration*100));downloadNotice.textContent='Creando video… '+pct+'% ('+Math.floor(audioEl.currentTime/60)+':'+String(Math.floor(audioEl.currentTime%60)).padStart(2,'0')+' / '+Math.floor(audioEl.duration/60)+':'+String(Math.floor(audioEl.duration%60)).padStart(2,'0')+'). No cierres esta página.';if(audioEl.ended||audioEl.currentTime>=audioEl.duration-0.35)finish()}};
-   audioEl.addEventListener('timeupdate',timeUpdateHandler);
-   const monitorEnd=()=>{if(finished)return;if(audioEl.ended||(Number.isFinite(audioEl.duration)&&audioEl.duration>0&&audioEl.currentTime>=audioEl.duration-0.35)){finish();return}requestAnimationFrame(monitorEnd)};
-   requestAnimationFrame(monitorEnd);
-   timeoutId=setTimeout(()=>{reject(new Error('El audio no confirmó el final de la reproducción. No se cerró el video para evitar crear un archivo incompleto. Vuelve a intentarlo con Chrome abierto y la pantalla encendida.'))},Math.max(300000,(Number(audioEl.duration)||240)*1000+60000));
+  // El montaje se realiza en el servidor con FFmpeg: el celular solo envía la selección de imágenes.
+  videoStage='preparación de imágenes para FFmpeg';
+  downloadNotice.textContent='Preparando las imágenes para el renderizado profesional en el servidor…';
+  const customerPhotos=[];
+  for(const file of (window.customerVideoPhotoFiles||[])){
+   if(!/^image\\/(jpeg|png|webp)$/i.test(file.type||''))continue;
+   if(file.size>6*1024*1024)throw new Error('Una de tus fotografías supera 6 MB. Reduce su tamaño y vuelve a intentarlo.');
+   const data=await new Promise((resolve,reject)=>{
+    const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar una de tus fotografías.'));reader.readAsDataURL(file);
+   });
+   if(data)customerPhotos.push({mime:file.type,data});
+  }
+  const serverAssets=(ownImages||[]).slice(0,12).map(item=>({category:item.category,name:item.name}));
+  if(!serverAssets.length&&!customerPhotos.length)throw new Error('No hay fotografías disponibles en la biblioteca ni fotos personales para crear el video.');
+  videoStage='renderizado Full HD con FFmpeg en el servidor';
+  downloadNotice.textContent='Enviando las imágenes al servidor. Tu celular ya no grabará el video; FFmpeg preparará el MP4 con la canción original…';
+  const renderResponse=await fetch(API_BASE+'/api/render-video',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({path:audio,previewToken:previewLinkToken||'',grantToken:grantToken||'',duration:recordingDuration,assets:serverAssets,customerPhotos})
   });
-  recorder.start(1000);
-  downloadNotice.textContent='Creando video… 0%. Mantén esta página abierta y la pantalla encendida hasta que termine.';
-  try{await audioEl.play();draw();await waitForEnd}finally{
-   if(timeoutId)clearTimeout(timeoutId);
-   if(endedHandler)audioEl.removeEventListener('ended',endedHandler);
-   if(timeUpdateHandler)audioEl.removeEventListener('timeupdate',timeUpdateHandler);
-   if(recorder.state!=='inactive'){downloadNotice.textContent='Cerrando la grabación del video…';recorder.stop();}
+  if(!renderResponse.ok){let detail='No se pudo iniciar el renderizado con FFmpeg.';try{const problem=await renderResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail);}
+  const renderJob=await renderResponse.json();
+  if(!renderJob.jobId)throw new Error('El servidor no devolvió el identificador del renderizado.');
+  const renderStarted=Date.now();let conversionResult=null;
+  while(Date.now()-renderStarted<15*60*1000){
+   downloadNotice.textContent='FFmpeg está creando tu video Full HD y sincronizando la canción original. Mantén esta pantalla abierta…';
+   await new Promise(resolve=>setTimeout(resolve,4000));
+   const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(renderJob.jobId),{cache:'no-store'},3);
+   if(!statusResponse.ok){let detail='No se pudo consultar el renderizado.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail);}
+   const statusData=await statusResponse.json();
+   if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
+   if(statusData.status==='error')throw new Error(statusData.error||'FFmpeg no pudo completar el video.');
   }
-  downloadNotice.textContent='Esperando que el navegador cierre el archivo de video…';
-  await Promise.race([chunksPromise,new Promise((_,reject)=>setTimeout(()=>reject(new Error('El navegador no terminó de cerrar la grabación. Prueba desde Chrome actualizado, sin salir de la página.')),20000))]);
-  downloadNotice.textContent='Grabación cerrada. Preparando el archivo para convertirlo a MP4…';
-  stream.getTracks().forEach(t=>t.stop());
-  await audioCtx.close();
+  if(!conversionResult)throw new Error('El renderizado está tardando más de lo esperado. Inténtalo nuevamente.');
+  downloadNotice.textContent='Video Full HD terminado. Preparando la descarga…';
+  const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
+  if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
+  const mp4Blob=await mp4Response.blob();
+  if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
   URL.revokeObjectURL(audioUrl);
-  if(!chunks.length)throw new Error('El navegador no produjo datos de video. Prueba con Chrome actualizado y mantén la pantalla encendida.');
-  const videoBlob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
-  if(!videoBlob.size)throw new Error('El archivo de video quedó vacío. Inténtalo otra vez en Chrome.');
-  let mp4Blob=null,conversionResult=null;
-  try{
-   videoStage='conversión del video a MP4 en el servidor';
-   downloadNotice.textContent='Convirtiendo el video a MP4 para que puedas reproducirlo en tu celular…';
-   const conversionUrl=API_BASE+'/api/convert-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
-   const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
-   if(!conversionResponse.ok){let detail='No se pudo iniciar la conversión del MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-   const conversionJob=await conversionResponse.json();
-   if(!conversionJob.jobId)throw new Error('El servidor no devolvió el identificador de conversión.');
-   const conversionStarted=Date.now();
-   while(Date.now()-conversionStarted<15*60*1000){
-    downloadNotice.textContent='Convirtiendo el video a MP4 en segundo plano… No cierres esta página.';
-    await new Promise(resolve=>setTimeout(resolve,4000));
-    const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'},3);
-    if(!statusResponse.ok){let detail='No se pudo consultar el estado de la conversión.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-    const statusData=await statusResponse.json();
-    if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
-    if(statusData.status==='error')throw new Error(statusData.error||'Falló la conversión del video.');
-   }
-   if(!conversionResult)throw new Error('La conversión sigue tardando más de lo esperado.');
-   downloadNotice.textContent='MP4 listo. Preparando la descarga y el enlace de sorpresa…';
-   const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
-   if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
-   mp4Blob=await mp4Response.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
-  }catch(conversionError){
-   console.warn('Conversión MP4 fallida; se entregará el WebM original:',conversionError?.message||conversionError);
-   const webmBlob=videoBlob.slice(0,videoBlob.size,'video/webm');
-   if(!webmBlob.size)throw conversionError;
-   const webmName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.webm';
-   const webmUrl=URL.createObjectURL(webmBlob);
-   window.lastGeneratedVideoFile=new File([webmBlob],webmName,{type:'video/webm'});
-   window.lastVideoShareLink='';
-   window.lastSurpriseWebLink='';
-   let webmPreview=document.getElementById('generatedVideoPreview');
-   if(!webmPreview){webmPreview=document.createElement('section');webmPreview.id='generatedVideoPreview';webmPreview.style.cssText='margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(30,10,25,.25)';document.getElementById('videoNotice').after(webmPreview)}
-   webmPreview.replaceChildren();
-   const webmHeading=document.createElement('h3');webmHeading.textContent='Tu video está listo en formato alternativo';webmHeading.style.color='#fff0e8';webmPreview.appendChild(webmHeading);
-   const webmPlayer=document.createElement('video');webmPlayer.controls=true;webmPlayer.playsInline=true;webmPlayer.preload='metadata';webmPlayer.src=webmUrl;webmPlayer.style.cssText='display:block;width:100%;max-height:65vh;border-radius:12px;background:#120811';webmPreview.appendChild(webmPlayer);
-   const webmHelp=document.createElement('p');webmHelp.textContent='La conversión a MP4 no estuvo disponible. Tu videoclip se entrega en WebM, sin volver a procesarlo. Puedes reproducirlo aquí y descargarlo.';webmHelp.style.color='#fff0e8';webmPreview.appendChild(webmHelp);
-   const webmDownload=document.createElement('a');webmDownload.href=webmUrl;webmDownload.download=webmName;webmDownload.textContent='⬇️ Descargar video WebM';webmDownload.className='btn';webmDownload.style.cssText='display:block;text-align:center;margin:10px 0;text-decoration:none';webmPreview.appendChild(webmDownload);
-   const webmShare=document.createElement('button');webmShare.type='button';webmShare.className='btn secondary';webmShare.textContent='📲 Compartir video';webmShare.style.cssText='display:block;width:100%;margin:10px 0';
-   webmShare.addEventListener('click',async()=>{try{const file=new File([webmBlob],webmName,{type:'video/webm'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Tu celular no permite compartir este WebM directamente. Descárgalo y adjúntalo desde WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo compartir automáticamente. Descarga el video y adjúntalo en WhatsApp.'}});
-   webmPreview.appendChild(webmShare);
-   webmDownload.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video WebM. Si no aparece, revisa la carpeta Descargas de tu celular.'});
-   downloadNotice.textContent='¡Videoclip creado! La conversión MP4 falló, pero ya puedes reproducir y descargar el WebM. Tu canción MP3 permanece segura.';
-   videoNotice.textContent='Videoclip vertical listo en WebM como respaldo. Si tu aplicación no lo reproduce, abre el archivo con Chrome o un reproductor compatible.';
-   webmPreview.scrollIntoView({behavior:'smooth',block:'center'});
-   return;
-  }
   downloadNotice.textContent='Preparando tu enlace de sorpresa…';
   videoStage='creación del enlace para compartir';
   window.lastVideoShareLink='';
