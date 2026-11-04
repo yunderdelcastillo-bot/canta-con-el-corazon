@@ -628,16 +628,17 @@ app.post("/api/render-video",async(req,res)=>{
     if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
     const transition=0.55;
     const clipDuration=(duration+transition*(imagePaths.length-1))/imagePaths.length;
-    const frames=Math.max(1,Math.round(clipDuration*24));
+    const fps=30;
+     const frames=Math.max(1,Math.round(clipDuration*fps));
     const args=["-y","-threads","2"];
-    for(const imagePath of imagePaths)args.push("-loop","1","-framerate","24","-t",clipDuration.toFixed(3),"-i",imagePath);
+    for(const imagePath of imagePaths)args.push("-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePath);
     args.push("-i",audioInput);
     const filters=[];
     for(let i=0;i<imagePaths.length;i++){
      const pan=i%2===0
       ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
       :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
-     filters.push("["+i+":v]scale=1188:2112:force_original_aspect_ratio=increase,crop=1188:2112,setsar=1,zoompan=z='1+0.10*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=24,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p[v"+i+"]");
+     filters.push("["+i+":v]scale=1188:2112:force_original_aspect_ratio=increase,crop=1188:2112,setsar=1,zoompan=z='1+0.10*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p[v"+i+"]");
     }
     let videoLabel="v0";
     for(let i=1;i<imagePaths.length;i++){
@@ -670,12 +671,12 @@ app.post("/api/render-video",async(req,res)=>{
      finalVideoLabel="karaoke";
     }
     const output=path.join(dir,"rendered.mp4");
-    args.push("-filter_complex",filters.join(";"),"-map","["+finalVideoLabel+"]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","25","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
-    console.log("Starting cinematic server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:24,zoomMotion:true,fadeTransitionSeconds:transition});
+    args.push("-filter_complex",filters.join(";"),"-map","["+finalVideoLabel+"]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","fast","-crf","22","-maxrate","3200k","-bufsize","6400k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart",output);
+    console.log("Starting cinematic server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:30,videoQuality:"high",zoomMotion:true,fadeTransitionSeconds:transition});
     await execFileAsync(ffmpegPath,args,{timeout:900000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
-    if(mp4.length>45*1024*1024)throw new Error("El MP4 supera el límite de 45 MB de almacenamiento.");
+    if(mp4.length>95*1024*1024)throw new Error("El MP4 supera el límite seguro de 95 MB. Reduce la cantidad de fotografías o la duración e inténtalo nuevamente.");
     const {data:buckets,error:listError}=await db.storage.listBuckets();if(listError)throw listError;
     if(!(buckets||[]).some(b=>b.name==="shared-videos")){
      const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
