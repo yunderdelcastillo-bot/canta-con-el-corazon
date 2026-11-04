@@ -529,8 +529,8 @@ app.post("/api/convert-video",async(req,res)=>{
     await writeFile(input,Buffer.concat(chunks));chunks.length=0;
     await writeFile(audioInput,originalAudioBuffer);
     const conversionStartedAt=Date.now();
-    console.log("Starting asynchronous 720p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:720,targetHeight:1280,fps:30});
-    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30","-c:v","libx264","-threads","2","-preset","veryfast","-crf","28","-maxrate","1100k","-bufsize","2200k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
+    console.log("Starting asynchronous 480p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:480,targetHeight:854,fps:30});
+    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=480:854:force_original_aspect_ratio=increase,crop=480:854,fps=30","-c:v","libx264","-threads","2","-preset","veryfast","-crf","27","-maxrate","650k","-bufsize","1300k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
     if(mp4.length>45*1024*1024)throw new Error("El MP4 pesa "+(mp4.length/1024/1024).toFixed(1)+" MB y supera el límite de 45 MB del almacenamiento. Se redujo la tasa de bits para evitarlo.");
