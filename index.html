@@ -627,21 +627,15 @@ downloadButton.addEventListener('click',async()=>{
    // Limpia líneas vacías o separadores antes de pedir la alineación a Gemini.
    lyricLines=lyricLines.map(line=>String(line||'').replace(/[\\u200B-\\u200D\\uFEFF]/g,'').trim()).filter(line=>line.length>2);
    if(!lyricLines.length)throw new Error('No se encontraron frases válidas en la letra para sincronizar.');
-   // Primero intenta la alineación inteligente; si el servicio gratuito no responde,
-   // usa la distribución temporal local ya integrada para que el videoclip no se bloquee.
-   try{
-    const alignResponse=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})},1);
-    const alignData=await alignResponse.json().catch(()=>({}));
-    if(alignResponse.ok&&Array.isArray(alignData.segments)&&alignData.segments.length===lyricLines.length){
-     lyricTimeline=alignData.segments;
-    }else{
-     console.warn('Alineación inteligente no disponible; se usará sincronización local.');
-     buildLyricTimeline(recordingDuration);
-    }
-   }catch(alignError){
-    console.warn('Alineación inteligente no disponible; se usará sincronización local:',alignError?.message||alignError);
-    buildLyricTimeline(recordingDuration);
+   // El karaoke palabra por palabra requiere marcas reales de Gemini. No sustituirlas
+   // por tiempos aproximados: eso produciría un MP4 con la letra desincronizada.
+   const alignResponse=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:recordingDuration})},1);
+   const alignData=await alignResponse.json().catch(()=>({}));
+   if(!alignResponse.ok)throw new Error(alignData.error||'No se pudo sincronizar cada palabra con la voz. Vuelve a intentarlo más tarde.');
+   if(!Array.isArray(alignData.segments)||alignData.segments.length!==lyricLines.length||!alignData.segments.every(segment=>Array.isArray(segment?.words)&&segment.words.length>0)){
+    throw new Error('Gemini no devolvió marcas de tiempo para todas las palabras. No se generó un video desincronizado.');
    }
+   lyricTimeline=alignData.segments;
    }
 
   // El montaje se realiza en el servidor con FFmpeg: el celular solo envía la selección de imágenes.
