@@ -524,7 +524,7 @@ downloadButton.addEventListener('click',async()=>{
   let stockVideo=null,stockImage=null;
   let libraryVideos=[],libraryVideoIndex=0,libraryVideoSwitching=false,libraryTransitionAt=0;
    const customerImages=[];
-   for(const file of (window.customerVideoPhotoFiles||[])){
+   for(const file of (window.customerVideoPhotoFiles||[]).slice(0,4)){
     const url=URL.createObjectURL(file),img=new Image();img.src=url;
     await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('No se pudo cargar una de tus fotos.'));});
     customerImages.push({image:img,url});
