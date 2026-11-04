@@ -454,7 +454,7 @@ app.post("/api/share-video",async(req,res)=>{
    const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"50MB",allowedMimeTypes:["video/mp4"]});
    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
   }else{
-   const {error:updateError}=await db.storage.updateBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+   const {error:updateError}=await db.storage.updateBucket("shared-videos",{public:true,fileSizeLimit:"5MB",allowedMimeTypes:["video/mp4"]});
    if(updateError)throw updateError;
   }
   const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
@@ -678,14 +678,14 @@ app.post("/api/render-video",async(req,res)=>{
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
-    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","32","-maxrate","180k","-bufsize","360k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
+    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-vf","scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","29","-maxrate","150k","-bufsize","300k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
     await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
-    console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"720x1280",fps:30,videoQuality:"HD",renderMode:"one-image-at-a-time"});
+    console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"480x854",fps:24,videoQuality:"optimized-vertical",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
     console.log("HD MP4 encoded; checking storage size:",{jobId,bytes:mp4.length,megabytes:Number((mp4.length/1024/1024).toFixed(2))});
-    if(mp4.length>20*1024*1024)throw new Error("El MP4 supera el límite seguro de 20 MB. Se requiere una compresión adicional.");
+    if(mp4.length>4.7*1024*1024)throw new Error("El MP4 supera el límite seguro de 4.7 MB para el almacenamiento actual. Se requiere una compresión adicional.");
     const {data:buckets,error:listError}=await db.storage.listBuckets();if(listError)throw listError;
     if(!(buckets||[]).some(b=>b.name==="shared-videos")){
      const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
