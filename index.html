@@ -540,7 +540,7 @@ downloadButton.addEventListener('click',async()=>{
    const mediaPayloads=await Promise.all(mediaResponses.map(response=>response.json()));
    const ownItems=mediaPayloads.flatMap((payload,index)=>(payload.items||[]).filter(x=>x&&x.url).map(x=>({...x,category:x.category||mediaCategories[index]})));
    libraryVideos=ownItems.filter(x=>(x.mimeType||"").startsWith("video/"));
-   const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/"));
+   const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/")||/\.(png|jpe?g|webp|gif)$/i.test(x.name||x.url||""));
    // Groq dirige el montaje: interpreta la letra y elige el orden entre archivos reales disponibles.
    try{
     const directorResponse=await fetch(API_BASE+"/api/video/design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
@@ -561,7 +561,14 @@ downloadButton.addEventListener('click',async()=>{
      }
     }else console.warn("Director audiovisual no disponible; se usará el montaje automático.",directorData.error||"");
    }catch(directorError){console.warn("Director audiovisual no disponible; se usará el montaje automático.",directorError?.message||"");}
-    window.platformVideoImages=ownImages.map(item=>({url:item.url,name:item.name,category:item.category}));
+    // Precarga las imágenes antes de grabar para que el lienzo pueda dibujarlas.
+    const loadedPlatformImages=await Promise.all(ownImages.map(item=>new Promise(resolve=>{
+     const img=new Image();img.crossOrigin="anonymous";
+     img.onload=()=>resolve({...item,image:img});
+     img.onerror=()=>{console.warn("No se pudo cargar una imagen de la biblioteca:",item.name||item.url);resolve(null)};
+     img.src=item.url;
+    })));
+    window.platformVideoImages=loadedPlatformImages.filter(Boolean);
    if(libraryVideos.length){
     // Orden aleatorio por canción, pero cada clip se reproduce antes de repetir la lista.
     if(!window.videoDirectorPlan?.assetOrder?.length)libraryVideos=libraryVideos.slice().sort(()=>Math.random()-.5);
@@ -679,7 +686,7 @@ downloadButton.addEventListener('click',async()=>{
    const aiSceneIndex=aiStills.length?Math.min(aiStills.length-1,Math.floor(progress*aiStills.length)):0;
    const showAiScene=!photoCount&&aiStills.length>0;
    const platformStills=(window.platformVideoImages||[]).map(item=>typeof item==="string"?{url:item}:item);
-   const showPlatformStill=!photoCount&&!showAiScene&&platformStills.length>0&&(!stockVideo||Math.floor(motionTime/8)%2===1);
+   const showPlatformStill=!photoCount&&!showAiScene&&platformStills.length>0&&(!stockVideo||Math.floor(motionTime/6)%2===1);
    const showStill=showCustomerPhoto||showAiScene||showPlatformStill;
    if(showStill){
     const item=showCustomerPhoto?customerImages[photoSlot]:showAiScene?aiStills[aiSceneIndex]:platformStills[Math.floor(motionTime/8)%platformStills.length];
