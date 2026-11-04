@@ -559,6 +559,104 @@ app.post("/api/convert-video",async(req,res)=>{
   if(!res.headersSent)res.status(500).json({error:"No se pudo iniciar el proceso de conversión: "+(e?.message||"error interno")});
  }
 });
+app.post("/api/render-video",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio de video no está configurado."});
+  const audioPath=String(req.body?.path||"");
+  const previewToken=String(req.body?.previewToken||"");
+  const grantToken=String(req.body?.grantToken||"");
+  if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+  const db=admin();
+  const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
+  if(!song)return res.status(404).json({error:"No se encontró la canción."});
+  let allowedDownload=false;
+  if(previewToken&&/^[A-Za-z0-9_-]{40,100}$/.test(previewToken)){
+   const hash=crypto.createHash("sha256").update(previewToken).digest("hex");
+   const {data:link}=await db.from("song_preview_links").select("id").eq("song_id",song.id).eq("token_hash",hash).eq("download_enabled",true).maybeSingle();
+   allowedDownload=!!link;
+  }
+  if(!allowedDownload&&grantToken&&/^[A-Za-z0-9_-]{40,100}$/.test(grantToken)){
+   const hash=crypto.createHash("sha256").update(grantToken).digest("hex");
+   const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
+   allowedDownload=!!grant?.can_video;
+  }
+  const {data:packageGate,error:packageGateError}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();
+  if(packageGateError)return res.status(503).json({error:"No se pudo verificar el permiso de video."});
+  if(!allowedDownload||!packageGate?.can_video)return res.status(403).json({error:"La generación de video no está autorizada para este paquete."});
+  const duration=Number(req.body?.duration);
+  if(!Number.isFinite(duration)||duration<10||duration>600)return res.status(400).json({error:"La duración de la canción no es válida."});
+  const assets=Array.isArray(req.body?.assets)?req.body.assets.slice(0,12):[];
+  const customerPhotos=Array.isArray(req.body?.customerPhotos)?req.body.customerPhotos.slice(0,8):[];
+  if(!assets.length&&!customerPhotos.length)return res.status(400).json({error:"No hay imágenes disponibles para crear el video."});
+  const jobId=crypto.randomUUID();
+  await ensureVideoJobBucket(db);
+  await persistVideoJob(db,jobId,{status:"processing",createdAt:Date.now(),songId:song.id});
+  res.status(202).set("Cache-Control","no-store").json({ok:true,jobId,status:"processing"});
+  setImmediate(async()=>{
+   let dir="";
+   try{
+    const started=Date.now();
+    dir=await mkdtemp(path.join(os.tmpdir(),"cch-render-"));
+    const audioResult=await db.storage.from("songs-audio").download(audioPath);
+    if(audioResult.error||!audioResult.data)throw new Error("No se pudo recuperar la canción original.");
+    const audioInput=path.join(dir,"original.mp3");
+    await writeFile(audioInput,Buffer.from(await audioResult.data.arrayBuffer()));
+    const imagePaths=[];
+    for(const asset of assets){
+     const category=String(asset?.category||""),name=String(asset?.name||"");
+     if(!MEDIA_CATEGORIES.has(category)||!/^[0-9a-f-]{36}\\.(png|jpe?g|webp)$/i.test(name))continue;
+     const result=await db.storage.from(MEDIA_BUCKET).download(category+"/"+name);
+     if(result.error||!result.data){console.warn("No se pudo descargar imagen de biblioteca:",category,name);continue;}
+     const ext=path.extname(name).toLowerCase()||".jpg",dest=path.join(dir,"library-"+imagePaths.length+ext);
+     await writeFile(dest,Buffer.from(await result.data.arrayBuffer()));imagePaths.push(dest);
+    }
+    for(const photo of customerPhotos){
+     const mime=String(photo?.mime||"");
+     const ext=mime==="image/png"?".png":mime==="image/webp"?".webp":".jpg";
+     const encoded=String(photo?.data||"");
+     if(!["image/jpeg","image/png","image/webp"].includes(mime)||!encoded||encoded.length>8*1024*1024)continue;
+     const buffer=Buffer.from(encoded,"base64");
+     if(!buffer.length||buffer.length>6*1024*1024)continue;
+     const dest=path.join(dir,"customer-"+imagePaths.length+ext);
+     await writeFile(dest,buffer);imagePaths.push(dest);
+    }
+    if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
+    const perImage=duration/imagePaths.length;
+    const args=["-y","-threads","2"];
+    for(const imagePath of imagePaths)args.push("-loop","1","-framerate","24","-t",perImage.toFixed(3),"-i",imagePath);
+    args.push("-i",audioInput);
+    const filters=[];
+    for(let i=0;i<imagePaths.length;i++)filters.push("["+i+":v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24,format=yuv420p[v"+i+"]");
+    filters.push(imagePaths.map((_,i)=>"[v"+i+"]").join("")+"concat=n="+imagePaths.length+":v=1:a=0[vout]");
+    const output=path.join(dir,"rendered.mp4");
+    args.push("-filter_complex",filters.join(";"),"-map","[vout]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","27","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart",output);
+    console.log("Starting server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920"});
+    await execFileAsync(ffmpegPath,args,{timeout:900000,maxBuffer:4*1024*1024});
+    const mp4=await readFile(output);
+    if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
+    if(mp4.length>45*1024*1024)throw new Error("El MP4 supera el límite de 45 MB de almacenamiento.");
+    const {data:buckets,error:listError}=await db.storage.listBuckets();if(listError)throw listError;
+    if(!(buckets||[]).some(b=>b.name==="shared-videos")){
+     const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+     if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+    }else{
+     const {error:updateError}=await db.storage.updateBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
+     if(updateError)throw updateError;
+    }
+    const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
+    const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
+    if(uploadError)throw uploadError;
+    const {data:{publicUrl}}=db.storage.from("shared-videos").getPublicUrl(objectPath);
+    console.log("Server-side FFmpeg render complete:",{jobId,megabytes:Number((mp4.length/1024/1024).toFixed(2)),seconds:Number(((Date.now()-started)/1000).toFixed(1))});
+    await persistVideoJob(db,jobId,{status:"done",videoUrl:publicUrl,createdAt:Date.now(),songId:song.id});
+   }catch(error){
+    console.error("Server-side FFmpeg render failed:",jobId,error?.message||error);
+    await persistVideoJob(db,jobId,{status:"error",error:error?.message||"No se pudo generar el video.",createdAt:Date.now(),songId:song.id}).catch(()=>{});
+   }finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
+  });
+ }catch(error){console.error("Server-side render setup failed:",error?.message||error);if(!res.headersSent)res.status(500).json({error:"No se pudo iniciar el renderizado: "+(error?.message||"error interno")});}
+});
+
 app.get("/api/convert-video-status/:jobId",async(req,res)=>{
   const jobId=String(req.params.jobId||"");
   if(!/^[0-9a-f-]{36}$/i.test(jobId))return res.status(400).set("Cache-Control","no-store").json({error:"Identificador de conversión no válido."});
