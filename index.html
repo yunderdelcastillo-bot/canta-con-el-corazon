@@ -523,6 +523,7 @@ downloadButton.addEventListener('click',async()=>{
   videoStage='carga del fondo visual';
   let stockVideo=null,stockImage=null;
   let libraryVideos=[],libraryVideoIndex=0,libraryVideoSwitching=false,libraryTransitionAt=0;
+  let ownImages=[];
    const customerImages=[];
    for(const file of (window.customerVideoPhotoFiles||[]).slice(0,4)){
     const url=URL.createObjectURL(file),img=new Image();img.src=url;
@@ -540,7 +541,7 @@ downloadButton.addEventListener('click',async()=>{
    const mediaPayloads=await Promise.all(mediaResponses.map(response=>response.json()));
    const ownItems=mediaPayloads.flatMap((payload,index)=>(payload.items||[]).filter(x=>x&&x.url).map(x=>({...x,category:x.category||mediaCategories[index]})));
    libraryVideos=ownItems.filter(x=>(x.mimeType||"").startsWith("video/"));
-   const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/")||/\.(png|jpe?g|webp|gif)$/i.test(x.name||x.url||""));
+   ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/")||/\.(png|jpe?g|webp|gif)$/i.test(x.name||x.url||""));
    // Groq dirige el montaje: interpreta la letra y elige el orden entre archivos reales disponibles.
    try{
     const directorResponse=await fetch(API_BASE+"/api/video/design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
