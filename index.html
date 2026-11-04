@@ -669,7 +669,7 @@ downloadButton.addEventListener('click',async()=>{
   const renderJob=await renderResponse.json();
   if(!renderJob.jobId)throw new Error('El servidor no devolvió el identificador del renderizado.');
   const renderStarted=Date.now();let conversionResult=null;
-  while(Date.now()-renderStarted<15*60*1000){
+  while(Date.now()-renderStarted<50*60*1000){
    downloadNotice.textContent='FFmpeg está creando tu video Full HD y sincronizando la canción original. Mantén esta pantalla abierta…';
    await new Promise(resolve=>setTimeout(resolve,4000));
    const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(renderJob.jobId),{cache:'no-store'},3);
@@ -678,7 +678,7 @@ downloadButton.addEventListener('click',async()=>{
    if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
    if(statusData.status==='error')throw new Error(statusData.error||'FFmpeg no pudo completar el video.');
   }
-  if(!conversionResult)throw new Error('El renderizado está tardando más de lo esperado. Inténtalo nuevamente.');
+  if(!conversionResult)throw new Error('El renderizado continúa en el servidor. No cierres esta pantalla; estamos esperando el MP4.');
   downloadNotice.textContent='Video Full HD terminado. Preparando la descarga…';
   const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
   if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
