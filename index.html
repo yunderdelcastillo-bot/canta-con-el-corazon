@@ -815,8 +815,8 @@ downloadButton.addEventListener('click',async()=>{
     else if(type==='sparkle'||type==='star')drawSparkle(x,y,8+sticker*2,alpha);
     else drawSparkle(x,y,7,alpha);
    }
-   const activeCue=lyricTimeline.find(cue=>motionTime>=cue.start&&motionTime<cue.end);
-   let idx=activeCue?activeCue.index:-1;
+   const activeCueIndex=lyricTimeline.findIndex(cue=>motionTime>=cue.start&&motionTime<cue.end);
+   let idx=activeCueIndex;
    if(idx<0&&lyricTimeline.length){
     const previous=lyricTimeline.filter(cue=>motionTime>=cue.end).slice(-1)[0];
     if(previous&&motionTime-previous.end<0.35)idx=previous.index;
@@ -826,7 +826,7 @@ downloadButton.addEventListener('click',async()=>{
     const cue=lyricTimeline[idx];
     const makeWords=(lineCue,lineIndex)=>{
      if(!lineCue)return [];
-     return Array.isArray(lineCue.words)&&lineCue.words.length?lineCue.words:lyricLines[lineIndex].split(/\\s+/).map((text,i,all)=>({text,start:lineCue.start+(lineCue.end-lineCue.start)*i/Math.max(1,all.length),end:lineCue.start+(lineCue.end-lineCue.start)*(i+1)/Math.max(1,all.length)}));
+     return Array.isArray(lineCue.words)&&lineCue.words.length?lineCue.words:lyricLines[lineIndex].split(/\s+/).map((text,i,all)=>({text,start:lineCue.start+(lineCue.end-lineCue.start)*i/Math.max(1,all.length),end:lineCue.start+(lineCue.end-lineCue.start)*(i+1)/Math.max(1,all.length)}));
     };
     const words=makeWords(cue,idx);
     const activeWord=words.findIndex(word=>motionTime>=word.start&&motionTime<word.end);
