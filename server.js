@@ -546,8 +546,9 @@ app.post("/api/convert-video",async(req,res)=>{
      if(updateError)throw updateError;
     }
     const objectPath=song.id+"/"+crypto.randomUUID()+".mp4";
+    console.log("Uploading MP4 to shared-videos:",{jobId,objectPath,megabytes:Number((mp4.length/1024/1024).toFixed(2))});
     const {error:uploadError}=await db.storage.from("shared-videos").upload(objectPath,mp4,{contentType:"video/mp4",upsert:false,cacheControl:"31536000"});
-    if(uploadError)throw uploadError;
+    if(uploadError){console.error("MP4 storage upload failed:",{jobId,megabytes:Number((mp4.length/1024/1024).toFixed(2)),message:uploadError.message,statusCode:uploadError.statusCode});throw uploadError;}
     const {data:{publicUrl}}=db.storage.from("shared-videos").getPublicUrl(objectPath);
     console.log("Asynchronous MP4 conversion ready:",{jobId,megabytes:Number((mp4.length/1024/1024).toFixed(2)),conversionSeconds:Number(((Date.now()-conversionStartedAt)/1000).toFixed(1))});
     await persistVideoJob(db,jobId,{status:"done",videoUrl:publicUrl,createdAt:Date.now(),songId:song.id});
@@ -677,13 +678,14 @@ app.post("/api/render-video",async(req,res)=>{
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
-    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","30","-maxrate","350k","-bufsize","700k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
+    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","32","-maxrate","180k","-bufsize","360k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
     await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
     console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"720x1280",fps:30,videoQuality:"HD",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
-    if(mp4.length>45*1024*1024)throw new Error("El MP4 supera el límite de almacenamiento de 45 MB. Se debe reducir la duración o volver a codificar con menor tasa de bits.");
+    console.log("HD MP4 encoded; checking storage size:",{jobId,bytes:mp4.length,megabytes:Number((mp4.length/1024/1024).toFixed(2))});
+    if(mp4.length>20*1024*1024)throw new Error("El MP4 supera el límite seguro de 20 MB. Se requiere una compresión adicional.");
     const {data:buckets,error:listError}=await db.storage.listBuckets();if(listError)throw listError;
     if(!(buckets||[]).some(b=>b.name==="shared-videos")){
      const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
