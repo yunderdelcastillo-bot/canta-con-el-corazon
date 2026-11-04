@@ -530,7 +530,7 @@ app.post("/api/convert-video",async(req,res)=>{
     await writeFile(audioInput,originalAudioBuffer);
     const conversionStartedAt=Date.now();
     console.log("Starting asynchronous Full HD 1080p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:1080,targetHeight:1920,fps:24});
-    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24","-c:v","libx264","-threads","1","-preset","veryfast","-crf","28","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
+    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24","-c:v","libx264","-threads","1","-preset","veryfast","-crf","28","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","12","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
     console.log("HD render encoding completed:",{jobId,seconds:Number(((Date.now()-started)/1000).toFixed(1))});
     await persistVideoJob(db,jobId,{status:"processing",progress:95,stage:"Guardando el video MP4",createdAt:Date.now(),songId:song.id});
     const mp4=await readFile(output);
@@ -630,10 +630,10 @@ app.post("/api/render-video",async(req,res)=>{
     }
     if(imagePaths.length>3){imagePaths.splice(3);console.log("Video limitado a las primeras 3 fotografías.");}
     if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
-    // Renderizado por etapas: solo una fotografía se procesa a la vez.
-    // Evita mantener 8 flujos Full HD simultáneos en la memoria del plan gratuito.
-    // 20 fps por segmento reduce la carga; el MP4 final se entrega a 30 fps.
-    const fps=20;
+    // Renderizado ligero para cumplir el objetivo de menos de 10 minutos.
+    // Se elimina zoompan (muy costoso en CPU) y se codifica cada foto a 480x854/12 fps.
+    // La canción completa y el karaoke se conservan en el MP4 final.
+    const fps=12;
     const clipDuration=duration/imagePaths.length;
     const segmentPaths=[];
     for(let i=0;i<imagePaths.length;i++){
@@ -642,11 +642,9 @@ app.post("/api/render-video",async(req,res)=>{
      await persistVideoJob(db,jobId,{status:"processing",progress:photoProgress,stage:"Procesando fotografía "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
      console.log("HD render stage started:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length,fps});
      const segment=path.join(dir,"segment-"+String(i).padStart(2,"0")+".mp4");
-     const frames=Math.max(1,Math.round(clipDuration*fps));
-     const pan=i%2===0
-      ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
-      :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
-     const vf="scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=720x1280:fps="+fps+",trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
+     const fade=Math.min(0.35,clipDuration/4);
+     const fadeOut=Math.max(0,clipDuration-fade);
+     const vf="scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1,fps="+fps+",fade=t=in:st=0:d="+fade.toFixed(3)+",fade=t=out:st="+fadeOut.toFixed(3)+":d="+fade.toFixed(3)+",format=yuv420p";
      const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r",String(fps),"-movflags","+faststart",segment];
      await execFileAsync(ffmpegPath,segmentArgs,{timeout:600000,maxBuffer:2*1024*1024});
      segmentPaths.push(segment);
@@ -681,7 +679,7 @@ app.post("/api/render-video",async(req,res)=>{
     }
     args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-vf","scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","29","-maxrate","150k","-bufsize","300k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
     await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
-    console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"480x854",fps:24,videoQuality:"optimized-vertical",renderMode:"one-image-at-a-time"});
+    console.log("Starting optimized fast FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"480x854",fps:12,videoQuality:"fast-vertical",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
