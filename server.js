@@ -1325,7 +1325,7 @@ app.post("/api/orders",async(req,res)=>{
   if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
   let paymentAccessToken=null,paymentReady=false;
   try{
-   const amount=25;
+   const amount=order.urgency.toLowerCase().includes("express")?30:25;
    paymentAccessToken=crypto.randomBytes(32).toString("base64url");
    const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
    const {error:paymentError}=await admin().from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
@@ -1378,7 +1378,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
   const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
-  const expectedTotal=25;
+  const expectedTotal=String(order.urgency||"").toLowerCase().includes("express")?30:25;
   if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe registrado para este pedido no coincide con el precio de su paquete. Revisa la configuración antes de recibir el voucher."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
   if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
