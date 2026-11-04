@@ -1332,7 +1332,8 @@ app.post("/api/orders",async(req,res)=>{
    if(paymentError)throw paymentError;
    paymentReady=true;
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
-  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido recibido",body:"Tienes un nuevo pedido en Canta con el corazón."});
+  const isExpress=order.urgency.toLowerCase().includes("express");
+  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS":"Nuevo pedido recibido",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+(isExpress?"Requiere confirmación de disponibilidad antes de iniciar.":"")});
   orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
@@ -1680,14 +1681,15 @@ app.post("/api/admin/orders/manual-whatsapp",async(req,res)=>{
   if(error)throw error;
   let paymentAccessToken=null,paymentReady=false;
   try{
-   const amount=25;
+   const amount=order.urgency.toLowerCase().includes("express")?30:25;
    paymentAccessToken=crypto.randomBytes(32).toString("base64url");
    const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
    const {error:paymentError}=await db.from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
    if(paymentError)throw paymentError;
    paymentReady=true;
   }catch(paymentError){paymentAccessToken=null;console.error("WhatsApp payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
-  await createSystemNotification(db,{order_id:data.id,event_type:"new_order",audience:"admin",title:"Nuevo pedido por WhatsApp",body:"Tienes un pedido manual de WhatsApp para preparar."});
+  const isExpress=order.urgency.toLowerCase().includes("express");
+  await createSystemNotification(db,{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS por WhatsApp":"Nuevo pedido por WhatsApp",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+(isExpress?"Requiere confirmación de disponibilidad antes de iniciar.":"")});
   orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create WhatsApp manual order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido de WhatsApp."});}
