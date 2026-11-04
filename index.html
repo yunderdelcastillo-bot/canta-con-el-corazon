@@ -648,7 +648,7 @@ downloadButton.addEventListener('click',async()=>{
   downloadNotice.textContent='Preparando las imágenes para el renderizado profesional en el servidor…';
   const customerPhotos=[];
   for(const file of (window.customerVideoPhotoFiles||[])){
-   if(!/^image\\/(jpeg|png|webp)$/i.test(file.type||''))continue;
+   if(!['image/jpeg','image/png','image/webp'].includes(String(file.type||'')))continue;
    if(file.size>6*1024*1024)throw new Error('Una de tus fotografías supera 6 MB. Reduce su tamaño y vuelve a intentarlo.');
    const data=await new Promise((resolve,reject)=>{
     const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');reader.onerror=()=>reject(new Error('No se pudo preparar una de tus fotografías.'));reader.readAsDataURL(file);
