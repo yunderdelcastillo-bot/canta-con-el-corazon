@@ -639,7 +639,7 @@ app.post("/api/render-video",async(req,res)=>{
       :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
      const vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
      const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r","30","-movflags","+faststart",segment];
-     await execFileAsync(ffmpegPath,segmentArgs,{timeout:300000,maxBuffer:2*1024*1024});
+     await execFileAsync(ffmpegPath,segmentArgs,{timeout:600000,maxBuffer:2*1024*1024});
      segmentPaths.push(segment);
     }
     const concatPath=path.join(dir,"segments.txt");
@@ -670,7 +670,7 @@ app.post("/api/render-video",async(req,res)=>{
     }
     args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","fast","-crf","22","-maxrate","3200k","-bufsize","6400k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart",output);
     console.log("Starting staged Full HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:30,videoQuality:"high",renderMode:"one-image-at-a-time"});
-    await execFileAsync(ffmpegPath,args,{timeout:900000,maxBuffer:4*1024*1024});
+    await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
     if(mp4.length>95*1024*1024)throw new Error("El MP4 supera el límite seguro de 95 MB. Reduce la cantidad de fotografías o la duración e inténtalo nuevamente.");
@@ -702,7 +702,7 @@ app.get("/api/convert-video-status/:jobId",async(req,res)=>{
   try{
    const job=await readVideoJob(admin(),jobId);
    if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
-   if(Date.now()-job.createdAt>30*60*1000)return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});
+   if(Date.now()-job.createdAt>60*60*1000)return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});
    res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
   }catch(e){console.error("Video conversion status lookup:",e?.message||e);res.status(503).set("Cache-Control","no-store").json({error:"No se pudo consultar el estado de la conversión."});}
 });
