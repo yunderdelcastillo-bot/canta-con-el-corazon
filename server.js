@@ -714,12 +714,34 @@ const lyricAlignLimits=new Map();
 function normalizeAlignWord(value){
  return String(value||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^\p{L}\p{N}]/gu,"");
 }
+function alignCharDistance(a,b){
+ const left=String(a||""),right=String(b||"");
+ if(left===right)return 0;
+ if(!left.length||!right.length)return Math.max(left.length,right.length);
+ const prev=Array.from({length:right.length+1},(_,i)=>i);
+ for(let i=1;i<=left.length;i++){
+  let diagonal=prev[0];prev[0]=i;
+  for(let j=1;j<=right.length;j++){
+   const above=prev[j],cost=left[i-1]===right[j-1]?0:1;
+   prev[j]=Math.min(prev[j]+1,prev[j-1]+1,diagonal+cost);diagonal=above;
+  }
+ }
+ return prev[right.length];
+}
+function alignWordCost(a,b){
+ if(a===b)return 0;
+ const longest=Math.max(a.length,b.length,1);
+ const similarity=1-alignCharDistance(a,b)/longest;
+ if(similarity>=.68)return .18;
+ if(similarity>=.52)return .42;
+ return 1;
+}
 function tokenEditDistance(a,b){
  const prev=Array.from({length:b.length+1},(_,i)=>i);
  for(let i=1;i<=a.length;i++){
   let diagonal=prev[0];prev[0]=i;
   for(let j=1;j<=b.length;j++){
-   const above=prev[j],cost=a[i-1]===b[j-1]?0:1;
+   const above=prev[j],cost=alignWordCost(a[i-1],b[j-1]);
    prev[j]=Math.min(prev[j]+1,prev[j-1]+1,diagonal+cost);diagonal=above;
   }
  }
@@ -977,8 +999,8 @@ app.post("/api/lyrics/align",async(req,res)=>{
    const expected=lyrics[lineIndex].split(/\s+/).map(normalizeAlignWord).filter(Boolean);
    if(!expected.length)throw new Error("Una línea de la letra está vacía.");
    let best=null;
-   const minLength=Math.max(1,Math.floor(expected.length*.65));
-   const maxLength=Math.min(words.length-cursor,expected.length+Math.max(3,Math.ceil(expected.length*.4)));
+   const minLength=Math.max(1,Math.floor(expected.length*.45));
+   const maxLength=Math.min(words.length-cursor,expected.length+Math.max(5,Math.ceil(expected.length*.65)));
    for(let from=cursor;from<words.length;from++){
     for(let size=minLength;size<=maxLength&&from+size<=words.length;size++){
      const heard=words.slice(from,from+size).map(w=>w.normalized);
@@ -988,7 +1010,7 @@ app.post("/api/lyrics/align",async(req,res)=>{
     }
     if(best&&best.score===0)break;
    }
-   if(!best||best.score>0.48)throw new Error("No se pudo reconocer con suficiente precisión la frase "+(lineIndex+1)+": "+lyrics[lineIndex]);
+   if(!best||best.score>0.62)throw new Error("No se pudo reconocer con suficiente precisión la frase "+(lineIndex+1)+": "+lyrics[lineIndex]);
    const matchedWords=words.slice(best.from,best.from+best.size);
    const first=matchedWords[0],last=matchedWords[matchedWords.length-1];
    // Alinear palabra por palabra dentro de la frase, conservando exactamente el texto original.
@@ -997,12 +1019,12 @@ app.post("/api/lyrics/align",async(req,res)=>{
    for(let i=0;i<=n;i++)dp[i][0]=i;
    for(let j=0;j<=m;j++)dp[0][j]=j;
    for(let i=1;i<=n;i++)for(let j=1;j<=m;j++){
-    const cost=expected[i-1]===matchedWords[j-1].normalized?0:1;
+    const cost=alignWordCost(expected[i-1],matchedWords[j-1].normalized);
     dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);
    }
    const mapping=Array(n).fill(null);let i=n,j=m;
    while(i>0||j>0){
-    if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+(expected[i-1]===matchedWords[j-1].normalized?0:1)){
+    if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+alignWordCost(expected[i-1],matchedWords[j-1].normalized)){
      mapping[i-1]=matchedWords[j-1];i--;j--;
     }else if(i>0&&dp[i][j]===dp[i-1][j]+1){i--;}
     else if(j>0){j--;}else break;
