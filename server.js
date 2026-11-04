@@ -91,7 +91,7 @@ app.get("/api/media/public",async(req,res)=>{
   if(!MEDIA_CATEGORIES.has(category))return res.status(400).json({error:"Categoría no válida."});
   const db=admin();const {data,error}=await db.storage.from(MEDIA_BUCKET).list(category,{limit:100,sortBy:{column:"created_at",order:"desc"}});
   if(error){if(/not found|does not exist/i.test(error.message||""))return res.json({items:[]});throw error;}
-  const items=(data||[]).filter(x=>x.name&&!x.name.startsWith(".")).map(x=>{const path=category+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);return {name:x.name,url:publicUrl,mimeType:x.metadata?.mimetype||"",createdAt:x.created_at||null};});
+  const items=(data||[]).filter(x=>x.name&&!x.name.startsWith(".")).map(x=>{const path=category+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);return {name:x.name,url:publicUrl,mimeType:x.metadata?.mimetype||x.metadata?.mimeType||({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",mp4:"video/mp4",webm:"video/webm",mov:"video/quicktime"}[(String(x.name).split(".").pop()||"").toLowerCase()]||""),createdAt:x.created_at||null};});
   res.set("Cache-Control","public, max-age=60").json({items});
  }catch(e){console.error("media public list:",e?.message||e);res.status(500).json({error:"No se pudo cargar la biblioteca multimedia."});}
 });
@@ -439,7 +439,7 @@ app.post("/api/share-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
-  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
+  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=allowedDownload&&!!packageGate?.can_video;
   if(!allowedDownload)return res.status(403).json({error:"No hay autorización vigente para crear el enlace compartible."});
   const chunks=[];let total=0;const maxBytes=100*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"El MP4 supera el límite de 100 MB."});chunks.push(chunk);}
@@ -462,6 +462,24 @@ app.post("/api/share-video",async(req,res)=>{
 });
 
 const videoConversionJobs=new Map();
+const VIDEO_JOB_BUCKET="video-conversion-jobs";
+async function ensureVideoJobBucket(db){
+ const {data:buckets,error}=await db.storage.listBuckets();if(error)throw error;
+ if(!(buckets||[]).some(b=>b.name===VIDEO_JOB_BUCKET)){
+  const {error:createError}=await db.storage.createBucket(VIDEO_JOB_BUCKET,{public:false,fileSizeLimit:"1MB",allowedMimeTypes:["application/json"]});
+  if(createError&&!/already exists/i.test(createError.message||""))throw createError;
+ }
+}
+async function persistVideoJob(db,jobId,job){
+ const {error}=await db.storage.from(VIDEO_JOB_BUCKET).upload(jobId+".json",Buffer.from(JSON.stringify(job)),{contentType:"application/json",upsert:true,cacheControl:"60"});
+ if(error)throw error;
+ videoConversionJobs.set(jobId,job);
+}
+async function readVideoJob(db,jobId){
+ const {data,error}=await db.storage.from(VIDEO_JOB_BUCKET).download(jobId+".json");
+ if(error||!data)return videoConversionJobs.get(jobId)||null;
+ try{return JSON.parse(await data.text())}catch{return videoConversionJobs.get(jobId)||null}
+}
 app.post("/api/convert-video",async(req,res)=>{
  console.log("MP4 conversion job received; origin:",req.headers.origin||"(none)");
  try{
@@ -490,7 +508,8 @@ app.post("/api/convert-video",async(req,res)=>{
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
   const jobId=crypto.randomUUID();
-  videoConversionJobs.set(jobId,{status:"processing",createdAt:Date.now(),songId:song.id});
+  await ensureVideoJobBucket(db);
+   await persistVideoJob(db,jobId,{status:"processing",createdAt:Date.now(),songId:song.id});
   res.status(202).set("Cache-Control","no-store").json({ok:true,jobId,status:"processing"});
   setImmediate(async()=>{
    let dir="";
@@ -504,8 +523,8 @@ app.post("/api/convert-video",async(req,res)=>{
     await writeFile(input,Buffer.concat(chunks));chunks.length=0;
     await writeFile(audioInput,originalAudioBuffer);
     const conversionStartedAt=Date.now();
-    console.log("Starting asynchronous Full HD MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:1080,targetHeight:1920,fps:30});
-    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30","-c:v","libx264","-threads","2","-preset","medium","-crf","21","-maxrate","4M","-bufsize","8M","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
+    console.log("Starting asynchronous 720p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:720,targetHeight:1280,fps:30});
+    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,fps=30","-c:v","libx264","-threads","2","-preset","veryfast","-crf","23","-maxrate","2M","-bufsize","4M","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
     if(mp4.length>100*1024*1024)throw new Error("El MP4 supera el límite seguro de 100 MB ("+(mp4.length/1024/1024).toFixed(1)+" MB).");
@@ -523,10 +542,10 @@ app.post("/api/convert-video",async(req,res)=>{
     if(uploadError)throw uploadError;
     const {data:{publicUrl}}=db.storage.from("shared-videos").getPublicUrl(objectPath);
     console.log("Asynchronous MP4 conversion ready:",{jobId,megabytes:Number((mp4.length/1024/1024).toFixed(2)),conversionSeconds:Number(((Date.now()-conversionStartedAt)/1000).toFixed(1))});
-    videoConversionJobs.set(jobId,{status:"done",videoUrl:publicUrl,createdAt:Date.now(),songId:song.id});
+    await persistVideoJob(db,jobId,{status:"done",videoUrl:publicUrl,createdAt:Date.now(),songId:song.id});
    }catch(e){
     console.error("Asynchronous video conversion failed:",jobId,e?.message||e);
-    videoConversionJobs.set(jobId,{status:"error",error:e?.message||"No se pudo preparar el MP4.",createdAt:Date.now(),songId:song.id});
+    await persistVideoJob(db,jobId,{status:"error",error:e?.message||"No se pudo preparar el MP4.",createdAt:Date.now(),songId:song.id}).catch(saveError=>console.error("Could not persist conversion failure:",saveError?.message||saveError));
    }finally{if(dir)await rm(dir,{recursive:true,force:true}).catch(()=>{});}
   });
  }catch(e){
@@ -534,13 +553,17 @@ app.post("/api/convert-video",async(req,res)=>{
   if(!res.headersSent)res.status(500).json({error:"No se pudo iniciar el proceso de conversión: "+(e?.message||"error interno")});
  }
 });
-app.get("/api/convert-video-status/:jobId",(req,res)=>{
- const job=videoConversionJobs.get(String(req.params.jobId||""));
- if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
- if(Date.now()-job.createdAt>30*60*1000){videoConversionJobs.delete(String(req.params.jobId));return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});}
- res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
+app.get("/api/convert-video-status/:jobId",async(req,res)=>{
+  const jobId=String(req.params.jobId||"");
+  if(!/^[0-9a-f-]{36}$/i.test(jobId))return res.status(400).set("Cache-Control","no-store").json({error:"Identificador de conversión no válido."});
+  try{
+   const job=await readVideoJob(admin(),jobId);
+   if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
+   if(Date.now()-job.createdAt>30*60*1000)return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});
+   res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
+  }catch(e){console.error("Video conversion status lookup:",e?.message||e);res.status(503).set("Cache-Control","no-store").json({error:"No se pudo consultar el estado de la conversión."});}
 });
-
+ 
 // Sincronización real: Gemini 3.5 Transcribe entrega marcas de tiempo por palabra.
 const lyricAlignLimits=new Map();
 function normalizeAlignWord(value){
