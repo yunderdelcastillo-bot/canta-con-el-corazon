@@ -821,7 +821,7 @@ downloadButton.addEventListener('click',async()=>{
     const nextWords=makeWords(lyricTimeline[idx+1]||null,idx+1);
     const wrapWords=(items,font,maxWidth)=>{
      ctx.font=font;const rows=[];let row=[],rowWidth=0;const space=ctx.measureText(' ').width;
-     items.forEach(word=>{const width=ctx.measureText(word.text).width;const gap=row.length?space:0;if(row.length&&rowWidth+gap+width>maxWidth){rows.push({items:row,width:rowWidth});row=[];rowWidth=0;}const itemGap=row.length?space:0;row.push({word,width,gap:itemGap});rowWidth+=itemGap+width;});
+     items.forEach((word,index)=>{const width=ctx.measureText(word.text).width;const gap=row.length?space:0;if(row.length&&rowWidth+gap+width>maxWidth){rows.push({items:row,width:rowWidth});row=[];rowWidth=0;}const itemGap=row.length?space:0;row.push({word,index,width,gap:itemGap});rowWidth+=itemGap+width;});
      if(row.length)rows.push({items:row,width:rowWidth});return rows;
     };
     const currentRows=wrapWords(words,'bold 31px Georgia,serif',570).slice(0,2);
@@ -834,7 +834,7 @@ downloadButton.addEventListener('click',async()=>{
     ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='rgba(246,215,140,.82)';ctx.font='bold 13px sans-serif';ctx.fillText('CANTA CON EL CORAZÓN · KARAOKE',w/2,cardTop+25);
     currentRows.forEach((line,lineNo)=>{
      let x=(w-line.width)/2;const y=cardTop+75+lineNo*38;
-     line.items.forEach((item,i)=>{x+=item.gap;const isActive=i===activeWord;const isPast=activeWord>=0&&i<activeWord;
+     line.items.forEach(item=>{x+=item.gap;const isActive=item.index===activeWord;const isPast=activeWord>=0&&item.index<activeWord;
       ctx.save();ctx.textAlign='left';ctx.font=isActive?'bold 34px Georgia,serif':'bold 31px Georgia,serif';
       ctx.fillStyle=isActive?'#ffe18a':isPast?'#f5dfb8':'#fff8ef';ctx.shadowColor=isActive?'#ffc94a':'transparent';ctx.shadowBlur=isActive?24:0;
       ctx.fillText(item.word.text,x,cardTop+75+lineNo*38);x+=item.width;ctx.restore();
