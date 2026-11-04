@@ -409,11 +409,10 @@ app.post("/api/grants",async(req,res)=>{
   const {data:song,error}=await db.from("songs").select("id,owner_id,package_key,package_price").eq("id",songId).maybeSingle();
   if(error||!song||song.owner_id!==user.id)return res.status(403).json({error:"No tienes permiso para cambiar los beneficios de esta canción."});
   // La opción de paquete guardada en la canción es la fuente principal; el precio solo recupera registros antiguos sin paquete.
-  const savedPackageKey=["esencial","detalle","completo"].includes(song.package_key)?song.package_key:null;
-  const packagePrice=Number(song.package_price)||({esencial:20,detalle:25,completo:30}[savedPackageKey||"esencial"]);
-  const packageKey=savedPackageKey||(packagePrice>=30?"completo":packagePrice>=25?"detalle":"esencial");
-  const canMp3=enabled;
-  const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
+  const packageKey="esencial";
+   const packagePrice=25;
+   const canMp3=enabled;
+   const canVideo=false;
   const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:canMp3,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
   if(permissionError){console.error("Package permission save failed:",permissionError.message);return res.status(500).json({error:"No se pudo cambiar el permiso: "+permissionError.message});}
   res.set("Cache-Control","no-store").json({ok:true,songId:song.id,enabled,packageKey,packagePrice,canMp3,canVideo});
@@ -1326,9 +1325,7 @@ app.post("/api/orders",async(req,res)=>{
   if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
   let paymentAccessToken=null,paymentReady=false;
   try{
-   const rawPackage=String(order.package_name||"").toLowerCase();
-   const baseAmount=rawPackage.includes("completo")||rawPackage.includes("s/30")||rawPackage.includes("30")?30:rawPackage.includes("detalle")||rawPackage.includes("s/25")||rawPackage.includes("25")?25:20;
-   const amount=baseAmount+(/express|expres|30 minutos|media hora/.test(String(order.urgency||"").toLowerCase())?5:0);
+   const amount=25;
    paymentAccessToken=crypto.randomBytes(32).toString("base64url");
    const tokenHash=crypto.createHash("sha256").update(paymentAccessToken).digest("hex");
    const {error:paymentError}=await admin().from("payment_submissions").insert({order_id:data.id,access_token_hash:tokenHash,amount,package_name:order.package_name||"",payment_status:"pending",provider:"manual"});
@@ -1381,9 +1378,7 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
   const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
-  const packageLabel=String(payment.package_name||order.package_name||"").toLowerCase();
-  const expectedBase=packageLabel.includes("completo")||packageLabel.includes("30")?30:packageLabel.includes("detalle")||packageLabel.includes("25")?25:20;
-  const expectedTotal=expectedBase+(/express|expres|30 minutos|media hora/.test(String(order.urgency||"").toLowerCase())?5:0);
+  const expectedTotal=25;
   if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe registrado para este pedido no coincide con el precio de su paquete. Revisa la configuración antes de recibir el voucher."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
   if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
@@ -1751,7 +1746,7 @@ app.post("/api/admin/orders/:id/simulate-approval",async(req,res)=>{
   const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,amount,package_name,payment_status,voucher_path").eq("order_id",id).maybeSingle();
   if(paymentError)throw paymentError;
   const isExactTest=String(order.buyer||"").trim().toLowerCase()==="yunder"&&String(order.recipient||"").trim().toLowerCase()==="diana"&&String(order.occasion||"").toLowerCase().includes("sorpresa")&&Number(payment?.amount)===30;
-  if(!isExactTest)return res.status(403).json({error:"La simulación está limitada al pedido de prueba Yunder/Diana, S/30 y ocasión Sorpresa."});
+  if(!isExactTest)return res.status(403).json({error:"La simulación está limitada al pedido de prueba Yunder/Diana, S/25 y ocasión Sorpresa."});
   if(!payment?.voucher_path)return res.status(409).json({error:"Este pedido no tiene un voucher guardado; no se puede simular el recorrido completo."});
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya figura aprobado."});
   let songId=String(req.body?.songId||"");
