@@ -427,7 +427,8 @@ app.post("/api/share-video",async(req,res)=>{
   const audioPath=String(req.query.path||"");
   const previewToken=String(req.query.previewToken||"");
   const grantToken=String(req.query.grantToken||"");
-  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+  const audioParts=audioPath.split("/");
+  if(audioParts.length!==2||!/^[0-9a-f-]{36}$/i.test(audioParts[0])||!/^[0-9a-f-]{36}\\.mp3$/i.test(audioParts[1]))return res.status(400).json({error:"Ruta de canción no válida."});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
   if(!song)return res.status(404).json({error:"No se encontró la canción."});
@@ -604,7 +605,7 @@ app.post("/api/render-video",async(req,res)=>{
     const imagePaths=[];
     for(const asset of assets){
      const category=String(asset?.category||""),name=String(asset?.name||"");
-     if(!MEDIA_CATEGORIES.has(category)||!/^[0-9a-f-]{36}\\.(png|jpe?g|webp)$/i.test(name))continue;
+     if(!MEDIA_CATEGORIES.has(category)||!/^[0-9a-f-]{36}$/i.test(name.split(".")[0])||!["png","jpg","jpeg","webp"].includes(name.split(".").pop().toLowerCase()))continue;
      const result=await db.storage.from(MEDIA_BUCKET).download(category+"/"+name);
      if(result.error||!result.data){console.warn("No se pudo descargar imagen de biblioteca:",category,name);continue;}
      const ext=path.extname(name).toLowerCase()||".jpg",dest=path.join(dir,"library-"+imagePaths.length+ext);
