@@ -593,8 +593,8 @@ app.post("/api/render-video",async(req,res)=>{
   const karaokeLines=Array.isArray(req.body?.lyrics)?req.body.lyrics.slice(0,100).map(x=>String(x||"").slice(0,500)):[];
   const hasWordKaraoke=karaokeLines.length>0&&lyricSegments.length===karaokeLines.length&&lyricSegments.every(segment=>segment&&Array.isArray(segment.words)&&segment.words.length>0&&segment.words.every(w=>Number.isFinite(Number(w.start))&&Number.isFinite(Number(w.end))&&Number(w.end)>Number(w.start)));
   if(karaokeLines.length&&!hasWordKaraoke)return res.status(400).json({error:"La letra todavía no tiene sincronización palabra por palabra. Vuelve a intentar la sincronización antes de crear el videoclip."});
-  const assets=Array.isArray(req.body?.assets)?req.body.assets.slice(0,12):[];
-  const customerPhotos=Array.isArray(req.body?.customerPhotos)?req.body.customerPhotos.slice(0,8):[];
+  const assets=Array.isArray(req.body?.assets)?req.body.assets.slice(0,3):[];
+  const customerPhotos=Array.isArray(req.body?.customerPhotos)?req.body.customerPhotos.slice(0,3):[];
   if(!assets.length&&!customerPhotos.length)return res.status(400).json({error:"No hay imágenes disponibles para crear el video."});
   const jobId=crypto.randomUUID();
   await ensureVideoJobBucket(db);
@@ -628,6 +628,7 @@ app.post("/api/render-video",async(req,res)=>{
      const dest=path.join(dir,"customer-"+imagePaths.length+ext);
      await writeFile(dest,buffer);imagePaths.push(dest);
     }
+    if(imagePaths.length>3){imagePaths.splice(3);console.log("Video limitado a las primeras 3 fotografías.");}
     if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
     // Renderizado por etapas: solo una fotografía se procesa a la vez.
     // Evita mantener 8 flujos Full HD simultáneos en la memoria del plan gratuito.
