@@ -561,7 +561,7 @@ downloadButton.addEventListener('click',async()=>{
     window.platformVideoImages=ownImages.map(item=>item.url);
    if(libraryVideos.length){
     // Orden aleatorio por canción, pero cada clip se reproduce antes de repetir la lista.
-    libraryVideos=libraryVideos.slice().sort(()=>Math.random()-.5);
+    if(!window.videoDirectorPlan?.assetOrder?.length)libraryVideos=libraryVideos.slice().sort(()=>Math.random()-.5);
     stockVideo=document.createElement("video");
     stockVideo.crossOrigin="anonymous";stockVideo.muted=true;stockVideo.loop=false;
     stockVideo.playsInline=true;stockVideo.preload="auto";
