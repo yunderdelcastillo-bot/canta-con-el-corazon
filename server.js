@@ -648,7 +648,7 @@ app.post("/api/render-video",async(req,res)=>{
     }
     let finalVideoLabel=videoLabel;
     if(hasWordKaraoke){
-     const assTime=value=>{const cs=Math.max(0,Math.round(Number(value)*100));const h=Math.floor(cs/360000),m=Math.floor((cs%360000)/6000),s=Math.floor((cs%6000)/100),c=cs%100;return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0);};
+     const assTime=value=>{const cs=Math.max(0,Math.round(Number(value)*100));const h=Math.floor(cs/360000),m=Math.floor((cs%360000)/6000),s=Math.floor((cs%6000)/100),c=cs%100;return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0")};
      const assEscape=value=>String(value||"").replace(/\\/g,"\\\\").replace(/{/g,"\\{").replace(/}/g,"\\}").replace(/\r?\n/g," ");
      const ass=["[Script Info]","ScriptType: v4.00+","PlayResX: 1080","PlayResY: 1920","WrapStyle: 2","ScaledBorderAndShadow: yes","","[V4+ Styles]","Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding","Style: Karaoke,Arial,52,&H00FFFFFF,&H0000D7FF,&H00101010,&H70000000,1,0,0,0,100,100,1,0,1,3,1,2,70,70,180,1","","[Events]","Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text"];
      for(let li=0;li<lyricSegments.length;li++){
