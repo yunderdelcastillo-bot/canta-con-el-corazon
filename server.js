@@ -88,10 +88,14 @@ async function ensureMediaBucket(){
 app.get("/api/media/public",async(req,res)=>{
  try{
   const category=String(req.query.category||"");
-  if(!MEDIA_CATEGORIES.has(category))return res.status(400).json({error:"Categoría no válida."});
-  const db=admin();const {data,error}=await db.storage.from(MEDIA_BUCKET).list(category,{limit:100,sortBy:{column:"created_at",order:"desc"}});
-  if(error){if(/not found|does not exist/i.test(error.message||""))return res.json({items:[]});throw error;}
-  const items=(data||[]).filter(x=>x.name&&!x.name.startsWith(".")).map(x=>{const path=category+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);return {name:x.name,url:publicUrl,mimeType:x.metadata?.mimetype||x.metadata?.mimeType||({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",mp4:"video/mp4",webm:"video/webm",mov:"video/quicktime"}[(String(x.name).split(".").pop()||"").toLowerCase()]||""),createdAt:x.created_at||null};});
+  if(category!=="all"&&!MEDIA_CATEGORIES.has(category))return res.status(400).json({error:"Categoría no válida."});
+  const db=admin(),categories=category==="all"?Array.from(MEDIA_CATEGORIES):[category],items=[];
+  for(const folder of categories){
+   const {data,error}=await db.storage.from(MEDIA_BUCKET).list(folder,{limit:100,sortBy:{column:"created_at",order:"desc"}});
+   if(error){if(/not found|does not exist/i.test(error.message||""))continue;throw error;}
+   for(const x of data||[]){if(!x.name||x.name.startsWith("."))continue;const path=folder+"/"+x.name;const {data:{publicUrl}}=db.storage.from(MEDIA_BUCKET).getPublicUrl(path);const mimeType=x.metadata?.mimetype||x.metadata?.mimeType||({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp",mp4:"video/mp4",webm:"video/webm",mov:"video/quicktime"}[(String(x.name).split(".").pop()||"").toLowerCase()]||"");items.push({name:x.name,url:publicUrl,mimeType,category:folder,createdAt:x.created_at||null});}
+  }
+  items.sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
   res.set("Cache-Control","public, max-age=60").json({items});
  }catch(e){console.error("media public list:",e?.message||e);res.status(500).json({error:"No se pudo cargar la biblioteca multimedia."});}
 });
