@@ -622,16 +622,29 @@ app.post("/api/render-video",async(req,res)=>{
      await writeFile(dest,buffer);imagePaths.push(dest);
     }
     if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
-    const perImage=duration/imagePaths.length;
+    const transition=0.55;
+    const clipDuration=(duration+transition*(imagePaths.length-1))/imagePaths.length;
+    const frames=Math.max(1,Math.round(clipDuration*24));
     const args=["-y","-threads","2"];
-    for(const imagePath of imagePaths)args.push("-loop","1","-framerate","24","-t",perImage.toFixed(3),"-i",imagePath);
+    for(const imagePath of imagePaths)args.push("-loop","1","-framerate","24","-t",clipDuration.toFixed(3),"-i",imagePath);
     args.push("-i",audioInput);
     const filters=[];
-    for(let i=0;i<imagePaths.length;i++)filters.push("["+i+":v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=24,format=yuv420p[v"+i+"]");
-    filters.push(imagePaths.map((_,i)=>"[v"+i+"]").join("")+"concat=n="+imagePaths.length+":v=1:a=0[vout]");
+    for(let i=0;i<imagePaths.length;i++){
+     const pan=i%2===0
+      ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
+      :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
+     filters.push("["+i+":v]scale=1188:2112:force_original_aspect_ratio=increase,crop=1188:2112,setsar=1,zoompan=z='1+0.10*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=24,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p[v"+i+"]");
+    }
+    let videoLabel="v0";
+    for(let i=1;i<imagePaths.length;i++){
+     const nextLabel="xf"+i;
+     const offset=(clipDuration*i-transition*i).toFixed(3);
+     filters.push("["+videoLabel+"][v"+i+"]xfade=transition=fade:duration="+transition.toFixed(2)+":offset="+offset+"["+nextLabel+"]");
+     videoLabel=nextLabel;
+    }
     const output=path.join(dir,"rendered.mp4");
-    args.push("-filter_complex",filters.join(";"),"-map","[vout]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","27","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart",output);
-    console.log("Starting server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920"});
+    args.push("-filter_complex",filters.join(";"),"-map","["+videoLabel+"]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","25","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
+    console.log("Starting cinematic server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:24,zoomMotion:true,fadeTransitionSeconds:transition});
     await execFileAsync(ffmpegPath,args,{timeout:900000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
