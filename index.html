@@ -684,17 +684,19 @@ downloadButton.addEventListener('click',async()=>{
    const showCustomerPhoto=photoCount>0&&photoProgress<1;
    const aiStills=window.aiSceneImages||[];
    const aiSceneIndex=aiStills.length?Math.min(aiStills.length-1,Math.floor(progress*aiStills.length)):0;
-   const showAiScene=!photoCount&&aiStills.length>0;
    const platformStills=(window.platformVideoImages||[]).map(item=>typeof item==="string"?{url:item}:item);
-   const showPlatformStill=!photoCount&&!showAiScene&&platformStills.length>0&&(!stockVideo||Math.floor(motionTime/6)%2===1);
-   const showStill=showCustomerPhoto||showAiScene||showPlatformStill;
+   // Prioridad visual: fotos del cliente, biblioteca propia y, solo si no hay recursos propios, escenas IA.
+   const hasOwnLibraryVisuals=platformStills.length>0||libraryVideos.length>0;
+   const showPlatformStill=!photoCount&&platformStills.length>0&&(!stockVideo||Math.floor(motionTime/6)%2===1);
+   const showAiScene=!photoCount&&!hasOwnLibraryVisuals&&aiStills.length>0;
+   const showStill=showCustomerPhoto||showPlatformStill||showAiScene;
    if(showStill){
-    const item=showCustomerPhoto?customerImages[photoSlot]:showAiScene?aiStills[aiSceneIndex]:platformStills[Math.floor(motionTime/8)%platformStills.length];
+    const item=showCustomerPhoto?customerImages[photoSlot]:showPlatformStill?platformStills[Math.floor(motionTime/6)%platformStills.length]:aiStills[aiSceneIndex];
     let img=item.image;if(!img){img=new Image();img.crossOrigin='anonymous';img.src=item.url;item.image=img;}
     if(img.complete&&img.naturalWidth){
      const iw=img.naturalWidth,ih=img.naturalHeight,scale=Math.max(w/iw,h/ih),dw=iw*scale,dh=ih*scale;
-     const fadeIn=Math.min(1,photoProgress/0.06),fadeOut=Math.min(1,(1-photoProgress)/0.06);
-     ctx.save();ctx.globalAlpha=Math.max(0,Math.min(fadeIn,fadeOut));
+     const photoAlpha=showCustomerPhoto?Math.max(0,Math.min(1,Math.min(photoProgress/0.06,(1-photoProgress)/0.06))):1;
+     ctx.save();ctx.globalAlpha=photoAlpha;
      ctx.drawImage(img,(w-dw)/2,(h-dh)/2,dw,dh);ctx.restore();
     }else if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){const vw=stockVideo.videoWidth||w,vh=stockVideo.videoHeight||h,scale=Math.max(w/vw,h/vh),dw=vw*scale,dh=vh*scale;ctx.drawImage(stockVideo,(w-dw)/2,(h-dh)/2,dw,dh);}
     else{ctx.fillStyle='#33213f';ctx.fillRect(0,0,w,h);}
