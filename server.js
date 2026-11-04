@@ -677,7 +677,7 @@ app.post("/api/render-video",async(req,res)=>{
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
-    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-vf","scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","29","-maxrate","150k","-bufsize","300k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
+    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-vf","scale=480:854:force_original_aspect_ratio=increase,crop=480:854,setsar=1","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","29","-maxrate","150k","-bufsize","300k","-pix_fmt","yuv420p","-r","12","-c:a","aac","-b:a","64k","-ac","2","-movflags","+faststart",output);
     await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
     console.log("Starting optimized fast FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"480x854",fps:12,videoQuality:"fast-vertical",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
