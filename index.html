@@ -1041,7 +1041,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
   if(role==='user'&&manualMode&&manualCurrentField&&manualCurrentField!=='__final'&&!correctionStage){
    const field=manualCurrentField;
    const edit=document.createElement('button');edit.type='button';edit.textContent='✏️ Corregir';edit.setAttribute('aria-label','Corregir esta respuesta');
-   edit.style.cssText='display:block;margin:10px 0 0 auto;padding:7px 12px;border:1px solid #f6d78c;border-radius:18px;background:#fff7f2;color:#681b43;font-size:13px;font-weight:800;cursor:pointer';
+   edit.style.cssText='display:inline-flex;vertical-align:middle;margin:0 0 0 10px;padding:7px 12px;border:1px solid #f6d78c;border-radius:18px;background:#fff7f2;color:#681b43;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap';
    edit.addEventListener('click',()=>{correctionField=field;correctionStage='value';const item=correctionFields.find(x=>x[0]===field);const el=document.getElementById(field);const current=String(el?.value||cachedOrderData[field]||'').trim();add('assistant','Claro 💗. Vamos a corregir «'+(item?.[1]||'esta respuesta')+'». Tu respuesta guardada es: '+(current||formatChatText(content))+'\\n\\nEscribe la respuesta correcta.');input.focus();});
    d.appendChild(edit);
   }
