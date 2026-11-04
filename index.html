@@ -539,6 +539,25 @@ downloadButton.addEventListener('click',async()=>{
    const ownItems=(mediaData.items||[]).filter(x=>x&&x.url);
    libraryVideos=ownItems.filter(x=>(x.mimeType||"").startsWith("video/"));
    const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/"));
+   // Groq dirige el montaje: interpreta la letra y elige el orden entre archivos reales disponibles.
+   try{
+    const directorResponse=await fetch(API_BASE+"/api/video/design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+     lyrics:(lyricLines||[]).join("\n"),
+     recipient:document.getElementById("giftTitle")?.textContent||"",
+     dedication:document.getElementById("giftMessage")?.textContent||"",
+     occasion:theme,
+     assets:ownItems.map(x=>({name:x.name,type:(x.mimeType||"").startsWith("video/")?"video":"image"}))
+    })});
+    const directorData=await directorResponse.json().catch(()=>({}));
+    if(directorResponse.ok&&directorData.design){
+     window.videoDirectorPlan=directorData.design;
+     const order=directorData.design.assetOrder||[];
+     if(order.length){
+      const rank=new Map(order.map((name,index)=>[name,index]));
+      libraryVideos.sort((a,b)=>(rank.get(a.name)??999)-(rank.get(b.name)??999));
+     }
+    }else console.warn("Director audiovisual no disponible; se usará el montaje automático.",directorData.error||"");
+   }catch(directorError){console.warn("Director audiovisual no disponible; se usará el montaje automático.",directorError?.message||"");}
     window.platformVideoImages=ownImages.map(item=>item.url);
    if(libraryVideos.length){
     // Orden aleatorio por canción, pero cada clip se reproduce antes de repetir la lista.
