@@ -1334,7 +1334,7 @@ app.post("/api/orders",async(req,res)=>{
    paymentReady=true;
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   const isExpress=order.urgency.toLowerCase().includes("express");
-  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS":"Nuevo pedido recibido",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+(isExpress?"Requiere confirmación de disponibilidad antes de iniciar.":"")});
+  await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS":"Nuevo pedido recibido",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+""});
   orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
