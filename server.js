@@ -629,8 +629,10 @@ app.post("/api/render-video",async(req,res)=>{
     const transition=0.55;
     const clipDuration=(duration+transition*(imagePaths.length-1))/imagePaths.length;
     const fps=30;
-     const frames=Math.max(1,Math.round(clipDuration*fps));
-    const args=["-y","-threads","2"];
+    const frames=Math.max(1,Math.round(clipDuration*fps));
+    // Limita los búferes y los hilos del grafo: evita picos de RAM en Render
+    // al combinar varias fotografías verticales en Full HD.
+    const args=["-y","-threads","1","-filter_threads","1","-filter_complex_threads","1"];
     for(const imagePath of imagePaths)args.push("-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePath);
     args.push("-i",audioInput);
     const filters=[];
@@ -638,7 +640,7 @@ app.post("/api/render-video",async(req,res)=>{
      const pan=i%2===0
       ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
       :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
-     filters.push("["+i+":v]scale=1188:2112:force_original_aspect_ratio=increase,crop=1188:2112,setsar=1,zoompan=z='1+0.10*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p[v"+i+"]");
+     filters.push("["+i+":v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p[v"+i+"]");
     }
     let videoLabel="v0";
     for(let i=1;i<imagePaths.length;i++){
@@ -660,12 +662,12 @@ app.post("/api/render-video",async(req,res)=>{
       for(let wi=0;wi<words.length;wi++){
        const word=words[wi],next=words[wi+1];
        const span=Math.max(8,Math.min(250,Math.round(((next?Number(next.start):Number(word.end))-Number(word.start))*100)));
-       karaokeText+="{\\kf"+span+"}"+assEscape(word.text)+(wi<words.length-1?" ":"");
+       karaokeText+="{\\\\kf"+span+"}"+assEscape(word.text)+(wi<words.length-1?" ":"");
       }
       ass.push("Dialogue: 0,"+assTime(start)+","+assTime(end)+",Karaoke,,0,0,0,,"+karaokeText);
      }
      const assPath=path.join(dir,"karaoke.ass");
-     await writeFile(assPath,ass.join("\n"),"utf8");
+     await writeFile(assPath,ass.join("\\n"),"utf8");
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      filters.push("["+videoLabel+"]subtitles=filename='"+escapedAssPath+"':charenc=UTF-8[karaoke]");
      finalVideoLabel="karaoke";
