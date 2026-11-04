@@ -753,7 +753,8 @@ downloadButton.addEventListener('click',async()=>{
     for(let k=0;k<14;k++){const x=(k*109+40)%w,y=(k*79+120)%490;ctx.fillStyle=['#f6d78c','#a6e3d0','#f2b7d1'][k%3];ctx.font='25px sans-serif';ctx.fillText(k%2?'✦':'♥',x,y)}
    }
    ctx.fillStyle=visualDesign.accent||'#f6d78c';ctx.font='bold 22px sans-serif';ctx.textAlign='center';ctx.fillText(occasionLabel,w/2,150);
-   const sceneCaption=activeDirectedScene?.visual||visualDesign.visualConcept;
+   // No mostrar descripciones internas del director si vienen en inglés.
+   const sceneCaption="";
    if(sceneCaption){ctx.save();ctx.fillStyle='rgba(255,240,232,.92)';ctx.font='italic 20px Georgia,serif';wrapText(ctx,sceneCaption,w/2,190,600,28);ctx.restore();}
    ctx.restore();
    const shade=ctx.createLinearGradient(0,440,0,h);shade.addColorStop(0,'rgba(24,10,24,.02)');shade.addColorStop(.48,'rgba(24,10,24,.20)');shade.addColorStop(1,'rgba(14,7,18,.68)');ctx.fillStyle=shade;ctx.fillRect(0,420,w,h-420);
