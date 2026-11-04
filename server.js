@@ -677,13 +677,13 @@ app.post("/api/render-video",async(req,res)=>{
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
-    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
+    args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","ultrafast","-crf","27","-maxrate","900k","-bufsize","1800k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart",output);
     await persistVideoJob(db,jobId,{status:"processing",progress:85,stage:"Uniendo escenas y sincronizando karaoke",createdAt:Date.now(),songId:song.id});
     console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"720x1280",fps:30,videoQuality:"HD",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
-    if(mp4.length>95*1024*1024)throw new Error("El MP4 supera el límite seguro de 95 MB. Reduce la cantidad de fotografías o la duración e inténtalo nuevamente.");
+    if(mp4.length>45*1024*1024)throw new Error("El MP4 supera el límite de almacenamiento de 45 MB. Se debe reducir la duración o volver a codificar con menor tasa de bits.");
     const {data:buckets,error:listError}=await db.storage.listBuckets();if(listError)throw listError;
     if(!(buckets||[]).some(b=>b.name==="shared-videos")){
      const {error:createError}=await db.storage.createBucket("shared-videos",{public:true,fileSizeLimit:"100MB",allowedMimeTypes:["video/mp4"]});
