@@ -637,7 +637,7 @@ app.post("/api/render-video",async(req,res)=>{
      const pan=i%2===0
       ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
       :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
-     const vf="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=1080x1920:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
+     const vf="scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=720x1280:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
      const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r","30","-movflags","+faststart",segment];
      await execFileAsync(ffmpegPath,segmentArgs,{timeout:600000,maxBuffer:2*1024*1024});
      segmentPaths.push(segment);
@@ -650,7 +650,7 @@ app.post("/api/render-video",async(req,res)=>{
     if(hasWordKaraoke){
      const assTime=value=>{const cs=Math.max(0,Math.round(Number(value)*100));const h=Math.floor(cs/360000),m=Math.floor((cs%360000)/6000),s= Math.floor((cs%6000)/100),c=cs%100;return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0")};
      const assEscape=value=>String(value||"").replace(/\\/g,"\\\\").replace(/{/g,"\\{").replace(/}/g,"\\}").replace(/\\r?\\n/g," ");
-     const ass=["[Script Info]","ScriptType: v4.00+","PlayResX: 1080","PlayResY: 1920","WrapStyle: 2","ScaledBorderAndShadow: yes","","[V4+ Styles]","Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding","Style: Karaoke,Arial,52,&H00FFFFFF,&H0000D7FF,&H00101010,&H70000000,1,0,0,0,100,100,1,0,1,3,1,2,70,70,180,1","","[Events]","Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text"];
+     const ass=["[Script Info]","ScriptType: v4.00+","PlayResX: 720","PlayResY: 1280","WrapStyle: 2","ScaledBorderAndShadow: yes","","[V4+ Styles]","Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding","Style: Karaoke,Arial,34,&H00FFFFFF,&H0000D7FF,&H00101010,&H70000000,1,0,0,0,100,100,1,0,1,3,1,2,70,70,180,1","","[Events]","Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text"];
      for(let li=0;li<lyricSegments.length;li++){
       const words=lyricSegments[li].words;
       const start=Math.max(0,Math.min(duration,Number(words[0].start)));
@@ -669,7 +669,7 @@ app.post("/api/render-video",async(req,res)=>{
      args.push("-vf","subtitles=filename='"+escapedAssPath+"':charenc=UTF-8");
     }
     args.push("-map","0:v:0","-map","1:a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","1","-preset","fast","-crf","22","-maxrate","3200k","-bufsize","6400k","-pix_fmt","yuv420p","-r","30","-c:a","aac","-b:a","160k","-ac","2","-movflags","+faststart",output);
-    console.log("Starting staged Full HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:30,videoQuality:"high",renderMode:"one-image-at-a-time"});
+    console.log("Starting staged HD FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"720x1280",fps:30,videoQuality:"HD",renderMode:"one-image-at-a-time"});
     await execFileAsync(ffmpegPath,args,{timeout:2700000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("FFmpeg produjo un video vacío.");
