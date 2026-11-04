@@ -883,29 +883,55 @@ downloadButton.addEventListener('click',async()=>{
   if(!chunks.length)throw new Error('El navegador no produjo datos de video. Prueba con Chrome actualizado y mantén la pantalla encendida.');
   const videoBlob=new Blob(chunks,{type:recorder.mimeType||'video/webm'});
   if(!videoBlob.size)throw new Error('El archivo de video quedó vacío. Inténtalo otra vez en Chrome.');
-  videoStage='conversión del video a MP4 en el servidor';
-  downloadNotice.textContent='Convirtiendo el video a MP4 para que puedas reproducirlo en tu celular…';
-  const conversionUrl=API_BASE+'/api/convert-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
-  const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
-  if(!conversionResponse.ok){let detail='No se pudo iniciar la conversión del MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-  const conversionJob=await conversionResponse.json();
-  if(!conversionJob.jobId)throw new Error('El servidor no devolvió el identificador de conversión.');
-  let conversionResult=null;
-  const conversionStarted=Date.now();
-  while(Date.now()-conversionStarted<15*60*1000){
-   downloadNotice.textContent='Convirtiendo el video a MP4 en segundo plano… No cierres esta página.';
-   await new Promise(resolve=>setTimeout(resolve,4000));
-   const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'},3);
-   if(!statusResponse.ok){let detail='No se pudo consultar el estado de la conversión.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
-   const statusData=await statusResponse.json();
-   if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
-   if(statusData.status==='error')throw new Error(statusData.error||'Falló la conversión del video.');
+  let mp4Blob=null,conversionResult=null;
+  try{
+   videoStage='conversión del video a MP4 en el servidor';
+   downloadNotice.textContent='Convirtiendo el video a MP4 para que puedas reproducirlo en tu celular…';
+   const conversionUrl=API_BASE+'/api/convert-video?path='+encodeURIComponent(audio)+(previewLinkToken?'&previewToken='+encodeURIComponent(previewLinkToken):'')+(grantToken?'&grantToken='+encodeURIComponent(grantToken):'');
+   const conversionResponse=await fetch(conversionUrl,{method:'POST',headers:{'Content-Type':videoBlob.type||'video/webm'},body:videoBlob});
+   if(!conversionResponse.ok){let detail='No se pudo iniciar la conversión del MP4.';try{const problem=await conversionResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
+   const conversionJob=await conversionResponse.json();
+   if(!conversionJob.jobId)throw new Error('El servidor no devolvió el identificador de conversión.');
+   const conversionStarted=Date.now();
+   while(Date.now()-conversionStarted<15*60*1000){
+    downloadNotice.textContent='Convirtiendo el video a MP4 en segundo plano… No cierres esta página.';
+    await new Promise(resolve=>setTimeout(resolve,4000));
+    const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(conversionJob.jobId),{cache:'no-store'},3);
+    if(!statusResponse.ok){let detail='No se pudo consultar el estado de la conversión.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail)}
+    const statusData=await statusResponse.json();
+    if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
+    if(statusData.status==='error')throw new Error(statusData.error||'Falló la conversión del video.');
+   }
+   if(!conversionResult)throw new Error('La conversión sigue tardando más de lo esperado.');
+   downloadNotice.textContent='MP4 listo. Preparando la descarga y el enlace de sorpresa…';
+   const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
+   if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
+   mp4Blob=await mp4Response.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
+  }catch(conversionError){
+   console.warn('Conversión MP4 fallida; se entregará el WebM original:',conversionError?.message||conversionError);
+   const webmBlob=videoBlob.slice(0,videoBlob.size,'video/webm');
+   if(!webmBlob.size)throw conversionError;
+   const webmName=(name||'regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()+'-canta-con-el-corazon.webm';
+   const webmUrl=URL.createObjectURL(webmBlob);
+   window.lastGeneratedVideoFile=new File([webmBlob],webmName,{type:'video/webm'});
+   window.lastVideoShareLink='';
+   window.lastSurpriseWebLink='';
+   let webmPreview=document.getElementById('generatedVideoPreview');
+   if(!webmPreview){webmPreview=document.createElement('section');webmPreview.id='generatedVideoPreview';webmPreview.style.cssText='margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.45);border-radius:16px;background:rgba(30,10,25,.25)';document.getElementById('videoNotice').after(webmPreview)}
+   webmPreview.replaceChildren();
+   const webmHeading=document.createElement('h3');webmHeading.textContent='Tu video está listo en formato alternativo';webmHeading.style.color='#fff0e8';webmPreview.appendChild(webmHeading);
+   const webmPlayer=document.createElement('video');webmPlayer.controls=true;webmPlayer.playsInline=true;webmPlayer.preload='metadata';webmPlayer.src=webmUrl;webmPlayer.style.cssText='display:block;width:100%;max-height:65vh;border-radius:12px;background:#120811';webmPreview.appendChild(webmPlayer);
+   const webmHelp=document.createElement('p');webmHelp.textContent='La conversión a MP4 no estuvo disponible. Tu videoclip se entrega en WebM, sin volver a procesarlo. Puedes reproducirlo aquí y descargarlo.';webmHelp.style.color='#fff0e8';webmPreview.appendChild(webmHelp);
+   const webmDownload=document.createElement('a');webmDownload.href=webmUrl;webmDownload.download=webmName;webmDownload.textContent='⬇️ Descargar video WebM';webmDownload.className='btn';webmDownload.style.cssText='display:block;text-align:center;margin:10px 0;text-decoration:none';webmPreview.appendChild(webmDownload);
+   const webmShare=document.createElement('button');webmShare.type='button';webmShare.className='btn secondary';webmShare.textContent='📲 Compartir video';webmShare.style.cssText='display:block;width:100%;margin:10px 0';
+   webmShare.addEventListener('click',async()=>{try{const file=new File([webmBlob],webmName,{type:'video/webm'});if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Mi regalo musical',text:'Un regalo de Canta con el corazón'});}else{downloadNotice.textContent='Tu celular no permite compartir este WebM directamente. Descárgalo y adjúntalo desde WhatsApp.';}}catch(err){if(err.name!=='AbortError')downloadNotice.textContent='No se pudo compartir automáticamente. Descarga el video y adjúntalo en WhatsApp.'}});
+   webmPreview.appendChild(webmShare);
+   webmDownload.addEventListener('click',()=>{downloadNotice.textContent='Descargando el video WebM. Si no aparece, revisa la carpeta Descargas de tu celular.'});
+   downloadNotice.textContent='¡Videoclip creado! La conversión MP4 falló, pero ya puedes reproducir y descargar el WebM. Tu canción MP3 permanece segura.';
+   videoNotice.textContent='Videoclip vertical listo en WebM como respaldo. Si tu aplicación no lo reproduce, abre el archivo con Chrome o un reproductor compatible.';
+   webmPreview.scrollIntoView({behavior:'smooth',block:'center'});
+   return;
   }
-  if(!conversionResult)throw new Error('La conversión sigue tardando más de lo esperado. No cierres esta página; vuelve a consultar el enlace o solicita ayuda antes de generar otro video.');
-  downloadNotice.textContent='MP4 listo. Preparando la descarga y el enlace de sorpresa…';
-  const mp4Response=await fetch(conversionResult.videoUrl,{cache:'no-store'});
-  if(!mp4Response.ok)throw new Error('El MP4 se creó, pero no se pudo descargar desde el almacenamiento.');
-  const mp4Blob=await mp4Response.blob();if(!mp4Blob.size)throw new Error('El servidor devolvió un MP4 vacío.');
   downloadNotice.textContent='Preparando tu enlace de sorpresa…';
   videoStage='creación del enlace para compartir';
   window.lastVideoShareLink='';
