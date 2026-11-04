@@ -640,19 +640,19 @@ downloadButton.addEventListener('click',async()=>{
   const visualDesign=window.videoDirectorPlan||{theme:theme||'romantic',accent:'#f6d78c',stickers:['heart','sparkle','star'],visualConcept:'Una historia contada con imágenes y música',lyricStyle:'cinematic',transitionStyle:'dissolve',endingPhrase:'Hecho con amor',sceneSequence:[]};
   window.aiSceneImages=[];
   downloadNotice.textContent='Preparando tus fondos cinematográficos y la letra sincronizada…';
-  videoStage='grabación HD en el celular';
+  videoStage='grabación de video en el celular (modo ligero)';
   const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1280;const ctx=canvas.getContext('2d');
   const audioCtx=new (window.AudioContext||window.webkitAudioContext)();await audioCtx.resume();
   const source=audioCtx.createMediaElementSource(audioEl);const dest=audioCtx.createMediaStreamDestination();source.connect(dest);source.connect(audioCtx.destination);
   // 18 FPS estables para reducir saltos en Android sin perder nitidez HD 720p.
-  const stream=canvas.captureStream(30);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
+  const stream=canvas.captureStream(20);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
   const mime=['video/webm;codecs=vp8,opus','video/webm;codecs=vp9,opus','video/webm'].find(t=>MediaRecorder.isTypeSupported(t))||'';
-  const recorderOptions={videoBitsPerSecond:6000000,audioBitsPerSecond:128000};if(mime)recorderOptions.mimeType=mime;
+  const recorderOptions={videoBitsPerSecond:2500000,audioBitsPerSecond:96000};if(mime)recorderOptions.mimeType=mime;
   const recorder=new MediaRecorder(stream,recorderOptions);const chunks=[];
   recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
   let lastDrawAt=0,lastStockTime=-1,stockStallSince=0,useAnimatedFallback=false;
   const draw=(frameTime=0)=>{
-   if(frameTime-lastDrawAt<33){if(recorder.state==='recording')requestAnimationFrame(draw);return}
+   if(frameTime-lastDrawAt<50){if(recorder.state==='recording')requestAnimationFrame(draw);return}
    lastDrawAt=frameTime;
    // Si el clip externo se congela o deja de avanzar, cambiar al fondo animado integrado.
    if(stockVideo&&stockVideo.readyState>=2&&!stockVideo.paused){
@@ -1012,7 +1012,7 @@ downloadButton.addEventListener('click',async()=>{
   preview.scrollIntoView({behavior:'smooth',block:'center'});
  }catch(err){
   console.error('Canta con el corazón video error at stage:',videoStage,err);
-  downloadNotice.textContent='No se pudo completar '+videoStage+'. Estamos identificando el motivo; tu canción MP3 sigue segura…';
+  downloadNotice.textContent='No se pudo completar '+videoStage+'. Motivo técnico: '+String(err?.message||err?.name||'Error desconocido').slice(0,220)+'. Tu canción MP3 sigue segura…';
   let friendly='No se pudo completar esta etapa. Tu MP3 sigue seguro.';
   try{
    const diagnosis=await fetchWithSafeRetry(API_BASE+'/api/support/diagnose',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({stage:videoStage,error:String(err?.message||'Error desconocido').slice(0,500)})},2);
