@@ -506,8 +506,10 @@ app.post("/api/convert-video",async(req,res)=>{
    const {data:grant}=await db.from("download_grants").select("id,can_video").eq("song_id",song.id).eq("token_hash",hash).gt("expires_at",new Date().toISOString()).maybeSingle();
    allowedDownload=!!grant?.can_video;
   }
-  const {data:packageGate}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();allowedDownload=!!packageGate?.can_video;
-  if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace."});
+  const {data:packageGate,error:packageGateError}=await db.from("song_package_permissions").select("can_video").eq("song_id",song.id).maybeSingle();
+  if(packageGateError)return res.status(503).json({error:"No se pudo verificar el permiso de video. Inténtalo nuevamente."});
+  allowedDownload=allowedDownload&&!!packageGate?.can_video;
+  if(!allowedDownload)return res.status(403).json({error:"La descarga de video no está autorizada para este enlace o paquete."});
   const chunks=[];let total=0;const maxBytes=90*1024*1024;
   for await(const chunk of req){total+=chunk.length;if(total>maxBytes)return res.status(413).json({error:"La grabación del video pesa demasiado. Intenta nuevamente con una canción más corta o una conexión estable."});chunks.push(chunk);}
   if(!total)return res.status(400).json({error:"No se recibió ningún video para convertir."});
