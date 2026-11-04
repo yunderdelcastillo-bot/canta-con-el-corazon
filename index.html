@@ -668,13 +668,14 @@ downloadButton.addEventListener('click',async()=>{
   if(!renderResponse.ok){let detail='No se pudo iniciar el renderizado con FFmpeg.';try{const problem=await renderResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail);}
   const renderJob=await renderResponse.json();
   if(!renderJob.jobId)throw new Error('El servidor no devolvió el identificador del renderizado.');
-  const renderStarted=Date.now();let conversionResult=null;
+  const renderStarted=Date.now();let conversionResult=null;let conversionProgressText='Preparando el video…';
   while(Date.now()-renderStarted<50*60*1000){
-   downloadNotice.textContent='FFmpeg está creando tu video HD y sincronizando la canción original. Mantén esta pantalla abierta…';
+   downloadNotice.textContent='FFmpeg está creando tu video HD. '+(conversionProgressText||'Mantén esta pantalla abierta…');
    await new Promise(resolve=>setTimeout(resolve,4000));
    const statusResponse=await fetchWithSafeRetry(API_BASE+'/api/convert-video-status/'+encodeURIComponent(renderJob.jobId),{cache:'no-store'},3);
    if(!statusResponse.ok){let detail='No se pudo consultar el renderizado.';try{const problem=await statusResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail);}
    const statusData=await statusResponse.json();
+   if(statusData.status==='processing'&&statusData.stage){conversionProgressText=statusData.stage+(statusData.progress?' · '+statusData.progress+'%':'');}
    if(statusData.status==='done'&&statusData.videoUrl){conversionResult=statusData;break;}
    if(statusData.status==='error')throw new Error(statusData.error||'FFmpeg no pudo completar el video.');
   }
