@@ -586,6 +586,10 @@ app.post("/api/render-video",async(req,res)=>{
   if(!allowedDownload||!packageGate?.can_video)return res.status(403).json({error:"La generación de video no está autorizada para este paquete."});
   const duration=Number(req.body?.duration);
   if(!Number.isFinite(duration)||duration<10||duration>600)return res.status(400).json({error:"La duración de la canción no es válida."});
+  const lyricSegments=Array.isArray(req.body?.lyricTimeline)?req.body.lyricTimeline.slice(0,100):[];
+  const karaokeLines=Array.isArray(req.body?.lyrics)?req.body.lyrics.slice(0,100).map(x=>String(x||"").slice(0,500)):[];
+  const hasWordKaraoke=karaokeLines.length>0&&lyricSegments.length===karaokeLines.length&&lyricSegments.every(segment=>segment&&Array.isArray(segment.words)&&segment.words.length>0&&segment.words.every(w=>Number.isFinite(Number(w.start))&&Number.isFinite(Number(w.end))&&Number(w.end)>Number(w.start)));
+  if(karaokeLines.length&&!hasWordKaraoke)return res.status(400).json({error:"La letra todavía no tiene sincronización palabra por palabra. Vuelve a intentar la sincronización antes de crear el videoclip."});
   const assets=Array.isArray(req.body?.assets)?req.body.assets.slice(0,12):[];
   const customerPhotos=Array.isArray(req.body?.customerPhotos)?req.body.customerPhotos.slice(0,8):[];
   if(!assets.length&&!customerPhotos.length)return res.status(400).json({error:"No hay imágenes disponibles para crear el video."});
@@ -642,8 +646,31 @@ app.post("/api/render-video",async(req,res)=>{
      filters.push("["+videoLabel+"][v"+i+"]xfade=transition=fade:duration="+transition.toFixed(2)+":offset="+offset+"["+nextLabel+"]");
      videoLabel=nextLabel;
     }
+    let finalVideoLabel=videoLabel;
+    if(hasWordKaraoke){
+     const assTime=value=>{const cs=Math.max(0,Math.round(Number(value)*100));const h=Math.floor(cs/360000),m=Math.floor((cs%360000)/6000),s=Math.floor((cs%6000)/100),c=cs%100;return h+":"+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+"."+String(c).padStart(2,"0);};
+     const assEscape=value=>String(value||"").replace(/\\/g,"\\\\").replace(/{/g,"\\{").replace(/}/g,"\\}").replace(/\r?\n/g," ");
+     const ass=["[Script Info]","ScriptType: v4.00+","PlayResX: 1080","PlayResY: 1920","WrapStyle: 2","ScaledBorderAndShadow: yes","","[V4+ Styles]","Format: Name,Fontname,Fontsize,PrimaryColour,SecondaryColour,OutlineColour,BackColour,Bold,Italic,Underline,StrikeOut,ScaleX,ScaleY,Spacing,Angle,BorderStyle,Outline,Shadow,Alignment,MarginL,MarginR,MarginV,Encoding","Style: Karaoke,Arial,52,&H00FFFFFF,&H0000D7FF,&H00101010,&H70000000,1,0,0,0,100,100,1,0,1,3,1,2,70,70,180,1","","[Events]","Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text"];
+     for(let li=0;li<lyricSegments.length;li++){
+      const words=lyricSegments[li].words;
+      const start=Math.max(0,Math.min(duration,Number(words[0].start)));
+      const end=Math.max(start+0.1,Math.min(duration,Number(words[words.length-1].end)));
+      let karaokeText="";
+      for(let wi=0;wi<words.length;wi++){
+       const word=words[wi],next=words[wi+1];
+       const span=Math.max(8,Math.min(250,Math.round(((next?Number(next.start):Number(word.end))-Number(word.start))*100)));
+       karaokeText+="{\\kf"+span+"}"+assEscape(word.text)+(wi<words.length-1?" ":"");
+      }
+      ass.push("Dialogue: 0,"+assTime(start)+","+assTime(end)+",Karaoke,,0,0,0,,"+karaokeText);
+     }
+     const assPath=path.join(dir,"karaoke.ass");
+     await writeFile(assPath,ass.join("\n"),"utf8");
+     const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
+     filters.push("["+videoLabel+"]subtitles=filename='"+escapedAssPath+"':charenc=UTF-8[karaoke]");
+     finalVideoLabel="karaoke";
+    }
     const output=path.join(dir,"rendered.mp4");
-    args.push("-filter_complex",filters.join(";"),"-map","["+videoLabel+"]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","25","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
+    args.push("-filter_complex",filters.join(";"),"-map","["+finalVideoLabel+"]","-map",String(imagePaths.length)+":a:0","-t",duration.toFixed(3),"-c:v","libx264","-threads","2","-preset","veryfast","-crf","25","-maxrate","1800k","-bufsize","3600k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","128k","-ac","2","-movflags","+faststart",output);
     console.log("Starting cinematic server-side FFmpeg render:",{jobId,songId:song.id,duration,imageCount:imagePaths.length,resolution:"1080x1920",fps:24,zoomMotion:true,fadeTransitionSeconds:transition});
     await execFileAsync(ffmpegPath,args,{timeout:900000,maxBuffer:4*1024*1024});
     const mp4=await readFile(output);
