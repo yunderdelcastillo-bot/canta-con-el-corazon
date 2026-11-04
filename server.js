@@ -1310,12 +1310,13 @@ app.post("/api/orders",async(req,res)=>{
   const b=req.body||{};
   const order={
    buyer:cleanOrderText(b.buyer,120),contact:cleanOrderText(b.contact,40),recipient:cleanOrderText(b.recipient,120),
-   occasion:cleanOrderText(b.occasion,100),story:cleanOrderText(b.story,3500),style:cleanOrderText(b.style,120),
+   relationship:cleanOrderText(b.relationship,120),
+   occasion:cleanOrderText(b.occasion,100),story:cleanOrderText((b.relationship?"Parentesco o relación: "+b.relationship+"\\n":"")+b.story,3500),style:cleanOrderText(b.style,120),
    custom_genre:cleanOrderText(b.customGenre,180),voice:cleanOrderText(b.voice,80),special_phrase:cleanOrderText(b.specialPhrase,500),
    lyric_duration:cleanOrderText(b.lyricDuration,80),lyric_tone:cleanOrderText(b.lyricTone,100),package_name:cleanOrderText(b.package,160),
    urgency:cleanOrderText(b.urgency,160),lyrics:cleanOrderText(b.lyrics,12000),status:"nuevo"
   };
-  if(!order.buyer||!order.contact||!order.recipient||!order.occasion||!order.story)return res.status(400).json({error:"Completa tu nombre, WhatsApp, destinatario, ocasión e historia."});
+  if(!order.buyer||!order.contact||!order.recipient||!order.occasion||!order.story)return res.status(400).json({error:"Completa tu nombre, WhatsApp, destinatario, parentesco, ocasión e historia."});
   const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
   const now=Date.now(),bucket="order:"+ip,rec=assistantChatLimits.get(bucket)||{start:now,count:0};
   if(now-rec.start>60*60*1000){rec.start=now;rec.count=0;}
