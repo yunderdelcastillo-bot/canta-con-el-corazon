@@ -533,12 +533,12 @@ downloadButton.addEventListener('click',async()=>{
   // Se reproducen todos los videos de la ocasión en secuencia y, al terminar el último,
   // se vuelve al primero hasta que termine la canción.
   try{
-   const mediaCategories=theme==="romantico"?["romantico","familia"]:[theme];
+   const mediaCategories=["all"];
    const mediaResponses=await Promise.all(mediaCategories.map(category=>fetch(API_BASE+"/api/media/public?category="+encodeURIComponent(category),{cache:"no-store"})));
    const failedMedia=mediaResponses.find(response=>!response.ok);
    if(failedMedia)throw new Error("No se pudo consultar la biblioteca ("+failedMedia.status+").");
    const mediaPayloads=await Promise.all(mediaResponses.map(response=>response.json()));
-   const ownItems=mediaPayloads.flatMap((payload,index)=>(payload.items||[]).filter(x=>x&&x.url).map(x=>({...x,category:mediaCategories[index]})));
+   const ownItems=mediaPayloads.flatMap((payload,index)=>(payload.items||[]).filter(x=>x&&x.url).map(x=>({...x,category:x.category||mediaCategories[index]})));
    libraryVideos=ownItems.filter(x=>(x.mimeType||"").startsWith("video/"));
    const ownImages=ownItems.filter(x=>(x.mimeType||"").startsWith("image/"));
    // Groq dirige el montaje: interpreta la letra y elige el orden entre archivos reales disponibles.
