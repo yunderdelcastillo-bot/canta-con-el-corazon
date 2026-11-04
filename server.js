@@ -530,7 +530,7 @@ app.post("/api/convert-video",async(req,res)=>{
     await writeFile(audioInput,originalAudioBuffer);
     const conversionStartedAt=Date.now();
     console.log("Starting asynchronous Full HD 1080p MP4 conversion:",{jobId,inputMB:Number((total/1024/1024).toFixed(2)),audioMB:Number((originalAudioBuffer.length/1024/1024).toFixed(2)),targetWidth:1080,targetHeight:1920,fps:24});
-    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24","-c:v","libx264","-threads","2","-preset","veryfast","-crf","28","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
+    await execFileAsync(ffmpegPath,["-y","-threads","2","-stream_loop","-1","-i",input,"-i",audioInput,"-map","0:v:0","-map","1:a:0","-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24","-c:v","libx264","-threads","1","-preset","veryfast","-crf","28","-maxrate","1200k","-bufsize","2400k","-pix_fmt","yuv420p","-r","24","-c:a","aac","-b:a","96k","-ac","2","-movflags","+faststart","-shortest",output],{timeout:900000,maxBuffer:2*1024*1024});
     const mp4=await readFile(output);
     if(!mp4.length)throw new Error("La conversión produjo un MP4 vacío.");
     if(mp4.length>45*1024*1024)throw new Error("El MP4 pesa "+(mp4.length/1024/1024).toFixed(1)+" MB y supera el límite de 45 MB del almacenamiento. Se redujo la tasa de bits para evitarlo.");
@@ -662,12 +662,12 @@ app.post("/api/render-video",async(req,res)=>{
       for(let wi=0;wi<words.length;wi++){
        const word=words[wi],next=words[wi+1];
        const span=Math.max(8,Math.min(250,Math.round(((next?Number(next.start):Number(word.end))-Number(word.start))*100)));
-       karaokeText+="{\\\\kf"+span+"}"+assEscape(word.text)+(wi<words.length-1?" ":"");
+       karaokeText+="{\\kf"+span+"}"+assEscape(word.text)+(wi<words.length-1?" ":"");
       }
       ass.push("Dialogue: 0,"+assTime(start)+","+assTime(end)+",Karaoke,,0,0,0,,"+karaokeText);
      }
      const assPath=path.join(dir,"karaoke.ass");
-     await writeFile(assPath,ass.join("\\n"),"utf8");
+     await writeFile(assPath,ass.join("\n"),"utf8");
      const escapedAssPath=assPath.replace(/\\/g,"/").replace(/:/g,"\\:");
      filters.push("["+videoLabel+"]subtitles=filename='"+escapedAssPath+"':charenc=UTF-8[karaoke]");
      finalVideoLabel="karaoke";
