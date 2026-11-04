@@ -566,7 +566,6 @@ app.post("/api/render-video",async(req,res)=>{
   const previewToken=String(req.body?.previewToken||"");
   const grantToken=String(req.body?.grantToken||"");
   const audioParts=audioPath.split("/");
-  const audioParts=audioPath.split("/");
   if(audioParts.length!==2||!/^[0-9a-f-]{36}$/i.test(audioParts[0])||!/^[0-9a-f-]{36}$/i.test(audioParts[1].slice(0,-4))||!audioParts[1].toLowerCase().endsWith(".mp3"))return res.status(400).json({error:"Ruta de canción no válida."});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
