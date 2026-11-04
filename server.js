@@ -710,7 +710,7 @@ app.get("/api/convert-video-status/:jobId",async(req,res)=>{
    const job=await readVideoJob(admin(),jobId);
    if(!job)return res.status(404).set("Cache-Control","no-store").json({error:"No encontramos este proceso. Vuelve a generar el video."});
    if(Date.now()-job.createdAt>60*60*1000)return res.status(410).set("Cache-Control","no-store").json({error:"El proceso expiró. Vuelve a intentarlo."});
-   res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
+   res.set("Cache-Control","no-store").json({status:job.status,...(job.status==="processing"?{progress:job.progress||0,stage:job.stage||"Preparando el video"}:{}),...(job.status==="done"?{videoUrl:job.videoUrl}:{}),...(job.status==="error"?{error:job.error}:{})});
   }catch(e){console.error("Video conversion status lookup:",e?.message||e);res.status(503).set("Cache-Control","no-store").json({error:"No se pudo consultar el estado de la conversión."});}
 });
  
