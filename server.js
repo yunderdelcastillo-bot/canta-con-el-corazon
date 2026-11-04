@@ -630,23 +630,26 @@ app.post("/api/render-video",async(req,res)=>{
     if(!imagePaths.length)throw new Error("No se pudieron recuperar imágenes válidas para el video.");
     // Renderizado por etapas: solo una fotografía se procesa a la vez.
     // Evita mantener 8 flujos Full HD simultáneos en la memoria del plan gratuito.
-    const fps=30;
+    // 20 fps por segmento reduce la carga; el MP4 final se entrega a 30 fps.
+    const fps=20;
     const clipDuration=duration/imagePaths.length;
     const segmentPaths=[];
     for(let i=0;i<imagePaths.length;i++){
      const segmentStarted=Date.now();
-     console.log("HD render stage started:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length});
+     const photoProgress=Math.round((i/imagePaths.length)*80);
+     await persistVideoJob(db,jobId,{status:"processing",progress:photoProgress,stage:"Procesando fotografía "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
+     console.log("HD render stage started:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length,fps});
      const segment=path.join(dir,"segment-"+String(i).padStart(2,"0")+".mp4");
      const frames=Math.max(1,Math.round(clipDuration*fps));
      const pan=i%2===0
       ?"x='(iw-iw/zoom)*(0.25+0.5*on/"+frames+")':y='(ih-ih/zoom)/2'"
       :"x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(0.25+0.5*on/"+frames+")'";
-     const vf="scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=720x1280:fps=30,trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
-     const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r","30","-movflags","+faststart",segment];
+     const vf="scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280,setsar=1,zoompan=z='1+0.08*on/"+frames+"':"+pan+":d=1:s=720x1280:fps="+fps+",trim=duration="+clipDuration.toFixed(3)+",setpts=PTS-STARTPTS,format=yuv420p";
+     const segmentArgs=["-y","-threads","1","-filter_threads","1","-loop","1","-framerate",String(fps),"-t",clipDuration.toFixed(3),"-i",imagePaths[i],"-vf",vf,"-an","-c:v","libx264","-threads","1","-preset","ultrafast","-crf","24","-pix_fmt","yuv420p","-r",String(fps),"-movflags","+faststart",segment];
      await execFileAsync(ffmpegPath,segmentArgs,{timeout:600000,maxBuffer:2*1024*1024});
      segmentPaths.push(segment);
      console.log("HD render stage completed:",{jobId,stage:"photo-segment",photo:i+1,total:imagePaths.length,seconds:Number(((Date.now()-segmentStarted)/1000).toFixed(1))});
-     await persistVideoJob(db,jobId,{status:"processing",progress:Math.round(((i+1)/(imagePaths.length+1))*80),stage:"Procesando fotografías "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
+     await persistVideoJob(db,jobId,{status:"processing",progress:Math.round(((i+1)/imagePaths.length)*80),stage:"Procesando fotografías "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
     }
     const concatPath=path.join(dir,"segments.txt");
     const concatText=segmentPaths.map(p=>"file '"+p.replace(/\\/g,"/").replace(/'/g,"'\\''")+"'").join("\n");
