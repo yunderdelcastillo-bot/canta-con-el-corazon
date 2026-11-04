@@ -31,10 +31,9 @@ async function syncApprovedOrderBenefits(db,orderId,song,ownerId){
  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,amount,package_name,payment_status").eq("order_id",orderId).maybeSingle();
  if(paymentError)throw paymentError;
  if(!payment||payment.payment_status!=="approved")return false;
- const label=String(payment.package_name||"").toLowerCase();
- const key=label.includes("completo")||label.includes("30")?"completo":label.includes("detalle")||label.includes("25")?"detalle":"esencial";
- const basePrice=key==="completo"?30:key==="detalle"?25:20;
- const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:ownerId,package_key:key,package_price:Number(payment.amount)||basePrice,can_mp3:true,can_video:key==="detalle"||key==="completo",updated_at:new Date().toISOString()},{onConflict:"song_id"});
+ const key="esencial";
+ const basePrice=25;
+ const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:ownerId,package_key:key,package_price:Number(payment.amount)||basePrice,can_mp3:true,can_video:false,updated_at:new Date().toISOString()},{onConflict:"song_id"});
  if(permissionError)throw permissionError;
  const {error:linkError}=await db.from("payment_submissions").update({song_id:song.id,updated_at:new Date().toISOString()}).eq("id",payment.id);
  if(linkError)throw linkError;
@@ -356,7 +355,7 @@ app.post("/api/songs",async(req,res)=>{
   if(grantReadError)return res.status(500).json({error:"La canción se guardó, pero no se pudieron sincronizar sus beneficios: "+grantReadError.message});
   if(oldGrant){
    const enabled=!!oldGrant.can_mp3;
-   const canVideo=enabled&&(packageKey==="detalle"||packageKey==="completo");
+   const canVideo=false
    const {error:grantSyncError}=await db.from("song_package_permissions").upsert({song_id:id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:enabled,can_video:canVideo,updated_at:new Date().toISOString()},{onConflict:"song_id"});
    if(grantSyncError)return res.status(500).json({error:"La canción se guardó, pero no se pudieron actualizar los permisos: "+grantSyncError.message});
   }
@@ -1293,9 +1292,8 @@ async function generateOrderAudio(orderId,order){
   if(canonicalUploadError)throw canonicalUploadError;
   const {data:existingSong,error:existingSongError}=await db.from("songs").select("id").eq("audio_path",canonicalPath).maybeSingle();
   if(existingSongError)throw existingSongError;
-  const packageText=String(order.package_name||"").toLowerCase();
-  const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
-  const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+  const packageKey="esencial";
+   const packagePrice=25;
   const occasion=String(order.occasion||"").toLowerCase();
   const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
   const songId=existingSong?.id||crypto.randomUUID();
@@ -1496,9 +1494,8 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
    if(existing.error)throw existing.error;
    if(existing.data){song=existing.data;}
    else{
-    const packageText=String(order.package_name||"").toLowerCase();
-    const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
-    const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+    const packageKey="esencial";
+   const packagePrice=25;
     const path=ownerId+"/"+id+".mp3";
     const {data:canonical,error:downloadError}=await db.storage.from("songs-audio").download("orders/"+id+".mp3");
     if(downloadError||!canonical)throw downloadError||new Error("No se pudo recuperar el audio generado.");
@@ -1821,9 +1818,8 @@ app.post("/api/admin/orders/:id/audio",async(req,res)=>{
   if(orderUploadError)throw orderUploadError;
   const {error:canonicalUploadError}=await db.storage.from("songs-audio").upload(canonicalPath,buffer,{contentType:"audio/mpeg",upsert:true,cacheControl:"3600"});
   if(canonicalUploadError)throw canonicalUploadError;
-  const packageText=String(order.package_name||"").toLowerCase();
-  const packageKey=packageText.includes("completo")||packageText.includes("30")?"completo":packageText.includes("detalle")||packageText.includes("25")?"detalle":"esencial";
-  const packagePrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+  const packageKey="esencial";
+   const packagePrice=25;
   const occasion=String(order.occasion||"").toLowerCase();
   const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
   const songRow={id,owner_id:user.id,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics:String(order.lyrics||""),theme,audio_path:canonicalPath,audio_url:null,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
