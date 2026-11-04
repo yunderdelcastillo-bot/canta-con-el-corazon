@@ -810,7 +810,7 @@ document.getElementById('orderForm').addEventListener('submit',e=>{
 });
 async function generateCustomerLyrics(){
  const btn=document.getElementById('generateCustomerLyrics'),status=document.getElementById('customerLyricsStatus'),result=document.getElementById('customerLyricsResult');
- const body={buyer:orderValue('buyer'),recipient:orderValue('recipient'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),voice:orderValue('voice'),customGenre:orderValue('customGenre'),phrase:orderValue('specialPhrase'),duration:orderValue('lyricDuration'),tone:orderValue('lyricTone')};
+ const body={buyer:orderValue('buyer'),recipient:orderValue('recipient'),relationship:orderValue('relationship'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),voice:orderValue('voice'),customGenre:orderValue('customGenre'),phrase:orderValue('specialPhrase'),duration:orderValue('lyricDuration'),tone:orderValue('lyricTone')};
  if(!body.buyer||!body.recipient||!body.occasion||!body.story){status.textContent='Completa tu nombre, para quién es, la ocasión y la historia antes de generar la letra.';return;}
  btn.disabled=true;document.getElementById('regenerateCustomerLyrics').disabled=true;status.textContent='✨ La IA está escribiendo tu canción. Puede tardar unos segundos…';result.classList.add('hidden');
  try{
@@ -1086,7 +1086,8 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  const manualFlow=[
   {field:'buyer',prompt:'¡Qué alegría tenerte aquí! 💗 Vamos a crear un regalo único, hecho con tu historia y tus sentimientos. Para comenzar, ¿cómo te llamas?'},
   {field:'contact',prompt:'¡Mucho gusto! 😊 ¿A qué número de WhatsApp podemos escribirte para coordinar los detalles de tu canción? Escríbelo con código de país si estás fuera de Perú.'},
-  {field:'recipient',prompt:'Ahora cuéntame: ¿para quién vamos a crear esta canción? Puedes indicarme su nombre, apodo o cómo le dices con cariño.'},\n  {field:'relationship',prompt:'¿Qué parentesco o relación tienes con esa persona? Puedes elegir: pareja/esposo(a), enamorado(a), novio(a), mamá, papá, hijo(a), hermano(a), abuelo(a), tío(a)/sobrino(a), amigo(a), familiar, compañero(a) de trabajo u otro.'},
+  {field:'recipient',prompt:'Ahora cuéntame: ¿para quién vamos a crear esta canción? Puedes indicarme su nombre, apodo o cómo le dices con cariño.'},
+  {field:'relationship',prompt:'¿Qué parentesco o relación tienes con esa persona? Puedes elegir: pareja/esposo(a), enamorado(a), novio(a), mamá, papá, hijo(a), hermano(a), abuelo(a), tío(a)/sobrino(a), amigo(a), familiar, compañero(a) de trabajo u otro.'},
   {field:'occasion',prompt:'¡Qué bonito detalle! 🌷 ¿Qué ocasión o motivo quieres celebrar? Si no encuentras una opción exacta, puedes elegir la más cercana o contármelo con tus propias palabras.'},
   {field:'story',prompt:'Esta es la parte más especial. 💞 Cuéntame un poquito de su historia: cómo se conocieron, qué momentos recuerdas, qué admiras de esa persona y qué quisieras decirle. No necesitas escribir perfecto; puedes expresarte con tus propias palabras.'},
   {field:'style',prompt:'Vamos a elegir el sonido de tu canción. 🎶 ¿Qué género musical te gustaría? Si no estás seguro, puedo orientarte: una balada suele ser íntima y emotiva; la cumbia aporta alegría y ritmo; una ranchera transmite sentimiento y fuerza.'},
