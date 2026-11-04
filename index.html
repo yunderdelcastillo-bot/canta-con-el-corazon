@@ -661,7 +661,7 @@ downloadButton.addEventListener('click',async()=>{
   downloadNotice.textContent='Enviando las imágenes al servidor. Tu celular ya no grabará el video; FFmpeg preparará el MP4 con la canción original…';
   const renderResponse=await fetch(API_BASE+'/api/render-video',{
    method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({path:audio,previewToken:previewLinkToken||'',grantToken:grantToken||'',duration:recordingDuration,assets:serverAssets,customerPhotos})
+   body:JSON.stringify({path:audio,previewToken:previewLinkToken||'',grantToken:grantToken||'',duration:recordingDuration,assets:serverAssets,customerPhotos,lyrics:lyricLines,lyricTimeline})
   });
   if(!renderResponse.ok){let detail='No se pudo iniciar el renderizado con FFmpeg.';try{const problem=await renderResponse.json();if(problem.error)detail=problem.error}catch(e){}throw new Error(detail);}
   const renderJob=await renderResponse.json();
