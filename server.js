@@ -643,7 +643,7 @@ app.post("/api/render-video",async(req,res)=>{
      segmentPaths.push(segment);
     }
     const concatPath=path.join(dir,"segments.txt");
-    const concatText=segmentPaths.map(p=>"file '"+p.replace(/\\/g,"/").replace(/'/g,"'\\''")+"'").join("\\n");
+    const concatText=segmentPaths.map(p=>"file '"+p.replace(/\\/g,"/").replace(/'/g,"'\\''")+"'").join("\n");
     await writeFile(concatPath,concatText,"utf8");
     const output=path.join(dir,"rendered.mp4");
     const args=["-y","-threads","1","-filter_threads","1","-f","concat","-safe","0","-i",concatPath,"-i",audioInput];
