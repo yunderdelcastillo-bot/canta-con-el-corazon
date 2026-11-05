@@ -912,4 +912,35 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  },true);
 })();
 </script>
+
+<script>
+/* Control independiente del botón de acceso: evita depender del registro de eventos del panel principal. */
+(function(){
+ const button=document.getElementById('login');
+ const status=document.getElementById('authStatus');
+ if(!button||!status)return;
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const email=(document.getElementById('email')?.value||'').trim();
+  const password=document.getElementById('password')?.value||'';
+  const say=t=>{status.textContent=t;};
+  if(!email||!password){say('Escribe el correo y la contraseña del administrador.');return;}
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem('cc_config')||'{}')}catch(_){}
+  if(!saved.url||!saved.key){say('Primero guarda la URL y la clave pública de Supabase.');return;}
+  if(!window.supabase||typeof window.supabase.createClient!=='function'){say('No se cargó Supabase. Actualiza la página y comprueba internet.');return;}
+  button.disabled=true;say('Verificando acceso administrativo con Supabase…');
+  try{
+   const client=window.supabase.createClient(saved.url,saved.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   const {data,error}=await client.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   if(!data.user)throw new Error('Supabase no devolvió un usuario autenticado.');
+   say('¡Inicio de sesión correcto! Abriendo el panel…');
+   setTimeout(()=>location.reload(),700);
+  }catch(error){say('No se pudo iniciar sesión: '+(error?.message||String(error)));}
+  finally{button.disabled=false;}
+ },true);
+})();
+</script>
 </body></html>
