@@ -1267,7 +1267,9 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
   const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status,amount,package_name,provider_payment_id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
   if(paymentError||!payment)return res.status(403).json({error:"No se pudo validar el acceso a este pedido."});
-  if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
+  // Si ya está aprobado pero aún no tiene archivo, permitir completar la carga del voucher.
+  // Si ya existe un archivo, aceptar reenvíos del mismo pedido sin bloquear al cliente.
+  // La carga automática no constituye verificación bancaria del abono.
   const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
   // No bloquear vouchers por diferencias históricas en el texto del paquete.
@@ -1298,17 +1300,27 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
   if(orderError)throw orderError;
   let downloadUnlocked=false;
+  // Buscar la canción por el UUID del pedido, sin depender de ADMIN_OWNER_ID.
+  // Los archivos se guardan como owner_id/order_id.mp3 y cada cuenta puede tener un owner_id distinto.
+  let song=null;
   const ownerId=String(process.env.ADMIN_OWNER_ID||"");
   if(ownerId){
-   const {data:song,error:songError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+   const {data:ownedSong,error:ownedSongError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+   if(ownedSongError)throw ownedSongError;
+   song=ownedSong;
+  }
+  if(!song){
+   const {data:matchingSongs,error:songError}=await db.from("songs").select("id,owner_id,audio_path").like("audio_path","%/"+id+".mp3").limit(2);
    if(songError)throw songError;
-   if(song){
-    const activated=await syncApprovedOrderBenefits(db,id,song,song.owner_id||ownerId);
-    if(activated){
-     const {error:linkError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",song.id);
-     if(linkError)throw linkError;
-     downloadUnlocked=true;
-    }
+   if((matchingSongs||[]).length>1)throw new Error("Hay más de una canción vinculada a este pedido; se requiere revisión.");
+   song=(matchingSongs||[])[0]||null;
+  }
+  if(song){
+   const activated=await syncApprovedOrderBenefits(db,id,song,song.owner_id||ownerId);
+   if(activated){
+    const {error:linkError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",song.id);
+    if(linkError)throw linkError;
+    downloadUnlocked=true;
    }
   }
   await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo voucher recibido",body:"El voucher se guardó y el MP3 quedó aprobado automáticamente por la regla de carga. Verifica el abono en Yape/Plin."});
@@ -1614,7 +1626,19 @@ app.get("/api/admin/orders",async(req,res)=>{
   const {data:payments,error:paymentError}=orderIds.length?await db.from("payment_submissions").select("id,order_id,amount,package_name,payment_status,provider,voucher_path,song_id,created_at,updated_at").in("order_id",orderIds):{data:[],error:null};
   if(paymentError)throw paymentError;
   const paymentByOrder=new Map();
-  for(const payment of payments||[]){let voucherUrl=null;if(payment.voucher_path){const {data:signed}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);voucherUrl=signed?.signedUrl||null;}paymentByOrder.set(payment.order_id,{...payment,voucher_url:voucherUrl});}
+  // Si existen registros de pago históricos duplicados, priorizar el que contiene el voucher.
+  for(const payment of payments||[]){
+   const previous=paymentByOrder.get(payment.order_id);
+   const score=p=>(p?.voucher_path?4:0)+(p?.payment_status==="approved"?2:0)+(p?.updated_at?1:0);
+   if(previous&&score(previous)>score(payment))continue;
+   let voucherUrl=null;
+   if(payment.voucher_path){
+    const {data:signed,error:signedError}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);
+    if(signedError)console.error("Admin voucher signing:",signedError.message||signedError);
+    voucherUrl=signed?.signedUrl||null;
+   }
+   paymentByOrder.set(payment.order_id,{...payment,voucher_url:voucherUrl});
+  }
   const orders=[];
   for(const order of data||[]){
    const audioReady=audioNames.has(order.id+".mp3");
