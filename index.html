@@ -1535,6 +1535,19 @@ function mountCustomerOrderChat(){
   const player=document.getElementById('audioPlayer');
   const note=document.getElementById('audioNote');
   const api='https://canta-corazon-private-api.onrender.com';
+  // Reaplica los datos personalizados al abrir el regalo en móviles.
+  const recipient=q.get('para')||'';
+  const dedication=q.get('mensaje')||'';
+  const lyrics=q.get('letra')||'';
+  const title=document.getElementById('giftTitle');
+  const message=document.getElementById('giftMessage');
+  if(title)title.textContent=recipient?'Para '+recipient:'Una canción para ti';
+  if(message&&dedication)message.textContent=dedication;
+  if(lyrics){
+   const clean=lyrics.replace(/\[(?:verso|coro|puente|intro|outro|pre[- ]?coro)[^\]]*\]/gi,'|');
+   const lines=clean.split(/[|\n]+/).map(x=>x.trim()).filter(x=>x.length>2);
+   if(lines.length){lyricLines=lines;const lyricBox=document.getElementById('lyricsBox');if(lyricBox)lyricBox.classList.remove('hidden');const current=document.getElementById('lyricsCurrent');if(current)current.textContent='♪';}
+  }
   if(!audio||!player)return;
   // Respaldo móvil: garantiza que al terminar el audio se muestre el bloque de pago,
   // incluso si el enlace de audio no cumplió la validación que registra el listener principal.
@@ -1552,7 +1565,7 @@ function mountCustomerOrderChat(){
     const start=await fetch(api+'/api/preview/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token})});
     const result=await start.json();
     if(!start.ok)throw new Error(result.error||'No se pudo abrir la muestra.');
-    if(result.completed){if(note){note.textContent='La muestra ya fue escuchada. Continúa con el pago para desbloquear tu MP3.';note.classList.remove('hidden');}return;}
+    if(result.completed){showPaymentCta();if(note){note.textContent='La muestra ya fue escuchada. Continúa con el pago para desbloquear tu MP3.';note.classList.remove('hidden');}return;}
     audioUrl+='&preview='+encodeURIComponent(token);
    }else{
     if(note){note.textContent='No se encontró el enlace de muestra. Solicita a la administradora un nuevo enlace.';note.classList.remove('hidden');}
