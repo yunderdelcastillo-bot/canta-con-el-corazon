@@ -1327,7 +1327,8 @@ app.post("/api/orders",async(req,res)=>{
   if(now-rec.start>60*60*1000){rec.start=now;rec.count=0;}
   if(rec.count>=8)return res.status(429).json({error:"Has enviado varias solicitudes. Continúa por WhatsApp para recibir ayuda."});
   rec.count++;assistantChatLimits.set(bucket,rec);
-  const {data,error}=await admin().from("customer_orders").insert(order).select("id,created_at").single();
+  const {relationship:orderRelationship,...orderForDatabase}=order;
+  const {data,error}=await admin().from("customer_orders").insert(orderForDatabase).select("id,created_at").single();
   if(error){console.error("Create customer order:",error.message);return res.status(500).json({error:"No se pudo guardar el pedido. Puedes enviarlo por WhatsApp sin perder tus datos."});}
   let paymentAccessToken=null,paymentReady=false;
   try{
