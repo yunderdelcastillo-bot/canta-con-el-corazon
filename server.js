@@ -1253,30 +1253,6 @@ app.post("/api/orders",async(req,res)=>{
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
-async function analyzeYapeVoucher(buffer,mime,expectedAmount){
- const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
- if(!apiKey)return {status:"manual",reason:"No está configurada la IA de revisión."};
- const prompt="Analiza esta captura o PDF de un comprobante de pago peruano Yape o Plin. Extrae únicamente datos claramente visibles. Devuelve SOLO JSON válido con: is_payment_receipt (boolean), amount (number o null), operation_id (string o null), transaction_date (string o null), payment_app (Yape o Plin o null), confidence (number entre 0 y 1), notes (string). No inventes ni completes datos borrosos. No confundas saldo, número telefónico, hora ni fecha con el código de operación. Acepta únicamente comprobantes identificables claramente como Yape o Plin. Si no es claramente un comprobante Yape o Plin, is_payment_receipt=false. Importe esperado: S/"+Number(expectedAmount).toFixed(2)+".";
- const response=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key="+encodeURIComponent(apiKey),{
-  method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt},{inline_data:{mime_type:mime,data:buffer.toString("base64")}}]}],generationConfig:{responseMimeType:"application/json"}}),
-  signal:AbortSignal.timeout(45000)
- });
- const payload=await response.json().catch(()=>({}));
- if(!response.ok)throw new Error("IA de comprobantes HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,240));
- const raw=(payload.candidates||[]).flatMap(c=>c.content?.parts||[]).map(p=>p.text||"").join("").trim();
- let parsed;try{parsed=JSON.parse(raw.replace(/^```(?:json)?/i,"").replace(/```$/,"").trim());}catch{throw new Error("La IA no devolvió datos válidos del comprobante.");}
- const amount=Number(parsed.amount);
- const operationId=String(parsed.operation_id||"").trim().replace(/\s+/g,"").slice(0,80);
- const confidence=Number(parsed.confidence||0);
- const paymentApp=String(parsed.payment_app||"").trim().toLowerCase();
- const normalizedApp=paymentApp.includes("plin")?"plin":paymentApp.includes("yape")?"yape":"";
- const isReceipt=parsed.is_payment_receipt===true&&Boolean(normalizedApp)&&Number.isFinite(amount);
- if(!isReceipt)return {status:"rejected",reason:"La captura no parece ser un comprobante Yape o Plin legible.",confidence};
- if(Math.abs(amount-Number(expectedAmount))>0.009)return {status:"rejected",reason:"El importe visible no coincide con el total del pedido.",amount,operationId,confidence};
- if(!operationId||confidence<0.82)return {status:"manual",reason:"No se pudo leer con suficiente seguridad el código de operación.",amount,operationId,confidence};
- return {status:"approved",reason:"Comprobante "+(normalizedApp==="plin"?"Plin":"Yape")+" legible; importe y código de operación extraídos.",amount,operationId,confidence,paymentApp:normalizedApp};
-}
 app.post("/api/orders/:id/voucher",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El sistema de pagos no está configurado."});
@@ -1310,42 +1286,37 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const path=id+"/"+Date.now()+"-"+crypto.randomBytes(5).toString("hex")+"."+allowed.get(mime);
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
-  let review={status:"manual",reason:"La IA no pudo revisar automáticamente el comprobante."};
-  try{review=await analyzeYapeVoucher(buffer,mime,payment.amount);}catch(reviewError){console.warn("Automatic Yape/Plin voucher review unavailable:",reviewError?.message||reviewError);}
-  const operationKey=review.operationId?(String(review.paymentApp||"yape")+":"+review.operationId):"sha256:"+fileHash;
-  if(review.status==="approved"){
-   const {data:used,error:usedError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id",operationKey).maybeSingle();
-   if(usedError)throw usedError;
-   if(used&&used.order_id!==id){
-    await db.storage.from("payment-vouchers").remove([path]);
-    return res.status(409).json({error:"El código de operación de este comprobante ya fue utilizado."});
-   }
-  }
-  const nextStatus=review.status==="approved"?"approved":review.status==="rejected"?"rejected":"voucher_submitted";
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:nextStatus,provider_payment_id:operationKey,updated_at:new Date().toISOString(),...(nextStatus==="approved"?{reviewed_at:new Date().toISOString()}: {})}).eq("id",payment.id);
+  // Aprobación automática por regla: el importe del pedido se contrasta con el importe registrado al crear el pedido.
+  // La carga del archivo NO verifica que el dinero haya ingresado realmente a Yape.
+  const fileHash=crypto.createHash("sha256").update(buffer).digest("hex");
+  const operationKey="voucher-sha256:"+fileHash;
+  const {data:duplicate,error:duplicateError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id",operationKey).maybeSingle();
+  if(duplicateError)throw duplicateError;
+  if(duplicate&&duplicate.order_id!==id)return res.status(409).json({error:"Este mismo comprobante ya fue enviado en otro pedido."});
+  const path=id+"/"+Date.now()+"-"+crypto.randomBytes(5).toString("hex")+"."+allowed.get(mime);
+  const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
+  if(uploadError)throw uploadError;
+  const now=new Date().toISOString();
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id);
   if(updateError)throw updateError;
-  if(nextStatus==="approved"){
-   const ownerId=String(process.env.ADMIN_OWNER_ID||"");
-   let benefitsActivated=false;
-   if(ownerId){
-    const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
-    if(songLookupError)throw songLookupError;
-    if(existingSong){
-     benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
-     if(benefitsActivated){
-      const {error:linksError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",existingSong.id);
-      if(linksError)throw linksError;
-     }
+  const ownerId=String(process.env.ADMIN_OWNER_ID||"");
+  let benefitsActivated=false;
+  if(ownerId){
+   const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+   if(songLookupError)throw songLookupError;
+   if(existingSong){
+    benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
+    if(benefitsActivated){
+     const {error:linksError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",existingSong.id);
+     if(linksError)throw linksError;
     }
    }
-   const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:new Date().toISOString()}).eq("id",id);
-   if(orderError)throw orderError;
-   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:benefitsActivated?"Paquete desbloqueado automáticamente":"Pago aprobado automáticamente",body:"La IA validó el voucher Yape/Plin, el importe coincide con el paquete y el código de operación no está repetido."});
-   await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:benefitsActivated?"¡Tu paquete está desbloqueado!":"¡Tu pago fue aprobado!",body:benefitsActivated?"Tu pago fue validado y los beneficios de tu paquete ya están habilitados.":"Tu pago fue validado. Los beneficios se habilitarán automáticamente cuando la canción esté lista."});
-  }else{
-   await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:nextStatus==="rejected"?"Comprobante no válido":"Comprobante requiere revisión",body:review.reason||"Revisa el comprobante desde el panel privado."});
   }
-  res.set("Cache-Control","no-store").json({ok:true,status:nextStatus,autoReviewed:review.status!=="manual",message:nextStatus==="approved"?"Voucher validado automáticamente. El paquete quedó aprobado y sus beneficios se activaron si la canción ya está guardada.":nextStatus==="rejected"?"El comprobante no coincide o no es legible. Puedes enviar una captura correcta.":"Comprobante recibido. La IA no pudo validarlo con seguridad y quedó pendiente de revisión.",reviewReason:review.reason||""});
+  const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
+  if(orderError)throw orderError;
+  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:benefitsActivated?"Paquete MP3 desbloqueado automáticamente":"Voucher registrado y pedido aprobado",body:"Aprobación automática por carga de voucher y coincidencia del importe registrado: S/"+expectedTotal+". No se verificó el ingreso real en Yape."});
+  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:benefitsActivated?"¡Tu MP3 está desbloqueado!":"¡Tu pedido fue aprobado!",body:benefitsActivated?"Tu pago quedó registrado y la descarga MP3 está habilitada.":"Tu voucher quedó registrado. La descarga MP3 se habilitará automáticamente cuando la canción esté lista."});
+  res.set("Cache-Control","no-store").json({ok:true,status:"approved",autoReviewed:true,message:benefitsActivated?"Voucher registrado. Tu pedido MP3 quedó aprobado y la descarga está habilitada.":"Voucher registrado y pedido aprobado. La descarga MP3 se habilitará automáticamente cuando la canción esté lista.",notice:"La aprobación automática no confirma el ingreso real del dinero en Yape."});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
