@@ -459,18 +459,15 @@ const openGiftButton=document.getElementById('openGift');
   if(audio&&grantToken){
    audioPlayer.play().catch(()=>{audioNote.textContent='Tu regalo está abierto. Pulsa reproducir para escuchar la canción.';audioNote.classList.remove('hidden')});
   }else if(audio&&previewLinkToken){
-   const playButton=document.getElementById('playPreview');
-   if(playButton&&!playButton.classList.contains('hidden'))startPreview();
-   else if(!downloadAllowed){audioNote.textContent='No se pudo preparar la muestra. Solicita un enlace nuevo desde el panel.';audioNote.classList.remove('hidden')}
+   // Iniciar siempre la muestra autorizada, incluso si el permiso de descarga oculta el botón auxiliar.
+   startPreview();
   }else if(audio&&!previewLinkToken){
    audioNote.textContent='Para escuchar la prueba, abre el enlace de muestra que te enviamos por WhatsApp.';
    audioNote.classList.remove('hidden');
   }
  };
  openGiftButton.addEventListener('click',revealGiftContent);
- openGiftButton.addEventListener('pointerup',e=>{e.preventDefault();revealGiftContent()});
- document.getElementById('intro').addEventListener('click',e=>{if(e.target.closest('#openGift'))revealGiftContent()});
- document.getElementById('intro').addEventListener('pointerup',e=>{if(e.target.closest('#openGift'))revealGiftContent()});
+ // Se conserva un único evento de clic para evitar dobles aperturas en móviles.
 
 const downloadButton=document.getElementById('downloadGift');
 const downloadMp3Button=document.getElementById('downloadMp3');
@@ -1468,48 +1465,7 @@ function mountCustomerOrderChat(){
 </script>
 
 
-<!-- Respaldo independiente para abrir la sorpresa, incluso si falla otro módulo de la página -->
-<script>
-(function(){
-  function openGiftSafely(){
-    var intro=document.getElementById('intro');
-    var revealed=document.getElementById('revealed');
-    if(!intro||!revealed) return;
-    intro.classList.add('hidden');
-    revealed.classList.remove('hidden');
-    revealed.style.display='block';
-    document.body.classList.add('gift-mode');
-    try{window.scrollTo({top:0,behavior:'smooth'});}catch(e){}
-    var audio=document.getElementById('audioPlayer');
-    var params=new URLSearchParams(window.location.search);
-    if(audio && params.get('grant') && audio.paused){
-      var play=audio.play();
-      if(play&&typeof play.catch==='function')play.catch(function(){});
-    }else{
-      try{
-        if(typeof startPreview==='function'){
-          var previewButton=document.getElementById('playPreview');
-          if(previewButton && !previewButton.classList.contains('hidden')) startPreview();
-        }
-      }catch(e){}
-    }
-  }
-  function bind(){
-    var button=document.getElementById('openGift');
-    if(!button)return;
-    button.type='button';
-    button.addEventListener('click',function(e){
-      e.preventDefault();
-      openGiftSafely();
-    },true);
-    button.addEventListener('touchend',function(){
-      openGiftSafely();
-    },{passive:true});
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind);
-  else bind();
-})();
-</script>
+<!-- Apertura centralizada en revealGiftContent para evitar dobles reproducciones. -->
 
 
 <script>
