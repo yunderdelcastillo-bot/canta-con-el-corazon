@@ -196,29 +196,6 @@ if(lyricText){
  if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent='♪'}
 }
 const API_BASE='https://canta-corazon-private-api.onrender.com';
-// Recupera el acceso de pago aunque el cliente cambie de aplicación o vuelva a abrir la página.
-function getCchPaymentContext(){
- const urlOrder=params.get('pedido')||'',urlToken=params.get('acceso')||'';
- if(urlOrder&&urlToken){
-  const fromUrl={orderId:urlOrder,accessToken:urlToken};
-  window.cchPaymentContext=fromUrl;
-  try{localStorage.setItem('cchPaymentContext',JSON.stringify(fromUrl));sessionStorage.setItem('cchPaymentContext',JSON.stringify(fromUrl));}catch(e){}
-  return fromUrl;
- }
- for(const storage of [localStorage,sessionStorage]){
-  try{
-   const raw=storage.getItem('cchPaymentContext');
-   if(!raw)continue;
-   const saved=JSON.parse(raw);
-   if(saved?.orderId&&saved?.accessToken&&(!urlOrder||saved.orderId===urlOrder)){
-    window.cchPaymentContext=saved;
-    return saved;
-   }
-  }catch(e){}
- }
- return null;
-}
-getCchPaymentContext();
 let lyricAlignmentPromise=null;
 async function alignGiftLyrics(){
  if(lyricAlignmentPromise)return lyricAlignmentPromise;
@@ -334,18 +311,15 @@ function showPaymentCta(){
  if(!box){
   box=document.createElement('section');box.id='previewPaymentCta';box.className='payment';box.style.cssText='display:block;margin:18px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:#ffffff0b;text-align:center';
   const amount=Number(params.get("precioTotal")||packagePrice)||20;const expressChosen=params.get("express")==="1";
-  box.innerHTML='<h3 style="color:#ffe5ee;margin:0 0 8px">💖 ¡Me encantó! Ahora realiza tu pago</h3><p id="previewPackageLabel" style="color:#f1d9e3;line-height:1.5"></p><p id="previewPackageAmount" style="color:#f6d78c;font-weight:900;font-size:2rem;margin:4px 0 10px"></p><p style="color:#f1d9e3;line-height:1.5">Paga con Yape escaneando el QR o envía desde Plin al número 977 974 730. Verifica el nombre del destinatario antes de confirmar.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar Canta con el corazón" style="display:block;width:min(100%,280px);max-height:320px;object-fit:contain;margin:14px auto;background:#fff;border-radius:14px;padding:10px"><p style="color:#f6d78c;font-weight:800;font-size:1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p style="color:#f1d9e3;font-size:.86rem;line-height:1.5">Después de pagar por Yape o Plin, adjunta aquí la captura o foto de tu voucher. El sistema aprobará automáticamente el pedido según el importe registrado; no verifica el ingreso real del dinero.</p><div id="previewVoucherUpload" style="margin-top:14px;text-align:left"><label for="previewVoucherFile">Comprobante de pago (JPG, PNG o WEBP; máximo 8 MB)</label><input id="previewVoucherFile" type="file" accept="image/jpeg,image/png,image/webp"><button id="previewUploadVoucher" class="btn secondary" type="button" style="margin-top:12px" onclick="const st=document.getElementById('previewVoucherStatus');if(st){st.style.display='block';st.style.minHeight='28px';st.style.color='#fff';st.textContent='⏳ Iniciando envío del voucher…'}">📤 Subir voucher al sistema</button><p id="previewVoucherStatus" class="microcopy" role="status" aria-live="polite" style="display:block;min-height:28px;margin-top:10px"></p></div>';
+  box.innerHTML='<h3 style="color:#ffe5ee;margin:0 0 8px">💖 ¡Me encantó! Ahora realiza tu pago</h3><p id="previewPackageLabel" style="color:#f1d9e3;line-height:1.5"></p><p id="previewPackageAmount" style="color:#f6d78c;font-weight:900;font-size:2rem;margin:4px 0 10px"></p><p style="color:#f1d9e3;line-height:1.5">Paga con Yape escaneando el QR o envía desde Plin al número 977 974 730. Verifica el nombre del destinatario antes de confirmar.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar Canta con el corazón" style="display:block;width:min(100%,280px);max-height:320px;object-fit:contain;margin:14px auto;background:#fff;border-radius:14px;padding:10px"><p style="color:#f6d78c;font-weight:800;font-size:1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p style="color:#f1d9e3;font-size:.86rem;line-height:1.5">Después de pagar por Yape o Plin, adjunta aquí la captura o foto de tu voucher. El sistema aprobará automáticamente el pedido según el importe registrado; no verifica el ingreso real del dinero.</p><div id="previewVoucherUpload" style="margin-top:14px;text-align:left"><label for="previewVoucherFile">Comprobante de pago (JPG, PNG o WEBP; máximo 8 MB)</label><input id="previewVoucherFile" type="file" accept="image/jpeg,image/png,image/webp"><button id="previewUploadVoucher" class="btn secondary" type="button" style="margin-top:12px">📤 Subir voucher al sistema</button><p id="previewVoucherStatus" class="microcopy" role="status" aria-live="polite"></p></div>';
   audioNote.after(box);
   const label=document.getElementById('previewPackageLabel'),price=document.getElementById('previewPackageAmount');
   if(label)label.textContent=packageName||'Tu paquete personalizado';
   if(price)price.textContent='S/'+amount+' SOLES'+(expressChosen?' (incluye servicio Express)':'');
   document.getElementById('previewUploadVoucher').addEventListener('click',async()=>{
    const file=document.getElementById('previewVoucherFile').files[0],status=document.getElementById('previewVoucherStatus'),button=document.getElementById('previewUploadVoucher');
-   const ctx=getCchPaymentContext();
-   const customerPreviewToken=previewLinkToken||previewToken||'';
-   const orderIdFromPreview=String(audio||'').split('/').pop().replace(/\.mp3$/i,'');
-   const uploadOrderId=ctx?.orderId||orderIdFromPreview;
-   if(!/^[0-9a-f-]{36}$/i.test(uploadOrderId)||(!ctx?.accessToken&&!customerPreviewToken)){status.textContent='No encontramos el acceso seguro de esta muestra. Abre el enlace original que recibiste para continuar.';return;}
+   const ctx={orderId:params.get('pedido')||'',accessToken:params.get('acceso')||''};
+   if(!ctx.orderId||!ctx.accessToken){status.textContent='No encontramos el acceso seguro de tu pedido. Regresa a la página donde registraste tu pedido y abre nuevamente la muestra.';return;}
    if(!file){status.textContent='Selecciona primero la captura de tu voucher.';return;}
    if(file.size>8*1024*1024){status.textContent='El comprobante debe pesar máximo 8 MB.';return;}
    button.disabled=true;button.textContent='Preparando voucher…';status.style.display='block';status.style.minHeight='24px';status.style.color='#fff';status.textContent='📂 Preparando la imagen para enviarla…';
@@ -356,13 +330,13 @@ function showPaymentCta(){
     const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer la foto. Vuelve a seleccionarla.'));reader.onprogress=e=>{if(e.lengthComputable)status.textContent='📂 Leyendo imagen… '+Math.round(e.loaded/e.total*100)+'%';};reader.readAsDataURL(file);});
     status.textContent='📤 Enviando voucher al servidor…';
     const result=await new Promise((resolve,reject)=>{
-     const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(uploadOrderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
+     const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);progress.value=pct;status.textContent='📤 Enviando voucher… '+pct+'%';}};
      xhr.onload=()=>{let data={};try{data=JSON.parse(xhr.responseText||'{}')}catch(e){}if(xhr.status>=200&&xhr.status<300)resolve(data);else reject(new Error(data.error||('El servidor respondió '+xhr.status+'.')));};
      xhr.onerror=()=>reject(new Error('No se pudo conectar con el servidor. Revisa internet e inténtalo otra vez.'));
      xhr.ontimeout=()=>reject(new Error('La subida tardó demasiado. Reduce el tamaño de la foto o inténtalo con mejor conexión.'));
      xhr.onabort=()=>reject(new Error('La subida fue cancelada.'));
-     xhr.send(JSON.stringify({accessToken:ctx?.accessToken||'',previewToken:customerPreviewToken,mimeType:file.type,fileBase64}));
+     xhr.send(JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64}));
     });
     progress.value=100;status.textContent='✅ Voucher recibido por el sistema. '+(result.message||'Tu pedido quedó registrado.');status.style.color='#b8ffd0';
     button.textContent='Voucher enviado';button.disabled=true;return;
@@ -459,15 +433,18 @@ const openGiftButton=document.getElementById('openGift');
   if(audio&&grantToken){
    audioPlayer.play().catch(()=>{audioNote.textContent='Tu regalo está abierto. Pulsa reproducir para escuchar la canción.';audioNote.classList.remove('hidden')});
   }else if(audio&&previewLinkToken){
-   // Iniciar siempre la muestra autorizada, incluso si el permiso de descarga oculta el botón auxiliar.
-   startPreview();
+   const playButton=document.getElementById('playPreview');
+   if(playButton&&!playButton.classList.contains('hidden'))startPreview();
+   else if(!downloadAllowed){audioNote.textContent='No se pudo preparar la muestra. Solicita un enlace nuevo desde el panel.';audioNote.classList.remove('hidden')}
   }else if(audio&&!previewLinkToken){
    audioNote.textContent='Para escuchar la prueba, abre el enlace de muestra que te enviamos por WhatsApp.';
    audioNote.classList.remove('hidden');
   }
  };
  openGiftButton.addEventListener('click',revealGiftContent);
- // Se conserva un único evento de clic para evitar dobles aperturas en móviles.
+ openGiftButton.addEventListener('pointerup',e=>{e.preventDefault();revealGiftContent()});
+ document.getElementById('intro').addEventListener('click',e=>{if(e.target.closest('#openGift'))revealGiftContent()});
+ document.getElementById('intro').addEventListener('pointerup',e=>{if(e.target.closest('#openGift'))revealGiftContent()});
 
 const downloadButton=document.getElementById('downloadGift');
 const downloadMp3Button=document.getElementById('downloadMp3');
@@ -905,7 +882,7 @@ async function watchCustomerOrderAudio(orderId){
      progress.remove();
      const link=document.getElementById('customerAutomaticPreviewLink');if(link)link.remove();
      const paymentContext=window.cchPaymentContext;
-     if(paymentContext?.orderId===orderId){window.cchPaymentContext=null;try{sessionStorage.removeItem('cchPaymentContext');localStorage.removeItem('cchPaymentContext');}catch(e){}}
+     if(paymentContext?.orderId===orderId){window.cchPaymentContext=null;try{sessionStorage.removeItem('cchPaymentContext');}catch(e){}}
      const upload=document.getElementById('orderPaymentUpload');if(upload)upload.classList.add('hidden');
      const status=document.getElementById('customerLyricsStatus');if(status)status.textContent='No encontramos un pedido anterior. Tu letra está lista; cuando pulses «Enviar pedido», se registrará una nueva solicitud.';
      return;
@@ -938,7 +915,7 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>
    try{localStorage.setItem('cchLastCustomerOrderId',window.cchAutoSavedOrderId);}catch(e){}
    if(saved.paymentReady&&saved.paymentAccessToken){
     window.cchPaymentContext={orderId:saved.orderId,accessToken:saved.paymentAccessToken};
-    try{localStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
+    try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
     mountCustomerOrderChat();
    }
    // El pago se solicita únicamente después de que el cliente escuche la muestra completa.
@@ -996,7 +973,7 @@ async function restoreCustomerOrderProgress(orderId){
  }catch(e){console.warn('No se pudo verificar el pedido anterior:',e?.message||e);}
 }
 try{
- const savedPaymentContext=localStorage.getItem('cchPaymentContext')||sessionStorage.getItem('cchPaymentContext');
+ const savedPaymentContext=sessionStorage.getItem('cchPaymentContext');
  if(savedPaymentContext){const parsed=JSON.parse(savedPaymentContext);if(parsed?.orderId&&parsed?.accessToken){window.cchPaymentContext=parsed;mountCustomerOrderChat();document.getElementById('orderPaymentUpload').classList.remove('hidden');}}
  const restoredOrderId=localStorage.getItem('cchLastCustomerOrderId');
  if(restoredOrderId)restoreCustomerOrderProgress(restoredOrderId);
@@ -1463,57 +1440,5 @@ function mountCustomerOrderChat(){
  btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();submit();},true);
 })();
 </script>
-
-
-<!-- Apertura centralizada en revealGiftContent para evitar dobles reproducciones. -->
-
-
-<script>
-/* Conserva el borrador del cliente si cambia al panel y regresa a esta página en la misma pestaña. */
-(function(){
- const KEY='cchCustomerOrderDraft_v1';
- function form(){return document.getElementById('orderForm');}
- function save(){
-  const f=form();if(!f)return;
-  const data={};
-  Array.from(f.elements).forEach(el=>{
-   if(!el.name&&!el.id)return;
-   if(['file','password','submit','button'].includes((el.type||'').toLowerCase()))return;
-   const key=el.name||el.id;
-   if(el.type==='checkbox')data[key]=!!el.checked;
-   else if(el.type==='radio'){if(el.checked)data[key]=el.value;}
-   else data[key]=el.value;
-  });
-  try{sessionStorage.setItem(KEY,JSON.stringify(data));}catch(e){}
- }
- function restore(){
-  const f=form();if(!f)return;
-  let data;try{data=JSON.parse(sessionStorage.getItem(KEY)||'null');}catch(e){data=null;}
-  if(!data||typeof data!=='object')return;
-  Array.from(f.elements).forEach(el=>{
-   if(!el.name&&!el.id)return;
-   if(['file','password','submit','button'].includes((el.type||'').toLowerCase()))return;
-   const key=el.name||el.id;if(!(key in data))return;
-   if(el.type==='checkbox')el.checked=!!data[key];
-   else if(el.type==='radio')el.checked=String(data[key])===String(el.value);
-   else if(data[key]!==null&&data[key]!==undefined)el.value=data[key];
-  });
-  const result=document.getElementById('customerLyricsResult');
-  const lyrics=document.getElementById('customerLyricsText');
-  if(result&&lyrics&&lyrics.value.trim())result.classList.remove('hidden');
- }
- function init(){
-  const f=form();if(!f)return;
-  restore();
-  f.addEventListener('input',save);
-  f.addEventListener('change',save);
-  window.addEventListener('pagehide',save);
-  window.addEventListener('pageshow',restore);
- }
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
- else init();
-})();
-</script>
-
 
 </body></html>
