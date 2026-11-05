@@ -116,13 +116,13 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
 <div style="margin:18px 0;padding:16px;border:1px solid #f6d78c;border-radius:16px;background:rgba(246,215,140,.08)">
  <h3 style="color:#f6d78c;margin:0 0 8px">✨ Crea tu letra con inteligencia artificial</h3>
  <p class="note" style="text-align:left">Completa tu historia y tus preferencias. La IA preparará una letra original para que puedas revisarla antes de enviarla.</p>
- <button class="btn" id="generateCustomerLyrics" type="button" onclick="window.generateCustomerLyrics()">✨ Generar mi letra personalizada</button>
+ <button class="btn" id="generateCustomerLyrics" type="button">✨ Generar mi letra personalizada</button>
  <div id="customerLyricsStatus" class="note" style="text-align:left" aria-live="polite">Tu letra aparecerá aquí después de generarla.</div>
  <div id="customerLyricsResult" class="hidden">
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
   <textarea id="customerLyricsText" rows="16" style="min-height:300px"></textarea>
   <button class="btn" id="sendCustomerLyrics" type="button">💗 Enviar pedido y generar canción</button>
-  <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button" onclick="generateCustomerLyrics()">🔄 Generar otra versión</button></div>
+  <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
   <label for="package">Paquete único</label><select id="package"><option value="CANCIÓN PERSONALIZADA MP3 — S/25">Canción personalizada en MP3 — S/25</option></select>
   <button class="btn alt hidden" id="sendCustomerLyricsWhatsApp" type="button">💬 Enviar pedido y letra por WhatsApp</button>
    <button class="btn hidden" id="notifyAdminAudioReady" type="button">✅ Avisarnos por WhatsApp: canción generada</button>
@@ -823,10 +823,6 @@ async function generateCustomerLyrics(){
  finally{btn.disabled=false;document.getElementById('regenerateCustomerLyrics').disabled=false;}
 }
 window.generateCustomerLyrics=generateCustomerLyrics;
-document.getElementById('generateCustomerLyrics').addEventListener('click',event=>{event.preventDefault();window.generateCustomerLyrics();});
-document.getElementById('regenerateCustomerLyrics').addEventListener('click',event=>{event.preventDefault();window.generateCustomerLyrics();});
-// El botón invoca directamente generateCustomerLyrics() desde su atributo onclick.
-// La regeneración también invoca directamente generateCustomerLyrics().
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
 async function watchCustomerOrderAudio(orderId){
  const progress=document.getElementById('customerAudioProgress');
@@ -1308,4 +1304,40 @@ function mountCustomerOrderChat(){
  window.addEventListener('hashchange',openOrderExperience);
 })();
 </script>
+
+<script>
+/* Generador independiente: no depende de que los demás scripts de la página terminen de inicializarse. */
+(function(){
+ const api='https://canta-corazon-private-api.onrender.com';
+ const get=id=>document.getElementById(id);
+ const generate=async function(){
+  const btn=get('generateCustomerLyrics'),again=get('regenerateCustomerLyrics'),status=get('customerLyricsStatus'),result=get('customerLyricsResult'),output=get('customerLyricsText');
+  if(!btn||!status||!result||!output){console.error('No se encontraron los elementos del generador de letras.');return;}
+  const val=id=>(get(id)?.value||'').trim();
+  const body={buyer:val('buyer'),recipient:val('recipient'),relationship:val('relationship'),occasion:val('occasion'),story:val('story'),style:val('style')||val('customGenre'),voice:val('voice'),customGenre:val('customGenre'),phrase:val('specialPhrase'),duration:val('lyricDuration'),tone:val('lyricTone')};
+  if(!body.buyer||!body.recipient||!body.occasion||!body.story||!body.style){
+   status.textContent='Completa tu nombre, para quién es, la ocasión, la historia y el género musical antes de generar.';
+   return;
+  }
+  btn.disabled=true;if(again)again.disabled=true;
+  status.textContent='✨ La IA está escribiendo tu canción. Espera un momento…';result.classList.add('hidden');
+  try{
+   const response=await fetch(api+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||('Error del servidor ('+response.status+').'));
+   if(!data.lyrics||!String(data.lyrics).trim())throw new Error('El servidor respondió, pero no devolvió una letra. Inténtalo nuevamente.');
+   output.value=data.lyrics;result.classList.remove('hidden');
+   status.textContent='💗 ¡Tu letra está lista! Revísala y edítala si lo deseas.';
+   result.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }catch(error){
+   console.error('Error al generar la letra:',error);
+   status.textContent='No se pudo generar: '+(error.message||'Error de conexión. Verifica tu internet e inténtalo otra vez.');
+  }finally{btn.disabled=false;if(again)again.disabled=false;}
+ };
+ window.generateCustomerLyrics=generate;
+ if(get('generateCustomerLyrics'))get('generateCustomerLyrics').onclick=generate;
+ if(get('regenerateCustomerLyrics'))get('regenerateCustomerLyrics').onclick=generate;
+})();
+</script>
+
 </body></html>
