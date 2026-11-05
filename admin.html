@@ -163,7 +163,7 @@ body.cch-preview-open{overflow:hidden}
 </section>
 <div id="panelToolbar" style="max-width:980px;margin:10px auto;padding:0 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="backToDashboard" type="button" style="margin:0;flex:1 1 150px">🏠 Volver al panel principal</button><button class="btn alt" id="panelMenuToggle" type="button" aria-expanded="false" aria-controls="panelMenu" style="margin:0;flex:1 1 130px">☰ Menú del panel</button><button class="btn" id="refreshAdminPanel" type="button" style="margin:0;flex:1 1 145px">🔄 Actualizar panel</button></div><nav class="panel-nav menu-collapsed" id="panelMenu" aria-label="Secciones del panel"><a href="#messenger">💬 Centro de mensajería</a><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#whatsappManualOrders">💬 Pedidos WhatsApp</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
 <section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
-<section class="card hidden" id="supabaseConfigPanel"><h2>☁️ Configuración de almacenamiento</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
+<section class="card hidden" id="supabaseConfigPanel"><h2>☁️ Configuración de almacenamiento</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect" type="button">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
 <section class="card hidden" id="adminLoginPanel"><h2>🔐 Acceso administrativo</h2><div class="grid"><div><label>Correo administrador</label><input id="email" type="email" autocomplete="username"></div><div><label>Contraseña</label><input id="password" type="password" autocomplete="current-password"></div></div><div class="row"><button class="btn" id="login">Iniciar sesión</button><button class="btn alt" id="logout">Cerrar sesión</button></div><div class="status" id="authStatus">Conecta Supabase y luego inicia sesión.</div></section>
 
 <section class="card hidden" id="messenger"><div class="row" style="justify-content:space-between;align-items:center"><h2>💬 CENTRO DE MENSAJERÍA</h2><button class="btn alt" id="refreshMessenger" type="button">Actualizar</button></div><p class="section-help">Aquí llegan los pedidos nuevos y los mensajes de tus clientes. Cada conversación está vinculada a un pedido independiente.</p><div class="messenger-layout"><div><h3>📥 Pedidos y conversaciones</h3><div id="messengerConversationList" class="messenger-list">Cargando conversaciones…</div></div><div><h3 id="messengerThreadTitle">Selecciona un pedido</h3><div id="messengerThread" class="messenger-thread"><p class="muted">Elige un pedido para consultar y responder sus mensajes.</p></div><div id="messengerComposer" class="hidden"><textarea id="messengerReply" maxlength="1200" placeholder="Escribe tu respuesta al cliente…"></textarea><button class="btn" id="sendMessengerReply" type="button">Enviar respuesta</button><p class="muted" id="messengerStatus" aria-live="polite"></p></div></div></div></section>
@@ -208,6 +208,51 @@ body.cch-preview-open{overflow:hidden}
  </div>
  <iframe id="cchCustomerPreviewFrame" title="Tienda pública para probar como cliente" loading="lazy" referrerpolicy="same-origin"></iframe>
 </section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+/* Conexión Supabase independiente: permite comprobarla aunque falle otro módulo del panel. */
+(function(){
+ const button=document.getElementById('connect');
+ const status=document.getElementById('connStatus');
+ const urlField=document.getElementById('url');
+ const keyField=document.getElementById('key');
+ if(!button||!status||!urlField||!keyField)return;
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const rawUrl=urlField.value.trim();
+  const key=keyField.value.trim();
+  const say=text=>{status.textContent=text;};
+  let parsed;
+  try{parsed=new URL(rawUrl);}catch(_){say('La URL no es válida. Copia la Project URL completa de Supabase.');return;}
+  if(parsed.protocol!=='https:'||!parsed.hostname||parsed.username||parsed.password||parsed.search||parsed.hash||parsed.pathname!=='/'){
+   say('La URL debe ser la Project URL completa, empezando con https:// y sin rutas adicionales.');return;
+  }
+  if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){
+   say('La clave no parece una clave pública Publishable o anon. No uses service_role.');return;
+  }
+  button.disabled=true;
+  say('Comprobando conexión con Supabase…');
+  try{
+   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Comprueba internet y vuelve a actualizar el panel.');
+   const projectUrl=parsed.origin;
+   const client=window.supabase.createClient(projectUrl,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   localStorage.setItem('cc_config',JSON.stringify({url:projectUrl,key}));
+   const result=await client.from('songs').select('id',{head:true}).limit(1);
+   if(result.error){
+    const detail=result.error.message||'Error sin descripción';
+    if(/permission|policy|row.level|rls|not found|does not exist|schema cache/i.test(detail)){
+     say('Supabase respondió. La conexión funciona, pero falta revisar la tabla songs o sus permisos: '+detail);
+    }else{
+     say('La configuración se guardó, pero Supabase devolvió un error: '+detail);
+    }
+   }else{
+    say('¡Conexión correcta! URL y clave pública guardadas en este navegador. Ahora puedes iniciar sesión.');
+   }
+  }catch(error){
+   say('No se pudo conectar: '+(error&&error.message?error.message:String(error)));
+  }finally{button.disabled=false;}
+ },true);
+})();
+</script><script>
 const API_BASE="https://canta-corazon-private-api.onrender.com";
 function cchPaymentLinkStore(){try{return JSON.parse(localStorage.getItem("cch_order_payment_links")||"{}")}catch{return {}}}
 function cchRememberPaymentLink(orderId,accessToken){if(!orderId||!accessToken)return;const links=cchPaymentLinkStore();links[orderId]=accessToken;localStorage.setItem("cch_order_payment_links",JSON.stringify(links));}
