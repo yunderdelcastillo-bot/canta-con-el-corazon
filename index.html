@@ -1536,6 +1536,9 @@ function mountCustomerOrderChat(){
   const note=document.getElementById('audioNote');
   const api='https://canta-corazon-private-api.onrender.com';
   if(!audio||!player)return;
+  // Evita que el controlador antiguo inicie una segunda vista previa en paralelo.
+  // El evento ended existente conserva el QR, el voucher y el cierre de la muestra.
+  if(token)previewToken=token;
   try{
    let audioUrl=api+'/api/audio?path='+encodeURIComponent(audio);
    if(grant)audioUrl+='&grant='+encodeURIComponent(grant);
@@ -1554,6 +1557,7 @@ function mountCustomerOrderChat(){
    try{await player.play();}catch(e){if(note){note.textContent='La sorpresa ya está abierta. Pulsa reproducir en el reproductor para escucharla.';note.classList.remove('hidden');}}
   }catch(error){if(note){note.textContent=error.message||'No se pudo cargar la canción. Revisa tu conexión e inténtalo otra vez.';note.classList.remove('hidden');}}
  },{capture:true});
+ button.addEventListener('click',function(e){e.stopImmediatePropagation();},{capture:true});
 })();
 </script>
 </body></html>
