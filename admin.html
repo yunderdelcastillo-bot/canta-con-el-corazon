@@ -933,11 +933,12 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   button.disabled=true;say('Verificando acceso administrativo con Supabase…');
   try{
    const client=window.supabase.createClient(saved.url,saved.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   db=client;
    const {data,error}=await client.auth.signInWithPassword({email,password});
    if(error)throw error;
    if(!data.user)throw new Error('Supabase no devolvió un usuario autenticado.');
-   say('¡Inicio de sesión correcto! Abriendo el panel…');
-   setTimeout(()=>location.reload(),700);
+   await activateAdminSession(data.user);
+   say('¡Inicio de sesión correcto! Supabase sigue conectado y el panel está abierto.');
   }catch(error){say('No se pudo iniciar sesión: '+(error?.message||String(error)));}
   finally{button.disabled=false;}
  },true);
