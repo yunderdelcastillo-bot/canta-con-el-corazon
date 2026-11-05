@@ -322,15 +322,26 @@ function showPaymentCta(){
    if(!ctx.orderId||!ctx.accessToken){status.textContent='No encontramos el acceso seguro de tu pedido. Regresa a la página donde registraste tu pedido y abre nuevamente la muestra.';return;}
    if(!file){status.textContent='Selecciona primero la captura de tu voucher.';return;}
    if(file.size>8*1024*1024){status.textContent='El comprobante debe pesar máximo 8 MB.';return;}
-   button.disabled=true;status.textContent='Subiendo tu comprobante de forma segura…';
+   button.disabled=true;button.textContent='Preparando voucher…';status.style.display='block';status.style.minHeight='24px';status.style.color='#fff';status.textContent='📂 Preparando la imagen para enviarla…';
+   let progress=document.getElementById('previewVoucherProgress');
+   if(!progress){progress=document.createElement('progress');progress.id='previewVoucherProgress';progress.max=100;progress.value=0;progress.style.cssText='display:block;width:100%;height:12px;margin:10px 0;accent-color:#f4b7d0';status.after(progress);}
+   progress.style.display='block';progress.value=0;
    try{
-    const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer el archivo.'));reader.readAsDataURL(file);});
-    const response=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64})});
-    const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'No se pudo enviar el comprobante.');
-    status.textContent=result.status==='approved'?'✅ ¡Voucher registrado! Tu pedido quedó aprobado automáticamente. La descarga MP3 se habilitará cuando la canción esté lista.':'📩 Voucher recibido.';
-    button.textContent='Voucher enviado';
-   }catch(error){status.textContent='No se pudo enviar: '+error.message;}
-   finally{button.disabled=false;}
+    const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer la foto. Vuelve a seleccionarla.'));reader.onprogress=e=>{if(e.lengthComputable)status.textContent='📂 Leyendo imagen… '+Math.round(e.loaded/e.total*100)+'%';};reader.readAsDataURL(file);});
+    status.textContent='📤 Enviando voucher al servidor…';
+    const result=await new Promise((resolve,reject)=>{
+     const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
+     xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);progress.value=pct;status.textContent='📤 Enviando voucher… '+pct+'%';}};
+     xhr.onload=()=>{let data={};try{data=JSON.parse(xhr.responseText||'{}')}catch(e){}if(xhr.status>=200&&xhr.status<300)resolve(data);else reject(new Error(data.error||('El servidor respondió '+xhr.status+'.')));};
+     xhr.onerror=()=>reject(new Error('No se pudo conectar con el servidor. Revisa internet e inténtalo otra vez.'));
+     xhr.ontimeout=()=>reject(new Error('La subida tardó demasiado. Reduce el tamaño de la foto o inténtalo con mejor conexión.'));
+     xhr.onabort=()=>reject(new Error('La subida fue cancelada.'));
+     xhr.send(JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64}));
+    });
+    progress.value=100;status.textContent='✅ Voucher recibido por el sistema. '+(result.message||'Tu pedido quedó registrado.');status.style.color='#b8ffd0';
+    button.textContent='Voucher enviado';button.disabled=true;return;
+   }catch(error){status.textContent='❌ No se pudo enviar: '+(error.message||'Error desconocido')+' Puedes volver a intentarlo.';status.style.color='#ffd0d0';progress.style.display='none';}
+   finally{if(button.textContent!=='Voucher enviado'){button.disabled=false;button.textContent='📤 Reintentar envío del voucher';}}
   });
  }
  box.classList.remove('hidden');
