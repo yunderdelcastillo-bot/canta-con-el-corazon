@@ -1511,4 +1511,52 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
+
+<script>
+/* Conserva el borrador del cliente si cambia al panel y regresa a esta página en la misma pestaña. */
+(function(){
+ const KEY='cchCustomerOrderDraft_v1';
+ function form(){return document.getElementById('orderForm');}
+ function save(){
+  const f=form();if(!f)return;
+  const data={};
+  Array.from(f.elements).forEach(el=>{
+   if(!el.name&&!el.id)return;
+   if(['file','password','submit','button'].includes((el.type||'').toLowerCase()))return;
+   const key=el.name||el.id;
+   if(el.type==='checkbox')data[key]=!!el.checked;
+   else if(el.type==='radio'){if(el.checked)data[key]=el.value;}
+   else data[key]=el.value;
+  });
+  try{sessionStorage.setItem(KEY,JSON.stringify(data));}catch(e){}
+ }
+ function restore(){
+  const f=form();if(!f)return;
+  let data;try{data=JSON.parse(sessionStorage.getItem(KEY)||'null');}catch(e){data=null;}
+  if(!data||typeof data!=='object')return;
+  Array.from(f.elements).forEach(el=>{
+   if(!el.name&&!el.id)return;
+   if(['file','password','submit','button'].includes((el.type||'').toLowerCase()))return;
+   const key=el.name||el.id;if(!(key in data))return;
+   if(el.type==='checkbox')el.checked=!!data[key];
+   else if(el.type==='radio')el.checked=String(data[key])===String(el.value);
+   else if(data[key]!==null&&data[key]!==undefined)el.value=data[key];
+  });
+  const result=document.getElementById('customerLyricsResult');
+  const lyrics=document.getElementById('customerLyricsText');
+  if(result&&lyrics&&lyrics.value.trim())result.classList.remove('hidden');
+ }
+ function init(){
+  const f=form();if(!f)return;
+  restore();
+  f.addEventListener('input',save);
+  f.addEventListener('change',save);
+  window.addEventListener('pagehide',save);
+  window.addEventListener('pageshow',restore);
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
+ else init();
+})();
+</script>
+
 </body></html>
