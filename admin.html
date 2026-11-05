@@ -324,7 +324,7 @@ $('login').onclick=async()=>{
   if(!email||!password)throw new Error('Escribe el correo y la contraseña del administrador.');
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error)throw error;
-  await window.cchActivateAdminSession(db,data.user);
+  await activateAdminSession(data.user);
  }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa la configuración de Supabase y tus datos.'))}
  finally{button.disabled=false}
 };
@@ -867,8 +867,8 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
    if(authError)throw authError;
    const {error}=await client.from('songs').select('id',{head:true}).limit(1);
    if(error && !/permission|policy|row.level|rls/i.test(error.message||''))throw error;
-   if(data.session?.user){await window.cchActivateAdminSession(client,data.session.user,{restored:true});say('¡Supabase conectado y sesión administrativa recuperada!');}
-   else {await window.cchActivateAdminSession(client,null);say('¡Conexión correcta! Ahora pulsa Iniciar sesión.');}
+   if(data.session?.user){say('Sesión de Supabase encontrada. Ahora pulsa Iniciar sesión para abrir el panel.');}
+   else say('¡Conexión correcta! URL y clave aceptadas. Ahora pulsa Iniciar sesión.');
   }catch(error){db=null;say('Error de conexión: '+(error?.message||String(error)));}
   finally{button.disabled=false;}
  },true);
