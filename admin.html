@@ -852,7 +852,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   const rawUrl=urlField.value.trim(),key=keyField.value.trim();
   let parsed;
   try{parsed=new URL(rawUrl);}catch(_){say('URL inválida. Usa la Project URL completa de Supabase.');return;}
-  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co')||parsed.pathname!=='/'||parsed.search||parsed.hash){say('La URL no corresponde a una Project URL válida de Supabase.');return;}
+  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('supabase.co')||parsed.username||parsed.password){say('La URL debe ser la Project URL HTTPS de Supabase, por ejemplo https://TU-PROYECTO.supabase.co.');return;}
   if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){say('La clave pública está incompleta o no es válida. No uses service_role.');return;}
   button.disabled=true;
   say('Conectando con Supabase…');
