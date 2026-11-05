@@ -1407,6 +1407,25 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
+app.post("/api/admin/orders/:id/payment-link",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",id).maybeSingle();
+  if(orderError)throw orderError;if(!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status").eq("order_id",id).maybeSingle();
+  if(paymentError)throw paymentError;if(!payment)return res.status(404).json({error:"Este pedido no tiene un registro de pago."});
+  if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya figura como pagado. No necesita un nuevo enlace de pago."});
+  const accessToken=crypto.randomBytes(32).toString("base64url");
+  const accessHash=crypto.createHash("sha256").update(accessToken).digest("hex");
+  const {error:updateError}=await db.from("payment_submissions").update({access_token_hash:accessHash,updated_at:new Date().toISOString()}).eq("id",payment.id);
+  if(updateError)throw updateError;
+  res.set("Cache-Control","no-store").json({ok:true,orderId:id,accessToken});
+ }catch(e){console.error("Admin payment link:",e?.message||e);res.status(500).json({error:"No se pudo generar el enlace seguro de pago."});}
+});
+
 async function customerPaymentAccess(db,id,token){
  if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return false;
  const hash=crypto.createHash("sha256").update(token).digest("hex");
