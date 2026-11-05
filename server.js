@@ -1201,114 +1201,10 @@ app.post("/api/assistant/chat",async(req,res)=>{
  }
 });
 
-// Generación musical Lyria 3.5: solo administradora autenticada; el MP3 vuelve al panel para revisión.
-const lyriaRateLimits=new Map();
-app.post("/api/music/generate",async(req,res)=>{
- try{
-  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-  if(!apiKey)return res.status(503).json({error:"Falta GEMINI_API_KEY en Render."});
-  const user=await mediaUser(req);
-  if(!user)return res.status(401).json({error:"Inicia sesión nuevamente en el panel administrador."});
-  const body=req.body||{};
-  const lyrics=String(body.lyrics||"").trim();
-  const style=String(body.style||"").trim().slice(0,180);
-  const voice=String(body.voice||"").trim().slice(0,100);
-  const duration=String(body.duration||"3 minutos").trim().slice(0,40);
-  const custom=String(body.custom||"").trim().slice(0,700);
-  if(lyrics.length<40||lyrics.length>12000)return res.status(400).json({error:"La letra debe tener entre 40 y 12 000 caracteres."});
-  if(!style)return res.status(400).json({error:"Selecciona el género musical."});
-  const now=Date.now(),record=lyriaRateLimits.get(user.id)||{start:now,count:0};
-  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
-  if(record.count>=5)return res.status(429).json({error:"Límite de 5 generaciones por hora alcanzado. Inténtalo más tarde."});
-  record.count++;lyriaRateLimits.set(user.id,record);
-  const prompt="Produce una canción completa en español latino, de aproximadamente "+duration+". Género: "+style+". Interpretación vocal: "+voice+". "+(custom?"Dirección musical adicional: "+custom+". ":"")+"Usa la letra proporcionada como letra principal, conserva los nombres propios y el sentido de la dedicatoria, no imites la voz de ningún artista. Crea una melodía original, arreglo profesional, estructura clara, intro, versos, coro, puente y cierre. La canción debe sonar terminada, no como una demo.\n\nLyrics:\n"+lyrics;
-  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
-   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-   body:JSON.stringify({model:"lyria-3.5",input:prompt}),
-   signal:AbortSignal.timeout(240000)
-  });
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok){
-   console.error("Lyria generation failed:",response.status,payload?.error?.message||"");
-   const status=response.status===429?429:(response.status===400||response.status===403?502:503);
-   return res.status(status).json({error:response.status===403?"Google no autorizó Lyria para esta clave. Revisa el acceso y la facturación de Gemini API.":response.status===429?"Lyria alcanzó el límite de uso. Espera antes de generar otra canción.":"Lyria no pudo generar el audio. Revisa que tu clave tenga acceso al modelo lyria-3.5."});
-  }
-  let audioBase64="",mimeType="audio/mpeg";
-  for(const step of payload.steps||[]){
-   if(step.type!=="model_output")continue;
-   for(const block of step.content||[]){
-    if(block.type==="audio"&&block.data){audioBase64=String(block.data);mimeType=String(block.mime_type||"audio/mpeg");}
-   }
-  }
-  if(!audioBase64&&payload.output_audio?.data)audioBase64=String(payload.output_audio.data);
-  if(!audioBase64)return res.status(502).json({error:"Lyria respondió, pero no devolvió un archivo de audio reconocible."});
-  const estimatedBytes=Math.floor(audioBase64.length*3/4);
-  if(estimatedBytes>25*1024*1024)return res.status(413).json({error:"El MP3 generado supera el límite actual de 25 MB. No se guardó; prueba una duración menor."});
-  res.set("Cache-Control","no-store").json({ok:true,audioBase64,mimeType,model:"lyria-3.5",sizeBytes:estimatedBytes});
- }catch(e){
-  console.error("Lyria music generation:",e?.message||e);
-  res.status(e?.name==="TimeoutError"?504:502).json({error:e?.name==="TimeoutError"?"La generación musical tardó demasiado. Inténtalo nuevamente.":"No se pudo completar la generación musical."});
- }
-});
-
-
 // Pedidos de clientes: registro separado de canciones. El cliente confirma el envío; el pago se verifica manualmente.
 const orderFields=["buyer","contact","recipient","relationship","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency","lyrics"];
 function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
-const orderAudioRateLimits=new Map();
-const orderAudioJobs=new Set();
 const orderAudioStatus=new Map();
-async function generateOrderAudio(orderId,order){
- const jobKey=String(orderId);if(orderAudioJobs.has(jobKey))return;
- orderAudioJobs.add(jobKey);orderAudioStatus.set(jobKey,{status:"processing",progress:20,message:"🎼 Estamos creando tu canción.",updatedAt:Date.now()});
- try{
-  if(!ready())throw new Error("Supabase no está configurado.");
-  if(!process.env.GEMINI_API_KEY)throw new Error("Falta GEMINI_API_KEY.");
-  const lyrics=String(order.lyrics||"").trim();if(lyrics.length<40)throw new Error("La letra no tiene suficientes caracteres.");
-  const now=Date.now(),record=orderAudioRateLimits.get("all")||{start:now,count:0};
-  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
-  if(record.count>=5)throw new Error("Límite horario de generación automática alcanzado.");
-  record.count++;orderAudioRateLimits.set("all",record);
-  const prompt="Produce una canción completa en español latino, de aproximadamente "+String(order.lyric_duration||"3 minutos").slice(0,40)+". Género: "+String(order.style||"Balada romántica").slice(0,120)+". Interpretación vocal: "+String(order.voice||"Voz femenina").slice(0,80)+". "+(order.custom_genre?"Dirección musical adicional: "+String(order.custom_genre).slice(0,180)+". ":"")+"Dedicatoria para "+String(order.recipient||"").slice(0,120)+", ocasión: "+String(order.occasion||"").slice(0,100)+". Conserva nombres propios y hechos, no inventes detalles ni imites la voz de artistas. Crea una melodía original con arreglo profesional y una canción terminada.\n\nLyrics:\n"+lyrics.slice(0,12000);
-  orderAudioStatus.set(jobKey,{status:"creating",progress:35,message:"🎼 La IA está componiendo tu canción.",updatedAt:Date.now()});
-  const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":String(process.env.GEMINI_API_KEY).trim(),"Content-Type":"application/json"},body:JSON.stringify({model:"lyria-3.5",input:prompt}),signal:AbortSignal.timeout(240000)});
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error("Lyria respondió HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,300));
-  let audioBase64="",audioMime="audio/mpeg";
-  for(const step of payload.steps||[])if(step.type==="model_output")for(const block of step.content||[])if(block.type==="audio"&&block.data){audioBase64=String(block.data);audioMime=String(block.mime_type||"audio/mpeg");}
-  if(!audioBase64&&payload.output_audio?.data){audioBase64=String(payload.output_audio.data);audioMime=String(payload.output_audio.mime_type||"audio/mpeg");}
-  if(!audioBase64)throw new Error("Lyria no devolvió un archivo de audio reconocible.");
-  orderAudioStatus.set(jobKey,{status:"uploading",progress:72,message:"☁️ La canción está creada. Estamos guardando el audio.",updatedAt:Date.now()});
-  const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
-  const db=admin();
-  const {error:orderUploadError}=await db.storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
-  if(orderUploadError)throw orderUploadError;
-  const {data:owners,error:ownerError}=await db.from("songs").select("owner_id").limit(20);
-  if(ownerError)throw ownerError;
-  const ownerIds=[...new Set((owners||[]).map(x=>x.owner_id).filter(Boolean))];
-  const ownerId=String(process.env.ADMIN_OWNER_ID||(ownerIds.length===1?ownerIds[0]:""));
-  if(!/^[0-9a-f-]{36}$/i.test(ownerId))throw new Error("No se pudo identificar de forma segura al usuario administrador. Configura ADMIN_OWNER_ID en Render.");
-  const canonicalPath=ownerId+"/"+jobKey+".mp3";
-  const {error:canonicalUploadError}=await db.storage.from("songs-audio").upload(canonicalPath,buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
-  if(canonicalUploadError)throw canonicalUploadError;
-  const {data:existingSong,error:existingSongError}=await db.from("songs").select("id").eq("audio_path",canonicalPath).maybeSingle();
-  if(existingSongError)throw existingSongError;
-  const packageKey="esencial";
-   const packagePrice=25;
-  const occasion=String(order.occasion||"").toLowerCase();
-  const theme=/cumple/.test(occasion)?"cumpleanos":/anivers|bodas/.test(occasion)?"aniversario":/serenata/.test(occasion)?"serenata":/homenaje|despedida/.test(occasion)?"homenaje":/amistad/.test(occasion)?"amistad":"romantico";
-  const songId=existingSong?.id||crypto.randomUUID();
-  const songRow={id:songId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics,theme,audio_path:canonicalPath,audio_url:null,owner_id:ownerId,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
-  const {error:songSaveError}=await db.from("songs").upsert(songRow);
-  if(songSaveError)throw songSaveError;
-  orderAudioStatus.set(jobKey,{status:"ready",progress:90,message:"🎵 ¡Tu canción está lista!",updatedAt:Date.now(),songId});
-  await createSystemNotification(db,{order_id:jobKey,event_type:"song_ready",audience:"admin",title:"🎵 ¡Canción de cliente lista!",body:"La canción de "+String(order.buyer||"un cliente").slice(0,100)+" para "+String(order.recipient||"").slice(0,100)+" ya se generó y está guardada en la biblioteca."});
-  console.log("Automatic customer song generated and added to library:",jobKey,songId,buffer.length);
- }catch(e){orderAudioStatus.set(jobKey,{status:"failed",progress:0,message:"No se pudo generar automáticamente: "+String(e?.message||e).slice(0,220),updatedAt:Date.now()});
-  try{await createSystemNotification(admin(),{order_id:jobKey,event_type:"song_generation_failed",audience:"admin",title:"⚠️ Falló la generación de una canción",body:"Pedido "+jobKey+": "+String(e?.message||e).slice(0,220)});}catch{}
-  console.error("Automatic customer song failed:",jobKey,e?.message||e);}
- finally{orderAudioJobs.delete(jobKey);}
-}
 app.post("/api/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado. Escríbenos por WhatsApp para continuar."});
@@ -1341,8 +1237,7 @@ app.post("/api/orders",async(req,res)=>{
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   const isExpress=order.urgency.toLowerCase().includes("express");
   await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS":"Nuevo pedido recibido",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+""});
-  orderAudioStatus.set(data.id,{status:"received",progress:15,message:"💗 Pedido recibido. Iniciando la creación de tu canción.",updatedAt:Date.now()});
-  setImmediate(()=>generateOrderAudio(data.id,order));
+  orderAudioStatus.set(data.id,{status:"received",progress:15,message:"💗 Pedido recibido. Ya llegó a nuestro panel. Prepararemos la muestra cuando la administradora suba el MP3.",updatedAt:Date.now()});
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
