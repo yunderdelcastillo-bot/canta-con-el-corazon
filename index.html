@@ -1441,4 +1441,36 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
+<script>
+/* Borrador temporal de la vista cliente: conserva los campos mientras esta página siga abierta.
+   No usa localStorage/sessionStorage, por lo que al actualizar se inicia una sesión limpia. */
+(function(){
+ const form=document.getElementById('orderForm');
+ if(!form)return;
+ const draft=Object.create(null);
+ const read=el=>{
+  if(!el.id||el.type==='file'||el.type==='password')return;
+  draft[el.id]=el.type==='checkbox'||el.type==='radio'
+   ?{type:el.type,checked:el.checked,value:el.value}
+   :{type:el.tagName,value:el.value};
+ };
+ const capture=()=>form.querySelectorAll('input,select,textarea').forEach(read);
+ const restore=()=>{
+  form.querySelectorAll('input,select,textarea').forEach(el=>{
+   const saved=el.id&&draft[el.id];
+   if(!saved||el.type==='file'||el.type==='password')return;
+   if(saved.type==='checkbox'||saved.type==='radio')el.checked=!!saved.checked;
+   else if(el.value===''&&saved.value!=='')el.value=saved.value;
+  });
+ };
+ form.addEventListener('input',e=>{if(e.target.matches('input,select,textarea'))read(e.target);},true);
+ form.addEventListener('change',e=>{if(e.target.matches('input,select,textarea'))read(e.target);},true);
+ capture();
+ const observer=new MutationObserver(()=>restore());
+ observer.observe(form,{childList:true,subtree:true});
+ window.addEventListener('pageshow',e=>{if(e.persisted)restore();});
+ window.addEventListener('pagehide',capture);
+})();
+</script>
+
 </body></html>
