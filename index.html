@@ -1515,4 +1515,45 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
+
+<script>
+/* Respaldo de apertura móvil: garantiza que el botón de la sorpresa responda aunque falle el controlador principal. */
+(function(){
+ const button=document.getElementById('openGift');
+ if(!button)return;
+ let opened=false;
+ button.addEventListener('click',async function(){
+  if(opened)return;
+  opened=true;
+  const intro=document.getElementById('intro');
+  const revealed=document.getElementById('revealed');
+  if(intro)intro.classList.add('hidden');
+  if(revealed){revealed.classList.remove('hidden');revealed.style.display='block';}
+  window.scrollTo({top:0,behavior:'smooth'});
+  const q=new URLSearchParams(location.search);
+  const audio=q.get('audio'),token=q.get('previewLink'),grant=q.get('grant');
+  const player=document.getElementById('audioPlayer');
+  const note=document.getElementById('audioNote');
+  const api='https://canta-corazon-private-api.onrender.com';
+  if(!audio||!player)return;
+  try{
+   let audioUrl=api+'/api/audio?path='+encodeURIComponent(audio);
+   if(grant)audioUrl+='&grant='+encodeURIComponent(grant);
+   else if(token){
+    const start=await fetch(api+'/api/preview/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token})});
+    const result=await start.json();
+    if(!start.ok)throw new Error(result.error||'No se pudo abrir la muestra.');
+    if(result.completed){if(note){note.textContent='La muestra ya fue escuchada. Continúa con el pago para desbloquear tu MP3.';note.classList.remove('hidden');}return;}
+    audioUrl+='&preview='+encodeURIComponent(token);
+   }else{
+    if(note){note.textContent='No se encontró el enlace de muestra. Solicita a la administradora un nuevo enlace.';note.classList.remove('hidden');}
+    return;
+   }
+   player.src=audioUrl;player.controls=true;player.classList.remove('hidden');
+   if(note)note.classList.add('hidden');
+   try{await player.play();}catch(e){if(note){note.textContent='La sorpresa ya está abierta. Pulsa reproducir en el reproductor para escucharla.';note.classList.remove('hidden');}}
+  }catch(error){if(note){note.textContent=error.message||'No se pudo cargar la canción. Revisa tu conexión e inténtalo otra vez.';note.classList.remove('hidden');}}
+ },{capture:true});
+})();
+</script>
 </body></html>
