@@ -208,51 +208,6 @@ body.cch-preview-open{overflow:hidden}
  </div>
  <iframe id="cchCustomerPreviewFrame" title="Tienda pública para probar como cliente" loading="lazy" referrerpolicy="same-origin"></iframe>
 </section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
-/* Conexión Supabase independiente: permite comprobarla aunque falle otro módulo del panel. */
-(function(){
- const button=document.getElementById('connect');
- const status=document.getElementById('connStatus');
- const urlField=document.getElementById('url');
- const keyField=document.getElementById('key');
- if(!button||!status||!urlField||!keyField)return;
- button.addEventListener('click',async function(event){
-  event.preventDefault();
-  event.stopImmediatePropagation();
-  const rawUrl=urlField.value.trim();
-  const key=keyField.value.trim();
-  const say=text=>{status.textContent=text;};
-  let parsed;
-  try{parsed=new URL(rawUrl);}catch(_){say('La URL no es válida. Copia la Project URL completa de Supabase.');return;}
-  if(parsed.protocol!=='https:'||!parsed.hostname||parsed.username||parsed.password||parsed.search||parsed.hash||parsed.pathname!=='/'){
-   say('La URL debe ser la Project URL completa, empezando con https:// y sin rutas adicionales.');return;
-  }
-  if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){
-   say('La clave no parece una clave pública Publishable o anon. No uses service_role.');return;
-  }
-  button.disabled=true;
-  say('Comprobando conexión con Supabase…');
-  try{
-   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Comprueba internet y vuelve a actualizar el panel.');
-   const projectUrl=parsed.origin;
-   const client=window.supabase.createClient(projectUrl,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-   localStorage.setItem('cc_config',JSON.stringify({url:projectUrl,key}));
-   const result=await client.from('songs').select('id',{head:true}).limit(1);
-   if(result.error){
-    const detail=result.error.message||'Error sin descripción';
-    if(/permission|policy|row.level|rls|not found|does not exist|schema cache/i.test(detail)){
-     say('Supabase respondió. La conexión funciona, pero falta revisar la tabla songs o sus permisos: '+detail);
-    }else{
-     say('La configuración se guardó, pero Supabase devolvió un error: '+detail);
-    }
-   }else{
-    say('¡Conexión correcta! URL y clave pública guardadas en este navegador. Ahora puedes iniciar sesión.');
-   }
-  }catch(error){
-   say('No se pudo conectar: '+(error&&error.message?error.message:String(error)));
-  }finally{button.disabled=false;}
- },true);
-})();
-</script><script>
 const API_BASE="https://canta-corazon-private-api.onrender.com";
 function cchPaymentLinkStore(){try{return JSON.parse(localStorage.getItem("cch_order_payment_links")||"{}")}catch{return {}}}
 function cchRememberPaymentLink(orderId,accessToken){if(!orderId||!accessToken)return;const links=cchPaymentLinkStore();links[orderId]=accessToken;localStorage.setItem("cch_order_payment_links",JSON.stringify(links));}
