@@ -343,7 +343,9 @@ function showPaymentCta(){
    const file=document.getElementById('previewVoucherFile').files[0],status=document.getElementById('previewVoucherStatus'),button=document.getElementById('previewUploadVoucher');
    const ctx=getCchPaymentContext();
    const customerPreviewToken=previewLinkToken||previewToken||'';
-   if((!ctx?.orderId||!ctx?.accessToken)&&!customerPreviewToken){status.textContent='No encontramos el acceso seguro de esta muestra. Abre el enlace original que recibiste para continuar.';return;}
+   const orderIdFromPreview=String(audio||'').split('/').pop().replace(/\.mp3$/i,'');
+   const uploadOrderId=ctx?.orderId||orderIdFromPreview;
+   if(!/^[0-9a-f-]{36}$/i.test(uploadOrderId)||(!ctx?.accessToken&&!customerPreviewToken)){status.textContent='No encontramos el acceso seguro de esta muestra. Abre el enlace original que recibiste para continuar.';return;}
    if(!file){status.textContent='Selecciona primero la captura de tu voucher.';return;}
    if(file.size>8*1024*1024){status.textContent='El comprobante debe pesar máximo 8 MB.';return;}
    button.disabled=true;button.textContent='Preparando voucher…';status.style.display='block';status.style.minHeight='24px';status.style.color='#fff';status.textContent='📂 Preparando la imagen para enviarla…';
@@ -354,7 +356,7 @@ function showPaymentCta(){
     const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer la foto. Vuelve a seleccionarla.'));reader.onprogress=e=>{if(e.lengthComputable)status.textContent='📂 Leyendo imagen… '+Math.round(e.loaded/e.total*100)+'%';};reader.readAsDataURL(file);});
     status.textContent='📤 Enviando voucher al servidor…';
     const result=await new Promise((resolve,reject)=>{
-     const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
+     const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(uploadOrderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);progress.value=pct;status.textContent='📤 Enviando voucher… '+pct+'%';}};
      xhr.onload=()=>{let data={};try{data=JSON.parse(xhr.responseText||'{}')}catch(e){}if(xhr.status>=200&&xhr.status<300)resolve(data);else reject(new Error(data.error||('El servidor respondió '+xhr.status+'.')));};
      xhr.onerror=()=>reject(new Error('No se pudo conectar con el servidor. Revisa internet e inténtalo otra vez.'));
