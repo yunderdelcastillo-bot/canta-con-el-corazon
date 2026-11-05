@@ -1256,16 +1256,25 @@ app.post("/api/orders",async(req,res)=>{
 app.post("/api/orders/:id/voucher",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El sistema de pagos no está configurado."});
-  const id=String(req.params.id||""),token=String(req.body?.accessToken||"");
-  if(!/^[0-9a-f-]{36}$/i.test(id)||!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Pedido o autorización no válidos."});
+  const id=String(req.params.id||""),token=String(req.body?.accessToken||""),previewToken=String(req.body?.previewToken||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||(!/^[A-Za-z0-9_-]{40,100}$/.test(token)&&!/^[A-Za-z0-9_-]{40,100}$/.test(previewToken)))return res.status(400).json({error:"Pedido o autorización no válidos."});
   const mime=String(req.body?.mimeType||"").toLowerCase();
   const allowed=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"],["application/pdf","pdf"]]);
   if(!allowed.has(mime))return res.status(400).json({error:"Adjunta una imagen JPG, PNG, WEBP o un PDF."});
   const raw=String(req.body?.fileBase64||"").replace(/^data:[^;]+;base64,/i,"");
   if(!raw||raw.length>11*1024*1024)return res.status(413).json({error:"El comprobante está vacío o supera 8 MB."});
   const buffer=Buffer.from(raw,"base64");if(!buffer.length||buffer.length>8*1024*1024)return res.status(413).json({error:"El comprobante supera 8 MB."});
-  const hash=crypto.createHash("sha256").update(token).digest("hex"),db=admin();
-  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("id,payment_status,amount,package_name,provider_payment_id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();
+  const db=admin();
+  let paymentQuery=db.from("payment_submissions").select("id,payment_status,amount,package_name,provider_payment_id").eq("order_id",id);
+  if(/^[A-Za-z0-9_-]{40,100}$/.test(token)){
+   const accessHash=crypto.createHash("sha256").update(token).digest("hex");
+   paymentQuery=paymentQuery.eq("access_token_hash",accessHash);
+  }else{
+   const previewHash=crypto.createHash("sha256").update(previewToken).digest("hex");
+   const {data:previewLink,error:previewError}=await db.from("song_preview_links").select("song_id").eq("token_hash",previewHash).maybeSingle();
+   if(previewError||!previewLink||previewLink.song_id!==id)return res.status(403).json({error:"El enlace de muestra no corresponde a este pedido."});
+  }
+  const {data:payment,error:paymentError}=await paymentQuery.maybeSingle();
   if(paymentError||!payment)return res.status(403).json({error:"No se pudo validar el acceso a este pedido."});
   // Si ya está aprobado pero aún no tiene archivo, permitir completar la carga del voucher.
   // Si ya existe un archivo, aceptar reenvíos del mismo pedido sin bloquear al cliente.
