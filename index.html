@@ -129,7 +129,8 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
  </div>
 </div>
 
-\n<label for="urgency">¿Cuándo necesitas tu canción?</label><select id="urgency" required><option value="Entrega normal (24–48 horas), por confirmar">Opción 1 — Entrega normal (24–48 horas) — S/25</option><option value="Servicio express en 30 minutos (+S/5)">Opción 2 — Servicio express en 30 minutos (+S/5) — S/30</option></select>
+
+<label for="urgency">¿Cuándo necesitas tu canción?</label><select id="urgency" required><option value="Entrega normal (24–48 horas), por confirmar">Opción 1 — Entrega normal (24–48 horas) — S/25</option><option value="Servicio express en 30 minutos (+S/5)">Opción 2 — Servicio express en 30 minutos (+S/5) — S/30</option></select>
 <p class="note">El servicio express requiere confirmación de disponibilidad de la administradora. No realices el pago adicional ni se iniciará el servicio hasta recibir esa confirmación.</p>
 <p class="note">Después de generar y revisar tu letra, pulsa el botón «Enviar pedido y generar canción» que aparece debajo de la letra.</p>
 </form>
@@ -1337,6 +1338,88 @@ function mountCustomerOrderChat(){
  window.generateCustomerLyrics=generate;
  if(get('generateCustomerLyrics'))get('generateCustomerLyrics').onclick=generate;
  if(get('regenerateCustomerLyrics'))get('regenerateCustomerLyrics').onclick=generate;
+})();
+</script>
+
+
+<script>
+/* Envío robusto de pedidos: intercepta el botón antes de cualquier listener antiguo. */
+(function(){
+ const API='https://canta-corazon-private-api.onrender.com';
+ const $=id=>document.getElementById(id);
+ const val=id=>($(id)?.value||'').trim();
+ const btn=$('sendCustomerLyrics');
+ if(!btn)return;
+ let busy=false;
+ function progressBox(){
+  let p=$('customerAudioProgress');
+  if(!p){
+   p=document.createElement('section');p.id='customerAudioProgress';
+   p.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
+   p.innerHTML='<div style="display:flex;justify-content:space-between;gap:10px;margin-bottom:10px"><strong>💗 Tu pedido y canción</strong><strong id="customerAudioPercent">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .7s"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;line-height:1.5">Preparando el envío…</p>';
+   btn.after(p);
+  }
+  p.classList.remove('hidden');return p;
+ }
+ function setProgress(n,msg){
+  const p=Math.max(0,Math.min(100,Number(n)||0));
+  if($('customerAudioPercent'))$('customerAudioPercent').textContent=p+'%';
+  if($('customerAudioBar'))$('customerAudioBar').style.width=p+'%';
+  if($('customerAudioStage'))$('customerAudioStage').textContent=msg;
+ }
+ async function track(id){
+  const deadline=Date.now()+30*60*1000;
+  while(Date.now()<deadline){
+   try{
+    const r=await fetch(API+'/api/orders/'+encodeURIComponent(id)+'/audio-status?ts='+Date.now(),{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(r.ok){
+     setProgress(d.progress??15,d.message||'Tu pedido está registrado y la canción sigue en preparación.');
+     if(d.status==='ready'&&d.previewUrl){
+      setProgress(90,'🎵 ¡Tu canción está lista! Abre tu regalo para escucharla.');
+      let a=$('customerAutomaticPreviewLink');
+      if(!a){a=document.createElement('a');a.id='customerAutomaticPreviewLink';a.className='btn full';a.style.cssText='display:block;text-align:center;margin:14px 0';a.textContent='🎁 ABRIR MI CANCIÓN';$('customerAudioProgress').after(a);}
+      a.href=d.previewUrl;a.classList.remove('hidden');return;
+     }
+     if(d.status==='failed'){setProgress(0,d.message||'La generación automática falló. La administradora debe revisar el pedido en el panel.');return;}
+     if(d.status==='downloaded'){setProgress(100,d.message||'¡Pedido completado!');return;}
+    }else setProgress(0,d.error||'No pudimos consultar el pedido. Reintentando…');
+   }catch(e){setProgress(0,'Sin conexión temporal. Estamos intentando consultar el estado nuevamente…');}
+   await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  setProgress(0,'El pedido fue enviado. La consulta automática se pausó; puedes volver a abrir esta página para revisar su estado.');
+ }
+ async function submit(){
+  if(busy)return;
+  const form=$('orderForm'),status=$('customerLyricsStatus'),lyrics=val('customerLyricsText');
+  if(!lyrics){status.textContent='Primero genera y revisa tu letra.';return;}
+  if(form&&!form.reportValidity())return;
+  busy=true;btn.disabled=true;btn.textContent='⏳ Enviando pedido…';
+  const fallback=$('sendCustomerLyricsWhatsApp');if(fallback)fallback.classList.add('hidden');
+  const p=progressBox();setProgress(5,'📨 Enviando tu pedido de forma segura…');
+  try{
+   const payload={buyer:val('buyer'),contact:val('contact'),recipient:val('recipient'),relationship:val('relationship'),occasion:val('occasion'),story:val('story'),style:val('style'),customGenre:val('customGenre'),voice:val('voice'),specialPhrase:val('specialPhrase'),lyricDuration:val('lyricDuration'),lyricTone:val('lyricTone'),package:val('package'),urgency:val('urgency'),lyrics};
+   const r=await fetch(API+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   const d=await r.json().catch(()=>({}));
+   if(!r.ok)throw new Error(d.error||'No se pudo registrar el pedido ('+r.status+').');
+   if(!d.orderId)throw new Error('El servidor no devolvió el número del pedido.');
+   window.cchAutoSavedOrderId=d.orderId;
+   try{localStorage.setItem('cchLastCustomerOrderId',d.orderId);}catch(e){}
+   if(d.paymentReady&&d.paymentAccessToken){
+    window.cchPaymentContext={orderId:d.orderId,accessToken:d.paymentAccessToken};
+    try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
+   }
+   btn.textContent='✅ Pedido enviado';status.textContent='💗 ¡Pedido registrado! La creación de tu canción ya fue iniciada.';
+   setProgress(15,'💗 Pedido registrado. La IA está iniciando la composición de tu canción.');
+   track(d.orderId);
+  }catch(e){
+   setProgress(0,'No se pudo enviar el pedido: '+e.message+'. Corrige los datos o inténtalo nuevamente.');
+   status.textContent='No se pudo registrar: '+e.message;
+   btn.disabled=false;btn.textContent='💗 Enviar pedido y generar canción';busy=false;
+   if(fallback)fallback.classList.remove('hidden');
+  }
+ }
+ btn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();submit();},true);
 })();
 </script>
 
