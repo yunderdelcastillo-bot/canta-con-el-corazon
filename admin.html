@@ -302,6 +302,9 @@ async function activateAdminSession(adminUser,{restored=false}={}){
  if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadAdminInbox()},15000);
  await cchRefreshPushStatus();
 }
+// Puente global para que los scripts de conexión externos usen la misma sesión y el mismo cliente del panel.
+window.cchActivateAdminSession=async function(client,adminUser,options={}){db=client;if(adminUser)await activateAdminSession(adminUser,options);};
+
 $('login').onclick=async()=>{
  const button=$('login');button.disabled=true;
  try{
@@ -321,7 +324,7 @@ $('login').onclick=async()=>{
   if(!email||!password)throw new Error('Escribe el correo y la contraseña del administrador.');
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error)throw error;
-  await activateAdminSession(data.user);
+  await window.cchActivateAdminSession(db,data.user);
  }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa la configuración de Supabase y tus datos.'))}
  finally{button.disabled=false}
 };
@@ -859,14 +862,13 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   try{
    if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Actualiza la página con internet.');
    const client=window.supabase.createClient(parsed.origin,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-   db=client;
    localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key}));
    const {data,error:authError}=await client.auth.getSession();
    if(authError)throw authError;
    const {error}=await client.from('songs').select('id',{head:true}).limit(1);
    if(error && !/permission|policy|row.level|rls/i.test(error.message||''))throw error;
-   if(data.session?.user){await activateAdminSession(data.session.user,{restored:true});say('¡Supabase conectado y sesión administrativa recuperada!');}
-   else say('¡Conexión correcta! Ahora pulsa Iniciar sesión.');
+   if(data.session?.user){await window.cchActivateAdminSession(client,data.session.user,{restored:true});say('¡Supabase conectado y sesión administrativa recuperada!');}
+   else {await window.cchActivateAdminSession(client,null);say('¡Conexión correcta! Ahora pulsa Iniciar sesión.');}
   }catch(error){db=null;say('Error de conexión: '+(error?.message||String(error)));}
   finally{button.disabled=false;}
  },true);
