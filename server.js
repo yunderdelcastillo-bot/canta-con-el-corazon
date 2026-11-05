@@ -1270,12 +1270,11 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
   const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
-  // Aceptar variaciones de mayúsculas, tildes y guiones del nombre histórico del paquete MP3.
-  // La autorización sigue protegida por el token del pedido y por la validación exacta del importe abajo.
-  const normalizedPackage=String(order.package_name||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
-  if(!normalizedPackage.includes("cancion personalizada")||!normalizedPackage.includes("mp3"))return res.status(409).json({error:"Este pedido no corresponde al paquete de canción MP3 vigente. Contacta con soporte para revisar el pedido."});
-  const expectedTotal=String(order.urgency||"").toLowerCase().includes("express")?30:25;
-  if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe del voucher no coincide con el precio exacto del pedido: S/"+expectedTotal+". No se desbloqueó la descarga."});
+  // No bloquear vouchers por diferencias históricas en el texto del paquete.
+  // El pedido y el registro de pago quedan vinculados por UUID + token privado.
+  // El importe esperado se conserva en payment_submissions.amount para revisión administrativa.
+  const expectedTotal=Number(payment.amount);
+  if(!Number.isFinite(expectedTotal)||expectedTotal<=0)return res.status(409).json({error:"El pedido no tiene un importe válido registrado. Contacta con soporte."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
   if(!(buckets||[]).some(b=>b.name==="payment-vouchers")){
    const {error:createError}=await db.storage.createBucket("payment-vouchers",{public:false,fileSizeLimit:"8MB",allowedMimeTypes:[...allowed.keys()]});
@@ -1292,26 +1291,12 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
   const now=new Date().toISOString();
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id);
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",provider_payment_id:operationKey,updated_at:now,reviewed_at:null}).eq("id",payment.id);
   if(updateError)throw updateError;
-  const ownerId=String(process.env.ADMIN_OWNER_ID||"");
-  let benefitsActivated=false;
-  if(ownerId){
-   const {data:existingSong,error:songLookupError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
-   if(songLookupError)throw songLookupError;
-   if(existingSong){
-    benefitsActivated=await syncApprovedOrderBenefits(db,id,existingSong,existingSong.owner_id);
-    if(benefitsActivated){
-     const {error:linksError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",existingSong.id);
-     if(linksError)throw linksError;
-    }
-   }
-  }
-  const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
-  if(orderError)throw orderError;
-  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"admin",title:benefitsActivated?"Paquete MP3 desbloqueado automáticamente":"Voucher registrado y pedido aprobado",body:"Aprobación automática por carga de voucher y coincidencia del importe registrado: S/"+expectedTotal+". No se verificó el ingreso real en Yape."});
-  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:benefitsActivated?"¡Tu MP3 está desbloqueado!":"¡Tu pedido fue aprobado!",body:benefitsActivated?"Tu pago quedó registrado y la descarga MP3 está habilitada.":"Tu voucher quedó registrado. La descarga MP3 se habilitará automáticamente cuando la canción esté lista."});
-  res.set("Cache-Control","no-store").json({ok:true,status:"approved",autoReviewed:true,message:benefitsActivated?"Voucher registrado. Tu pedido MP3 quedó aprobado y la descarga está habilitada.":"Voucher registrado y pedido aprobado. La descarga MP3 se habilitará automáticamente cuando la canción esté lista.",notice:"La aprobación automática no confirma el ingreso real del dinero en Yape."});
+  // El voucher queda visible para administración; adjuntar una imagen no confirma un abono bancario.
+  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo voucher recibido",body:"Se recibió un comprobante para el pedido. Revísalo en el panel antes de confirmar el pago."});
+  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"customer",title:"¡Recibimos tu voucher!",body:"Tu comprobante quedó guardado. La muestra estará disponible para escuchar cuando la canción esté lista; la descarga completa se habilita al confirmar el pago."});
+  res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",saved:true,message:"¡Voucher recibido y guardado! Ya aparece en el panel para revisión. La muestra se podrá escuchar cuando el MP3 esté listo.",notice:"El comprobante no confirma por sí solo el ingreso del dinero en Yape o Plin."});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
