@@ -836,4 +836,40 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reset,{once:true});else reset();
  window.addEventListener('load',reset,{once:true});
  setTimeout(()=>window.removeEventListener('scroll',onScroll,true),5200);
-})();</script></body></html>
+})();</script>
+<script>
+/* Reparación de conexión: el mismo cliente Supabase que comprueba la conexión queda asignado al panel de administración. */
+(function(){
+ const button=document.getElementById('connect');
+ const status=document.getElementById('connStatus');
+ const urlField=document.getElementById('url');
+ const keyField=document.getElementById('key');
+ if(!button||!status||!urlField||!keyField)return;
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const say=t=>{status.textContent=t;};
+  const rawUrl=urlField.value.trim(),key=keyField.value.trim();
+  let parsed;
+  try{parsed=new URL(rawUrl);}catch(_){say('URL inválida. Usa la Project URL completa de Supabase.');return;}
+  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co')||parsed.pathname!=='/'||parsed.search||parsed.hash){say('La URL no corresponde a una Project URL válida de Supabase.');return;}
+  if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){say('La clave pública está incompleta o no es válida. No uses service_role.');return;}
+  button.disabled=true;
+  say('Conectando con Supabase…');
+  try{
+   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Actualiza la página con internet.');
+   const client=window.supabase.createClient(parsed.origin,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   db=client;
+   localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key}));
+   const {data,error:authError}=await client.auth.getSession();
+   if(authError)throw authError;
+   const {error}=await client.from('songs').select('id',{head:true}).limit(1);
+   if(error && !/permission|policy|row.level|rls/i.test(error.message||''))throw error;
+   if(data.session?.user){await activateAdminSession(data.session.user,{restored:true});say('¡Supabase conectado y sesión administrativa recuperada!');}
+   else say('¡Conexión correcta! Ahora pulsa Iniciar sesión.');
+  }catch(error){db=null;say('Error de conexión: '+(error?.message||String(error)));}
+  finally{button.disabled=false;}
+ },true);
+})();
+</script>
+</body></html>
