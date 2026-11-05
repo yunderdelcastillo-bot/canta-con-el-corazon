@@ -1396,7 +1396,13 @@ function mountCustomerOrderChat(){
       const upload=$('orderPaymentUpload');if(upload){upload.classList.remove('hidden');const paymentStatus=$('orderPaymentStatus');if(paymentStatus)paymentStatus.textContent='Tu muestra está lista. Adjunta tu voucher de S/25 (o S/30 si elegiste express). Al adjuntar el voucher, el pedido se aprobará automáticamente y la descarga del MP3 se desbloqueará cuando la canción esté lista.';}
       let a=$('customerAutomaticPreviewLink');
       if(!a){a=document.createElement('a');a.id='customerAutomaticPreviewLink';a.className='btn full';a.style.cssText='display:block;text-align:center;margin:14px 0';a.textContent='🎁 ABRIR MI CANCIÓN';$('customerAudioProgress').after(a);}
-      a.href=d.previewUrl;a.classList.remove('hidden');return;
+      const previewUrl=new URL(d.previewUrl,location.origin);
+      const paymentContext=window.cchPaymentContext;
+      if(paymentContext?.orderId===id&&paymentContext?.accessToken){
+       previewUrl.searchParams.set('pedido',paymentContext.orderId);
+       previewUrl.searchParams.set('acceso',paymentContext.accessToken);
+      }
+      a.href=previewUrl.toString();a.classList.remove('hidden');return;
      }
      if(d.status==='failed'){setProgress(0,d.message||'La generación automática falló. La administradora debe revisar el pedido en el panel.');return;}
      if(d.status==='downloaded'){setProgress(100,d.message||'¡Pedido completado!');return;}
