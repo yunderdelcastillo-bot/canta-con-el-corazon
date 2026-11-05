@@ -13,7 +13,7 @@ self.addEventListener('notificationclick',event=>{
 });
 
 /* Recuperación de navegación: cache independiente para tienda y administración. */
-const CCH_SHELL_CACHE='cch-shell-v4';
+const CCH_SHELL_CACHE='cch-shell-v5';
 const CCH_NAV_PATHS=['/','/admin.html'];
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
