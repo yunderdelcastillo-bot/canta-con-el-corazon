@@ -1260,7 +1260,7 @@ const orderAudioJobs=new Set();
 const orderAudioStatus=new Map();
 async function generateOrderAudio(orderId,order){
  const jobKey=String(orderId);if(orderAudioJobs.has(jobKey))return;
- orderAudioJobs.add(jobKey);orderAudioStatus.set(jobKey,{status:"processing",updatedAt:Date.now()});
+ orderAudioJobs.add(jobKey);orderAudioStatus.set(jobKey,{status:"processing",progress:20,message:"🎼 Estamos creando tu canción.",updatedAt:Date.now()});
  try{
   if(!ready())throw new Error("Supabase no está configurado.");
   if(!process.env.GEMINI_API_KEY)throw new Error("Falta GEMINI_API_KEY.");
@@ -1270,6 +1270,7 @@ async function generateOrderAudio(orderId,order){
   if(record.count>=5)throw new Error("Límite horario de generación automática alcanzado.");
   record.count++;orderAudioRateLimits.set("all",record);
   const prompt="Produce una canción completa en español latino, de aproximadamente "+String(order.lyric_duration||"3 minutos").slice(0,40)+". Género: "+String(order.style||"Balada romántica").slice(0,120)+". Interpretación vocal: "+String(order.voice||"Voz femenina").slice(0,80)+". "+(order.custom_genre?"Dirección musical adicional: "+String(order.custom_genre).slice(0,180)+". ":"")+"Dedicatoria para "+String(order.recipient||"").slice(0,120)+", ocasión: "+String(order.occasion||"").slice(0,100)+". Conserva nombres propios y hechos, no inventes detalles ni imites la voz de artistas. Crea una melodía original con arreglo profesional y una canción terminada.\n\nLyrics:\n"+lyrics.slice(0,12000);
+  orderAudioStatus.set(jobKey,{status:"creating",progress:35,message:"🎼 La IA está componiendo tu canción.",updatedAt:Date.now()});
   const response=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{method:"POST",headers:{"x-goog-api-key":String(process.env.GEMINI_API_KEY).trim(),"Content-Type":"application/json"},body:JSON.stringify({model:"lyria-3.5",input:prompt}),signal:AbortSignal.timeout(240000)});
   const payload=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error("Lyria respondió HTTP "+response.status+": "+String(payload?.error?.message||"sin detalle").slice(0,300));
@@ -1277,6 +1278,7 @@ async function generateOrderAudio(orderId,order){
   for(const step of payload.steps||[])if(step.type==="model_output")for(const block of step.content||[])if(block.type==="audio"&&block.data){audioBase64=String(block.data);audioMime=String(block.mime_type||"audio/mpeg");}
   if(!audioBase64&&payload.output_audio?.data){audioBase64=String(payload.output_audio.data);audioMime=String(payload.output_audio.mime_type||"audio/mpeg");}
   if(!audioBase64)throw new Error("Lyria no devolvió un archivo de audio reconocible.");
+  orderAudioStatus.set(jobKey,{status:"uploading",progress:72,message:"☁️ La canción está creada. Estamos guardando el audio.",updatedAt:Date.now()});
   const buffer=Buffer.from(audioBase64,"base64");if(!buffer.length||buffer.length>25*1024*1024)throw new Error("El MP3 generado supera el límite de 25 MB.");
   const db=admin();
   const {error:orderUploadError}=await db.storage.from("songs-audio").upload("orders/"+jobKey+".mp3",buffer,{contentType:audioMime||"audio/mpeg",upsert:true,cacheControl:"3600"});
@@ -1299,9 +1301,12 @@ async function generateOrderAudio(orderId,order){
   const songRow={id:songId,title:"Canción para "+String(order.recipient||"").slice(0,100),recipient:String(order.recipient||"").slice(0,100),dedication:String(order.special_phrase||order.story||"").slice(0,1500),lyrics,theme,audio_path:canonicalPath,audio_url:null,owner_id:ownerId,published:true,package_key:packageKey,package_price:packagePrice,updated_at:new Date().toISOString()};
   const {error:songSaveError}=await db.from("songs").upsert(songRow);
   if(songSaveError)throw songSaveError;
-  orderAudioStatus.set(jobKey,{status:"ready",updatedAt:Date.now(),songId});
+  orderAudioStatus.set(jobKey,{status:"ready",progress:90,message:"🎵 ¡Tu canción está lista!",updatedAt:Date.now(),songId});
+  await createSystemNotification(db,{order_id:jobKey,event_type:"song_ready",audience:"admin",title:"🎵 ¡Canción de cliente lista!",body:"La canción de "+String(order.buyer||"un cliente").slice(0,100)+" para "+String(order.recipient||"").slice(0,100)+" ya se generó y está guardada en la biblioteca."});
   console.log("Automatic customer song generated and added to library:",jobKey,songId,buffer.length);
- }catch(e){orderAudioStatus.set(jobKey,{status:"failed",updatedAt:Date.now(),reason:String(e?.message||e).slice(0,300)});console.error("Automatic customer song failed:",jobKey,e?.message||e);}
+ }catch(e){orderAudioStatus.set(jobKey,{status:"failed",progress:0,message:"No se pudo generar automáticamente: "+String(e?.message||e).slice(0,220),updatedAt:Date.now()});
+  try{await createSystemNotification(admin(),{order_id:jobKey,event_type:"song_generation_failed",audience:"admin",title:"⚠️ Falló la generación de una canción",body:"Pedido "+jobKey+": "+String(e?.message||e).slice(0,220)});}catch{}
+  console.error("Automatic customer song failed:",jobKey,e?.message||e);}
  finally{orderAudioJobs.delete(jobKey);}
 }
 app.post("/api/orders",async(req,res)=>{
@@ -1335,7 +1340,8 @@ app.post("/api/orders",async(req,res)=>{
   }catch(paymentError){paymentAccessToken=null;console.error("Payment workflow not ready; run supabase-payment-workflow.sql:",paymentError?.message||paymentError);}
   const isExpress=order.urgency.toLowerCase().includes("express");
   await createSystemNotification(admin(),{order_id:data.id,event_type:"new_order",audience:"admin",title:isExpress?"🚀 Nuevo pedido EXPRESS":"Nuevo pedido recibido",body:"Cliente: "+order.buyer+". Entrega: "+(order.urgency||"No indicada")+". Total registrado: S/"+(isExpress?30:25)+". "+""});
-  orderAudioStatus.set(data.id,{status:"received",progress:15,updatedAt:Date.now()});
+  orderAudioStatus.set(data.id,{status:"received",progress:15,message:"💗 Pedido recibido. Iniciando la creación de tu canción.",updatedAt:Date.now()});
+  setImmediate(()=>generateOrderAudio(data.id,order));
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
@@ -1470,6 +1476,8 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   // Si ya se preparó la muestra en esta instancia, devolver el mismo enlace y no crear enlaces duplicados en cada consulta.
   if(order.status==="entregado")return res.set("Cache-Control","no-store").json({ok:true,status:"downloaded",progress:100,message:"🎉 ¡Pedido completado! Tu canción se descargó correctamente."});
   if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla.",previewUrl:state.previewUrl});
+  if(state?.status==="failed")return res.set("Cache-Control","no-store").json({ok:true,status:"failed",progress:0,message:state.message||"No se pudo generar la canción automáticamente."});
+  if(state&&["processing","creating","uploading","saving"].includes(state.status))return res.set("Cache-Control","no-store").json({ok:true,status:state.status,progress:state.progress||20,message:state.message||"Estamos preparando tu canción."});
   const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
   if(error)throw error;
   const stageMap={nuevo:{status:"received",progress:10,message:"Pedido recibido. Ya llegó a nuestro panel."},contactado:{status:"received",progress:15,message:"Estamos revisando los datos de tu pedido."},pago_verificado:{status:"received",progress:30,message:"¡Pago confirmado! Tu pedido está listo para producción."},en_proceso:{status:"creating",progress:45,message:"Estamos preparando tu canción."},audio_subiendo:{status:"uploading",progress:70,message:"Estamos subiendo tu audio."},audio_subido:{status:"saving",progress:90,message:"Audio guardado. Estamos preparando tu muestra privada."},muestra_lista:{status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla."},entregado:{status:"downloaded",progress:100,message:"🎉 ¡Pedido completado! Tu canción se descargó correctamente."},cancelado:{status:"cancelled",progress:0,message:"Este pedido fue cancelado."}};
