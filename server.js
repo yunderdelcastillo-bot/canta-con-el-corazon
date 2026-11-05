@@ -1270,8 +1270,10 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   if(payment.payment_status==="approved")return res.status(409).json({error:"Este pedido ya tiene el pago confirmado."});
   const {data:order,error:orderReadError}=await db.from("customer_orders").select("id,package_name,urgency").eq("id",id).maybeSingle();
   if(orderReadError||!order)return res.status(404).json({error:"No se encontró el pedido asociado al comprobante."});
-  const expectedPackage="CANCIÓN PERSONALIZADA MP3 — S/25";
-  if(String(order.package_name||"").trim()!==expectedPackage)return res.status(409).json({error:"El paquete de este pedido no coincide con el paquete único vigente. No se puede aprobar el voucher hasta corregir el pedido."});
+  // Aceptar variaciones de mayúsculas, tildes y guiones del nombre histórico del paquete MP3.
+  // La autorización sigue protegida por el token del pedido y por la validación exacta del importe abajo.
+  const normalizedPackage=String(order.package_name||"").normalize("NFD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  if(!normalizedPackage.includes("cancion personalizada")||!normalizedPackage.includes("mp3"))return res.status(409).json({error:"Este pedido no corresponde al paquete de canción MP3 vigente. Contacta con soporte para revisar el pedido."});
   const expectedTotal=String(order.urgency||"").toLowerCase().includes("express")?30:25;
   if(Math.abs(Number(payment.amount)-expectedTotal)>0.009)return res.status(409).json({error:"El importe del voucher no coincide con el precio exacto del pedido: S/"+expectedTotal+". No se desbloqueó la descarga."});
   const {data:buckets,error:bucketError}=await db.storage.listBuckets();if(bucketError)throw bucketError;
