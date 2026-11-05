@@ -140,7 +140,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
  <label for="orderVoucherFile">Comprobante (JPG, PNG, WEBP o PDF; máximo 8 MB)</label>
  <input id="orderVoucherFile" type="file" accept="image/jpeg,image/png,image/webp,application/pdf">
  <button class="btn secondary" id="uploadOrderVoucher" type="button">Enviar comprobante seguro</button>
- <p class="microcopy">El comprobante se guarda de forma privada. La IA revisa el importe y el código de operación visibles; si no puede leerlos con seguridad, queda pendiente de revisión. La captura no consulta directamente los movimientos de Yape.</p>
+ <p class="microcopy">El comprobante se guarda de forma privada. El sistema registra el voucher y aprueba automáticamente el pedido según el importe registrado: S/25 estándar o S/30 express. Esta aprobación no verifica el ingreso real del dinero en Yape.</p>
 </div>
 </section>
 <section class="card section faq" id="preguntas"><h2>Preguntas frecuentes</h2><details><summary>¿La canción se crea especialmente para mí?</summary><p>Sí. Usamos la historia, los nombres y el estilo que nos indiques para preparar tu canción por encargo.</p></details><details><summary>¿Cuánto demora?</summary><p>Confirmamos el plazo por WhatsApp según el pedido y la fecha que necesitas.</p></details><details><summary>¿Cómo pago?</summary><p>Coordinamos el precio final y el medio de pago por WhatsApp antes de iniciar el trabajo.</p></details><p class="note">Usamos los datos del formulario para responder tu solicitud. Evita incluir información sensible.</p><a class="btn full" href="https://wa.me/51977974730?text=Hola%2C%20quiero%20informaci%C3%B3n%20sobre%20una%20canci%C3%B3n%20personalizada" target="_blank" rel="noopener">Consultar por WhatsApp</a></section><footer>© Canta con el corazón · Regalos musicales personalizados<br>Usamos tus datos solo para coordinar tu solicitud.</footer>
@@ -327,7 +327,7 @@ function showPaymentCta(){
     const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer el archivo.'));reader.readAsDataURL(file);});
     const response=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64})});
     const result=await response.json().catch(()=>({}));if(!response.ok)throw new Error(result.error||'No se pudo enviar el comprobante.');
-    status.textContent=result.status==='approved'?'✅ ¡Pago validado! Tu paquete quedó aprobado.':result.status==='rejected'?'⚠️ El voucher no coincide o no se pudo leer. Sube una captura más clara.':'📩 Voucher recibido. Quedó pendiente de revisión por seguridad.';
+    status.textContent=result.status==='approved'?'✅ ¡Voucher registrado! Tu pedido quedó aprobado automáticamente. La descarga MP3 se habilitará cuando la canción esté lista.':'📩 Voucher recibido.';
     button.textContent='Voucher enviado';
    }catch(error){status.textContent='No se pudo enviar: '+error.message;}
    finally{button.disabled=false;}
@@ -1285,7 +1285,7 @@ function mountCustomerOrderChat(){
  window.cchPaymentContext={orderId,accessToken};
  try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
  const form=document.getElementById('orderForm');if(form)form.classList.add('hidden');
- const upload=document.getElementById('orderPaymentUpload');if(upload){upload.classList.remove('hidden');const status=document.getElementById('orderPaymentStatus');if(status)status.textContent='Este es tu acceso privado para adjuntar el comprobante de tu pedido. Selecciona tu captura de Yape o Plin y envíala de forma segura.';}
+ const upload=document.getElementById('orderPaymentUpload');if(upload){upload.classList.remove('hidden');const status=document.getElementById('orderPaymentStatus');if(status)status.textContent='Este es tu acceso privado para adjuntar el comprobante de tu pedido. Selecciona tu comprobante de Yape y envíalo de forma segura.';}
  const orderSection=document.getElementById('order');if(orderSection)orderSection.scrollIntoView({behavior:'auto',block:'start'});
  mountCustomerOrderChat();
 })();
