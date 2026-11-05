@@ -862,6 +862,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   try{
    if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Actualiza la página con internet.');
    const client=window.supabase.createClient(parsed.origin,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   db=client;
    localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key}));
    const {data,error:authError}=await client.auth.getSession();
    if(authError)throw authError;
