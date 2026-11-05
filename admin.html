@@ -449,11 +449,11 @@ async function loadCustomerOrders(){
    }else{const noPay=document.createElement('p');noPay.className='muted';noPay.textContent='No hay registro de comprobante. Ejecuta la migración de pagos para habilitarlo.';card.appendChild(noPay);}
    if(o.audio_ready&&o.preview_url){
     const previewCard=document.createElement('div');previewCard.className='status';
-    const previewTitle=document.createElement('strong');previewTitle.textContent='🎵 Canción lista para el cliente · descarga habilitada';previewCard.appendChild(previewTitle);
-    const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent='⬇️ Abrir página de descarga';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
+    const previewTitle=document.createElement('strong');previewTitle.textContent='🎵 Muestra disponible para el cliente · MP3 guardado';previewCard.appendChild(previewTitle);
+    const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent='💗 Abrir muestra del cliente';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
     const previewActions=document.createElement('div');previewActions.className='row';
     const copyPreview=document.createElement('button');copyPreview.type='button';copyPreview.className='btn alt';copyPreview.textContent='Copiar enlace';copyPreview.onclick=async()=>{try{await navigator.clipboard.writeText(o.preview_url);copyPreview.textContent='¡Copiado!';}catch{alert('No se pudo copiar automáticamente. Abre el enlace y copia la dirección.')}};
-    const sendPreview=document.createElement('a');sendPreview.className='btn alt';sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.href='https://wa.me/51'+String(o.contact||'').replace(/\\D/g,'')+'?text='+encodeURIComponent('🎵 ¡Tu canción está lista! Ya puedes descargarla aquí: '+o.preview_url);sendPreview.textContent='Enviar por WhatsApp';
+    const sendPreview=document.createElement('a');sendPreview.className='btn alt';sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.href='https://wa.me/51'+String(o.contact||'').replace(/\\D/g,'')+'?text='+encodeURIComponent('💗 Tu canción ya está lista para escuchar la muestra. Toca el corazón para descubrirla: '+o.preview_url);sendPreview.textContent='Enviar por WhatsApp';
     previewActions.append(copyPreview,sendPreview);previewCard.append(previewLink,previewActions);card.appendChild(previewCard);
    }
    if(o.audio_ready){
