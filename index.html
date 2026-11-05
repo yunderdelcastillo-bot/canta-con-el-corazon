@@ -359,10 +359,14 @@ async function startPreview(){
   const response=await fetch(API_BASE+'/api/preview/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
   const result=await response.json();
   if(!response.ok){
-   if(response.status===410){try{sessionStorage.removeItem(previewKey)}catch(e){}lockPreview(result.error||'Esta vista previa ya terminó. Solicita el enlace de pago.');return}
-   throw new Error(result.error||'No se pudo iniciar la vista previa.');
+   throw new Error(result.error||'No se pudo recuperar la muestra.');
   }
-  /* Token único incluido en el enlace generado desde el panel. */
+  if(result.completed){
+   showPaymentCta();
+   lockPreview('Tu muestra ya fue escuchada. Puedes continuar con el pago y subir tu voucher aquí.');
+   return;
+  }
+  /* Enlace recuperable: si la página se cerró antes de terminar, permite continuar con la misma muestra. */
   audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewToken);
   resolvedAudioUrl=audioPlayer.src;audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');playButton.classList.add('hidden');previewLastTime=0;
   try{await audioPlayer.play()}catch(e){audioNote.textContent='Pulsa reproducir en el reproductor para comenzar. Esta vista previa está reservada a este dispositivo durante 15 minutos.';audioNote.classList.remove('hidden')}
@@ -377,7 +381,7 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   let playButton=document.getElementById('playPreview');
   if(!playButton){playButton=document.createElement('button');playButton.id='playPreview';playButton.type='button';playButton.className='btn secondary';playButton.textContent='▶ Escuchar vista previa gratis';audioNote.after(playButton)}
   playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
-  try{if(!previewLinkToken||localStorage.getItem('cch-preview-played-'+audio+'-'+previewLinkToken)==='1')lockPreview('Este enlace de muestra ya se utilizó. Solicita otro enlace desde el panel.')}catch(e){}
+  if(!previewLinkToken)lockPreview('Este enlace no contiene una muestra válida. Escríbenos por WhatsApp para recuperar tu pedido.');
  }
  audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric();alignGiftLyrics()});
  audioPlayer.addEventListener('timeupdate',updateSyncedLyric);
@@ -394,7 +398,8 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
     const response=await fetch(API_BASE+'/api/preview/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,token:previewToken})});
     const result=await response.json();
     try{localStorage.setItem('cch-preview-played-'+audio+'-'+previewLinkToken,'1')}catch(e){}
-    lockPreview(result.ok?'La vista previa gratuita ya terminó. Si te encantó, solicita tu enlace de pago.':'La vista previa terminó. Solicita el enlace de pago para continuar.');
+    showPaymentCta();
+    lockPreview(result.ok?'La vista previa terminó. Ya puedes realizar el pago y subir tu voucher aquí.':'La vista previa terminó. Ya puedes continuar con el pago y subir tu voucher aquí.');
    }catch(e){lockPreview('La vista previa terminó. Solicita el enlace de pago para continuar.')}
   }
  },{once:true});
