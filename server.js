@@ -1291,12 +1291,29 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
   const now=new Date().toISOString();
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",provider_payment_id:operationKey,updated_at:now,reviewed_at:null}).eq("id",payment.id);
+  // Aprobación automática solicitada por el propietario: cargar el voucher habilita el MP3.
+  // Esta regla no verifica el abono real en Yape/Plin; evitar presentar el voucher como confirmación bancaria.
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id);
   if(updateError)throw updateError;
-  // El voucher queda visible para administración; adjuntar una imagen no confirma un abono bancario.
-  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo voucher recibido",body:"Se recibió un comprobante para el pedido. Revísalo en el panel antes de confirmar el pago."});
-  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"customer",title:"¡Recibimos tu voucher!",body:"Tu comprobante quedó guardado. La muestra estará disponible para escuchar cuando la canción esté lista; la descarga completa se habilita al confirmar el pago."});
-  res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",saved:true,message:"¡Voucher recibido y guardado! Ya aparece en el panel para revisión. La muestra se podrá escuchar cuando el MP3 esté listo.",notice:"El comprobante no confirma por sí solo el ingreso del dinero en Yape o Plin."});
+  const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
+  if(orderError)throw orderError;
+  let downloadUnlocked=false;
+  const ownerId=String(process.env.ADMIN_OWNER_ID||"");
+  if(ownerId){
+   const {data:song,error:songError}=await db.from("songs").select("id,owner_id,audio_path").eq("audio_path",ownerId+"/"+id+".mp3").maybeSingle();
+   if(songError)throw songError;
+   if(song){
+    const activated=await syncApprovedOrderBenefits(db,id,song,song.owner_id||ownerId);
+    if(activated){
+     const {error:linkError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",song.id);
+     if(linkError)throw linkError;
+     downloadUnlocked=true;
+    }
+   }
+  }
+  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo voucher recibido",body:"El voucher se guardó y el MP3 quedó aprobado automáticamente por la regla de carga. Verifica el abono en Yape/Plin."});
+  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:downloadUnlocked?"¡Tu canción está lista para descargar!":"¡Voucher recibido!",body:downloadUnlocked?"Tu voucher fue guardado y la descarga MP3 quedó habilitada.":"Tu voucher fue guardado y el pago quedó aprobado automáticamente. La descarga se habilitará al estar lista la canción."});
+  res.set("Cache-Control","no-store").json({ok:true,status:"approved",saved:true,downloadUnlocked,message:downloadUnlocked?"¡Voucher recibido! Tu canción MP3 ya está habilitada para descargar.":"¡Voucher recibido! Tu pedido quedó aprobado y la descarga se habilitará automáticamente cuando la canción esté lista.",notice:"Aprobación automática por carga del voucher; no confirma el ingreso real del dinero en Yape o Plin."});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
