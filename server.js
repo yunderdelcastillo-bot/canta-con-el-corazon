@@ -1279,13 +1279,6 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
    const {error:createError}=await db.storage.createBucket("payment-vouchers",{public:false,fileSizeLimit:"8MB",allowedMimeTypes:[...allowed.keys()]});
    if(createError&&!/already exists/i.test(createError.message||""))throw createError;
   }
-  const fileHash=crypto.createHash("sha256").update(buffer).digest("hex");
-  const {data:duplicate,error:duplicateError}=await db.from("payment_submissions").select("id,order_id").eq("provider_payment_id","sha256:"+fileHash).maybeSingle();
-  if(duplicateError)throw duplicateError;
-  if(duplicate&&duplicate.order_id!==id)return res.status(409).json({error:"Este mismo comprobante ya fue enviado en otro pedido."});
-  const path=id+"/"+Date.now()+"-"+crypto.randomBytes(5).toString("hex")+"."+allowed.get(mime);
-  const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
-  if(uploadError)throw uploadError;
   // Aprobación automática por regla: el importe del pedido se contrasta con el importe registrado al crear el pedido.
   // La carga del archivo NO verifica que el dinero haya ingresado realmente a Yape.
   const fileHash=crypto.createHash("sha256").update(buffer).digest("hex");
