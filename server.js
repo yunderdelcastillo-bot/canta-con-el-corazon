@@ -1454,6 +1454,30 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
+app.post("/api/admin/orders/:id/gift-unlock",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const id=String(req.params.id||"");if(!/^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:"Pedido no válido."});
+  const db=admin();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("id,package_name").eq("id",id).maybeSingle();
+  if(orderError)throw orderError;if(!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data:song,error:songError}=await db.from("songs").select("id,owner_id,audio_path,package_key,package_price").eq("owner_id",user.id).eq("audio_path",user.id+"/"+id+".mp3").maybeSingle();
+  if(songError)throw songError;if(!song)return res.status(409).json({error:"Primero debes subir el MP3 de este pedido."});
+  const {data:existingPermission,error:permissionReadError}=await db.from("song_package_permissions").select("package_key,package_price,can_video").eq("song_id",song.id).maybeSingle();
+  if(permissionReadError)throw permissionReadError;
+  const packageText=String(order.package_name||"").toLowerCase();
+  const packageKey=existingPermission?.package_key||song.package_key||(packageText.includes("completo")?"completo":packageText.includes("detalle")?"detalle":"esencial");
+  const fallbackPrice=packageKey==="completo"?30:packageKey==="detalle"?25:20;
+  const packagePrice=Number(existingPermission?.package_price||song.package_price||fallbackPrice)||fallbackPrice;
+  const now=new Date().toISOString();
+  const {error:permissionError}=await db.from("song_package_permissions").upsert({song_id:song.id,owner_id:user.id,package_key:packageKey,package_price:packagePrice,can_mp3:true,can_video:!!existingPermission?.can_video,updated_at:now},{onConflict:"song_id"});
+  if(permissionError)throw permissionError;
+  const {error:linkError}=await db.from("song_preview_links").update({download_enabled:true}).eq("song_id",song.id);
+  if(linkError)throw linkError;
+  res.set("Cache-Control","no-store").json({ok:true,giftUnlocked:true,paymentChanged:false,message:"Regalo desbloqueado. El MP3 está disponible; el pago y el voucher permanecen sin cambios."});
+ }catch(e){console.error("Gift unlock:",e?.message||e);res.status(500).json({error:"No se pudo desbloquear el regalo. "+(e?.message||"Error interno.")});}
+});
 app.post("/api/admin/orders/:id/payment-link",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
@@ -1678,9 +1702,12 @@ app.get("/api/admin/orders",async(req,res)=>{
     const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
     if(song?.audio_path){
      const payment=paymentByOrder.get(order.id)||null;
+     const {data:packagePermission,error:permissionReadError}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
+     if(permissionReadError)throw permissionReadError;
+     const giftUnlocked=!!packagePermission?.can_mp3&&payment?.payment_status!=="approved";
      const benefitsEnabled=payment?.payment_status==="approved"
       ? await syncApprovedOrderBenefits(db,order.id,song,user.id)
-      : false;
+      : giftUnlocked;
      const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
      const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:benefitsEnabled});
      if(!linkError){
@@ -1691,7 +1718,13 @@ app.get("/api/admin/orders",async(req,res)=>{
      }
     }
    }
-   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:paymentByOrder.get(order.id)||null});
+   const listedPayment=paymentByOrder.get(order.id)||null;
+   let giftUnlocked=false;
+   if(audioReady){
+    const {data:ownedSong}=await db.from("songs").select("id").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
+    if(ownedSong){const {data:permission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",ownedSong.id).maybeSingle();giftUnlocked=!!permission?.can_mp3&&listedPayment?.payment_status!=="approved";}
+   }
+   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
