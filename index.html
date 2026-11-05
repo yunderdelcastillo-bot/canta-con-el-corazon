@@ -116,7 +116,7 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
 <div style="margin:18px 0;padding:16px;border:1px solid #f6d78c;border-radius:16px;background:rgba(246,215,140,.08)">
  <h3 style="color:#f6d78c;margin:0 0 8px">✨ Crea tu letra con inteligencia artificial</h3>
  <p class="note" style="text-align:left">Completa tu historia y tus preferencias. La IA preparará una letra original para que puedas revisarla antes de enviarla.</p>
- <button class="btn" id="generateCustomerLyrics" type="button" onclick="generateCustomerLyrics()">✨ Generar mi letra personalizada</button>
+ <button class="btn" id="generateCustomerLyrics" type="button" onclick="window.generateCustomerLyrics()">✨ Generar mi letra personalizada</button>
  <div id="customerLyricsStatus" class="note" style="text-align:left" aria-live="polite">Tu letra aparecerá aquí después de generarla.</div>
  <div id="customerLyricsResult" class="hidden">
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
@@ -822,6 +822,9 @@ async function generateCustomerLyrics(){
  }catch(error){status.textContent='No se pudo generar: '+error.message;}
  finally{btn.disabled=false;document.getElementById('regenerateCustomerLyrics').disabled=false;}
 }
+window.generateCustomerLyrics=generateCustomerLyrics;
+document.getElementById('generateCustomerLyrics').addEventListener('click',event=>{event.preventDefault();window.generateCustomerLyrics();});
+document.getElementById('regenerateCustomerLyrics').addEventListener('click',event=>{event.preventDefault();window.generateCustomerLyrics();});
 // El botón invoca directamente generateCustomerLyrics() desde su atributo onclick.
 // La regeneración también invoca directamente generateCustomerLyrics().
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
