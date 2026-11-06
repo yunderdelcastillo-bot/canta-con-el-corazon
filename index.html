@@ -136,7 +136,7 @@ body.carta-opened #dedicationText{color:#6e5360!important}
  <div id="customerLyricsResult" class="hidden">
   <label for="customerLyricsText">Tu letra personalizada (puedes editarla)</label>
   <textarea id="customerLyricsText" rows="16" style="min-height:300px"></textarea>
-  <button class="btn" id="sendCustomerLyrics" type="button">💗 Enviar mi pedido</button>
+  <button class="btn" id="sendCustomerOrderNew" type="button">💗 Enviar mi pedido</button>
   <div class="grid"><button class="btn alt" id="copyCustomerLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="regenerateCustomerLyrics" type="button">🔄 Generar otra versión</button></div>
   <label for="package">Paquete único</label><select id="package"><option value="CANCIÓN PERSONALIZADA MP3 — S/25">Canción personalizada en MP3 — S/25</option></select>
   <button class="btn alt hidden" id="sendCustomerLyricsWhatsApp" type="button">💬 Enviar pedido y letra por WhatsApp</button>
@@ -900,12 +900,12 @@ document.getElementById('orderForm').addEventListener('submit',e=>{
   document.getElementById('generateCustomerLyrics').scrollIntoView({behavior:'smooth',block:'center'});
   return;
  }
- document.getElementById('sendCustomerLyrics').click();
+ document.getElementById('sendCustomerOrderNew').click();
 });
 let cchSendingCustomerOrder=false;
-document.getElementById('sendCustomerLyrics').addEventListener('click',async(event)=>{
+document.getElementById('sendCustomerOrderNew').addEventListener('click',async(event)=>{
  event.preventDefault();
- const button=document.getElementById('sendCustomerLyrics');
+ const button=document.getElementById('sendCustomerOrderNew');
  const fallback=document.getElementById('sendCustomerLyricsWhatsApp');
  const status=document.getElementById('customerLyricsStatus');
  const lyrics=orderValue('customerLyricsText');
@@ -1621,7 +1621,7 @@ function mountCustomerOrderChat(){
    return;
   }
 
-  const send=e.target.closest('#sendCustomerLyrics');
+  const send=e.target.closest('#sendCustomerOrderNew');
   if(!send)return;
   e.preventDefault();e.stopImmediatePropagation();
   if(send.dataset.cchBusy==='1')return;
