@@ -1681,7 +1681,7 @@ app.post("/api/customer/listening",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const orderId=String(req.body?.orderId||""),audioPath=String(req.body?.audioPath||"");
-  if(!/^[0-9a-f-]{36}$/i.test(orderId)||!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Pedido o audio no válido."});
+  if(!/^[0-9a-f-]{36}$/i.test(orderId)||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Pedido o audio no válido."});
   const db=admin();
   const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",orderId).eq("audio_path",audioPath).maybeSingle();
   if(songError)throw songError;
