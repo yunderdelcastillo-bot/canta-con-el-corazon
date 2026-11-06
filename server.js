@@ -1710,6 +1710,9 @@ app.get("/api/admin/orders",async(req,res)=>{
   const {data:listeningEvents,error:listeningError}=orderIds.length?await db.from("system_notifications").select("order_id").eq("audience","admin").eq("event_type","customer_listening").in("order_id",orderIds):{data:[],error:null};
   if(listeningError)throw listeningError;
   const listeningOrderIds=new Set((listeningEvents||[]).map(event=>event.order_id));
+  const {data:previewFinishedEvents,error:previewFinishedError}=orderIds.length?await db.from("system_notifications").select("order_id").eq("audience","admin").eq("event_type","preview_finished").in("order_id",orderIds):{data:[],error:null};
+  if(previewFinishedError)throw previewFinishedError;
+  const previewFinishedOrderIds=new Set((previewFinishedEvents||[]).map(event=>event.order_id));
   const {data:payments,error:paymentError}=orderIds.length?await db.from("payment_submissions").select("id,order_id,amount,package_name,payment_status,provider,voucher_path,song_id,created_at,updated_at").in("order_id",orderIds):{data:[],error:null};
   if(paymentError)throw paymentError;
   const paymentByOrder=new Map();
@@ -1769,7 +1772,7 @@ app.get("/api/admin/orders",async(req,res)=>{
      giftUnlocked=!!giftLink;
     }
    }
-   orders.push({...order,audio_ready:audioReady,customer_listening:listeningOrderIds.has(order.id),preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
+   orders.push({...order,audio_ready:audioReady,customer_listening:listeningOrderIds.has(order.id),preview_completed:previewFinishedOrderIds.has(order.id),preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
