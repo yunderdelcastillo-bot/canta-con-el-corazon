@@ -924,7 +924,11 @@ document.getElementById('sendCustomerLyrics').addEventListener('click',async(eve
   progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">💗 Tu pedido fue recibido</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">10%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:10%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Estamos registrando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El seguimiento se actualizará automáticamente. Cuando la muestra esté lista, aparecerá aquí el botón para escucharla.</p>';
   const result=document.getElementById('customerLyricsResult');
   if(result)result.classList.remove('hidden');
-  /* Mostrar el seguimiento inmediatamente debajo del botón que el cliente acaba de pulsar. */
+ }
+ /* También revelar y recolocar el seguimiento si fue restaurado tras recargar la página. */
+ const resultContainer=document.getElementById('customerLyricsResult');
+ if(resultContainer)resultContainer.classList.remove('hidden');
+ if(progress.parentElement!==button.parentElement||progress.previousElementSibling!==button){
   button.insertAdjacentElement('afterend',progress);
  }
  progress.classList.remove('hidden');
@@ -980,6 +984,9 @@ async function generateCustomerLyrics(){
 window.generateCustomerLyrics=generateCustomerLyrics;
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
 async function watchCustomerOrderAudio(orderId){
+ window.cchAudioWatchers=window.cchAudioWatchers||new Set();
+ if(window.cchAudioWatchers.has(orderId))return;
+ window.cchAudioWatchers.add(orderId);
  const progress=document.getElementById('customerAudioProgress');
  if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
@@ -1031,7 +1038,7 @@ async function watchCustomerOrderAudio(orderId){
    await new Promise(resolve=>setTimeout(resolve,5000));
   }
   setProgress(0,'No pudimos confirmar el estado del pedido. Vuelve a conectarte para consultar su registro.');
- }finally{}
+ }finally{if(window.cchAudioWatchers)window.cchAudioWatchers.delete(orderId);}
 }
 document.getElementById('orderForm').addEventListener('input',()=>{
  if(window.cchAutoSavedOrderId){
@@ -1062,7 +1069,10 @@ async function restoreCustomerOrderProgress(orderId){
    restoredProgress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
    restoredProgress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">🎵 Tu pedido está en preparación</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Pedido verificado. Consultando su estado…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">El 90% indica que tu canción está lista para descargar. El 100% aparecerá cuando completes la descarga.</p>';
    const lyricsResult=document.getElementById('customerLyricsResult');
-   (lyricsResult||document.getElementById('sendCustomerLyrics')?.parentElement||document.body).appendChild(restoredProgress);
+   if(lyricsResult)lyricsResult.classList.remove('hidden');
+   const sendButton=document.getElementById('sendCustomerLyrics');
+   if(sendButton)sendButton.insertAdjacentElement('afterend',restoredProgress);
+   else (lyricsResult||document.body).appendChild(restoredProgress);
   }
   const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
   const value=Math.max(0,Math.min(100,Math.round(Number(data.progress)||15)));
