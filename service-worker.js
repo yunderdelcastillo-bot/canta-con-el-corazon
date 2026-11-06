@@ -11,7 +11,7 @@ self.addEventListener('notificationclick',event=>{
   const adminTab=sameOrigin.find(client=>new URL(client.url).pathname==='/admin.html');
   if(adminTab&&'focus'in adminTab){
    await adminTab.focus();
-   adminTab.postMessage({type:'CCH_PUSH_NOTIFICATION_CLICK'});
+   adminTab.postMessage({type:'CCH_PUSH_NOTIFICATION_CLICK',url:target});
    return;
   }
   const existing=sameOrigin.find(client=>'focus'in client);
