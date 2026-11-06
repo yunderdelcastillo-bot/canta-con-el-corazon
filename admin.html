@@ -454,7 +454,8 @@ async function loadCustomerOrders(){
     // cuando el voucher está aprobado y el MP3 ya está listo.
     if(o.payment?.payment_status==='approved'&&o.preview_url){
      const surpriseUrl=new URL(o.preview_url);
-     surpriseUrl.searchParams.set('surprise','1');
+     surpriseUrl.searchParams.delete('surprise');
+     surpriseUrl.searchParams.set('carta','1');
      const surpriseLink=document.createElement('a');
      surpriseLink.href=surpriseUrl.toString();
      surpriseLink.target='_blank';
