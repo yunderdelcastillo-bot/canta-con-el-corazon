@@ -1529,26 +1529,32 @@ function mountCustomerOrderChat(){
 
 
 <script>
-/* Navegación de regreso para vistas de muestra y regalos abiertos desde el pedido. */
+/* Volver a la lista anterior de pedidos solo con un gesto de deslizamiento hacia la izquierda. */
 (function(){
  const p=new URLSearchParams(location.search);
  const giftView=['audio','name','message','grant','preview','previewToken','previewLink','video','surprise','carta'].some(k=>p.has(k));
  if(!giftView)return;
- const bar=document.createElement('div');
- bar.id='cchReturnToOrders';
- bar.style.cssText='position:sticky;top:0;z-index:99990;padding:10px 14px;background:rgba(35,12,29,.96);backdrop-filter:blur(8px);text-align:left;box-shadow:0 3px 14px #0003';
- const back=document.createElement('button');
- back.type='button';back.textContent='← Volver a mis pedidos';
- back.style.cssText='display:inline-flex;align-items:center;gap:8px;border:1px solid #f6d78c;border-radius:999px;padding:11px 18px;background:#fff8;color:#fff;font-weight:800;font-size:15px;cursor:pointer';
- back.addEventListener('click',()=>{
-  try{
-   const ref=document.referrer?new URL(document.referrer):null;
-   if(ref&&ref.origin===location.origin){history.back();return;}
-  }catch(e){}
-  location.href=location.origin+'/#order';
- });
- bar.appendChild(back);
- document.body.insertBefore(bar,document.body.firstChild);
+ let startX=0,startY=0,startTime=0;
+ document.addEventListener('touchstart',e=>{
+  if(!e.touches||e.touches.length!==1)return;
+  startX=e.touches[0].clientX;
+  startY=e.touches[0].clientY;
+  startTime=Date.now();
+ },{passive:true});
+ document.addEventListener('touchend',e=>{
+  if(!startTime||!e.changedTouches||e.changedTouches.length!==1)return;
+  const dx=e.changedTouches[0].clientX-startX;
+  const dy=e.changedTouches[0].clientY-startY;
+  const elapsed=Date.now()-startTime;
+  startTime=0;
+  if(dx < -90 && Math.abs(dy)<75 && elapsed<900){
+   if(history.length>1){history.back();return;}
+   try{
+    const ref=document.referrer?new URL(document.referrer):null;
+    if(ref&&ref.origin===location.origin){location.href=ref.href;}
+   }catch(err){}
+  }
+ },{passive:true});
 })();
 </script>
 
