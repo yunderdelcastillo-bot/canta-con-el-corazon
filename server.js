@@ -693,7 +693,7 @@ app.post("/api/render-video",async(req,res)=>{
      await persistVideoJob(db,jobId,{status:"processing",progress:Math.round(((i+1)/imagePaths.length)*80),stage:"Procesando fotografías "+(i+1)+" de "+imagePaths.length,createdAt:Date.now(),songId:song.id});
     }
     const concatPath=path.join(dir,"segments.txt");
-    const concatText=segmentPaths.map(p=>"file '"+p.replace(/\/g,"/").replace(/'/g,"'\\''")+"'").join("\n");
+     const concatText=segmentPaths.map(p=>"file '"+p.replace(/\\/g,"/").replace(/'/g,"'\\''")+"'").join("\n");
     await writeFile(concatPath,concatText,"utf8");
     const output=path.join(dir,"rendered.mp4");
     const args=["-y","-threads","1","-filter_threads","1","-f","concat","-safe","0","-i",concatPath,"-i",audioInput];
