@@ -1558,4 +1558,37 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
+<script>
+/* Presentación editorial de la carta: la dedicatoria queda visible y separada del reproductor. */
+(function(){
+ const params=new URLSearchParams(location.search);
+ if(params.get('carta')!=='1')return;
+ const revealed=document.getElementById('revealed');
+ const player=revealed&&revealed.querySelector('.player');
+ const card=document.getElementById('dedicationCard');
+ if(!revealed||!player||!card)return;
+ revealed.insertBefore(card,player);
+ card.style.setProperty('display','block','important');
+ card.style.setProperty('visibility','visible','important');
+ card.style.setProperty('opacity','1','important');
+ const style=document.createElement('style');
+ style.textContent=`
+ body.carta-opened #revealed{max-width:780px!important;margin:0 auto!important;padding:clamp(18px,4vw,34px)!important;background:linear-gradient(160deg,#fffaf0 0%,#f7e8df 48%,#fff8ed 100%)!important;border:0!important;border-radius:0!important;box-shadow:none!important}
+ body.carta-opened #revealed:before{content:'✦  UN REGALO ESCRITO PARA TI  ✦';display:block;text-align:center;color:#a56b83;font:800 .78rem/1.5 system-ui,sans-serif;letter-spacing:.2em;margin:12px auto 22px}
+ body.carta-opened #revealed h1{font:500 clamp(2.7rem,10vw,4.2rem)/1.08 Georgia,serif!important;color:#63304f!important;text-align:center!important;margin:12px auto 28px!important}
+ body.carta-opened #dedicationCard{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;overflow:hidden!important;margin:20px auto 30px!important;padding:clamp(28px,6vw,48px) clamp(20px,5vw,38px)!important;max-width:680px!important;border:1px solid #d9b99f!important;border-radius:28px!important;background:radial-gradient(ellipse at 8% 5%,#f8e3e7 0,transparent 32%),radial-gradient(ellipse at 95% 95%,#f5dfc7 0,transparent 34%),linear-gradient(145deg,#fffdf8,#f8eee2)!important;box-shadow:0 16px 42px rgba(87,43,62,.12)!important;text-align:center!important}
+ body.carta-opened #dedicationCard .dedication-ornament{display:flex!important;justify-content:center!important;gap:16px!important;color:#b77b8f!important;font-size:1.4rem!important;margin:0 auto 24px!important}
+ body.carta-opened #dedicationCard .dedication-kicker{color:#a36d7d!important;font:800 .72rem/1.5 system-ui,sans-serif!important;letter-spacing:.2em!important;margin:0 auto 14px!important}
+ body.carta-opened #dedicationCard h2{font:500 clamp(1.9rem,7vw,2.6rem)/1.2 Georgia,serif!important;color:#713653!important;margin:0 auto 16px!important}
+ body.carta-opened #dedicationText{display:block!important;white-space:pre-line!important;max-width:600px!important;margin:0 auto!important;color:#634457!important;font:clamp(1.18rem,4.7vw,1.48rem)/1.9 Georgia,serif!important;letter-spacing:.01em!important;text-align:center!important}
+ body.carta-opened #dedicationCard .dedication-bottom{display:block!important;color:#ad7187!important;font-size:2rem!important;margin:24px auto 0!important}
+ body.carta-opened #revealed .player{max-width:680px!important;margin:0 auto 24px!important;padding:24px 18px!important;background:#fffdf9!important;border:1px solid #dfc8b4!important;border-radius:24px!important;box-shadow:0 10px 30px rgba(87,43,62,.09)!important}
+ body.carta-opened #revealed .player>strong{font:700 1.3rem Georgia,serif!important;color:#713653!important}
+ body.carta-opened #revealed audio{width:100%!important;min-height:48px!important}
+ body.carta-opened #shareLetterWhatsApp{max-width:680px!important;margin:24px auto!important}
+ @media(max-width:520px){body.carta-opened #revealed{padding:14px!important}body.carta-opened #dedicationCard{border-radius:22px!important;padding:30px 22px!important}}
+ `;
+ document.head.appendChild(style);
+})();
+</script>
 </body></html>
