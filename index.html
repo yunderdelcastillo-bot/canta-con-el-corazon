@@ -425,6 +425,14 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   if(!previewLinkToken)lockPreview('Este enlace no contiene una muestra válida. Escríbenos por WhatsApp para recuperar tu pedido.');
  }
  audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric();alignGiftLyrics()});
+ let listeningEventSent=false;
+ audioPlayer.addEventListener('play',()=>{
+  if(listeningEventSent)return;
+  const orderId=params.get('orderId')||'';
+  if(!/^[0-9a-f-]{36}$/i.test(orderId)||!audio)return;
+  listeningEventSent=true;
+  fetch(API_BASE+'/api/customer/listening',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderId,audioPath:audio}),keepalive:true}).catch(error=>{listeningEventSent=false;console.warn('No se pudo registrar que el cliente comenzó a escuchar:',error);});
+ });
  audioPlayer.addEventListener('timeupdate',updateSyncedLyric);
  audioPlayer.addEventListener('seeked',updateSyncedLyric);
  audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&!downloadAllowed&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
