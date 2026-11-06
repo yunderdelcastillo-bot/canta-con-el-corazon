@@ -472,7 +472,7 @@ async function loadCustomerOrders(){
       giftUrl.searchParams.set('tema',theme);
       const shareUrl=giftUrl.toString();
       try{await navigator.clipboard.writeText(shareUrl)}catch{}
-      const phone=String(o.contact||'').replace(/\\D/g,'');
+      const phone=String(o.contact||'').replace(/\D/g,'');
       const textMessage='💌 ¡Tu carta sorpresa está lista! Comparte este enlace con '+(o.recipient||'esa persona especial')+'. Al abrirlo descubrirá su carta, la letra y la canción completa: '+shareUrl;
       if(phone&&waWindow){waWindow.location='https://wa.me/'+(phone.startsWith('51')?phone:'51'+phone)+'?text='+encodeURIComponent(textMessage);giftShareButton.textContent='✓ Carta creada · WhatsApp abierto';}
       else{if(waWindow)waWindow.close();window.prompt('Copia y comparte este enlace de regalo:',shareUrl);giftShareButton.textContent='✓ Carta sorpresa creada';}
