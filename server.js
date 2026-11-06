@@ -1996,6 +1996,46 @@ app.post("/api/assistant/intake",async(req,res)=>{
  }
 });
 
+// Carta sorpresa privada: el token del enlace autoriza la lectura y la generación de una sola carta por canción.
+const surpriseLetterCache=new Map();
+const surpriseLetterRate=new Map();
+app.get("/api/surprise-letter",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El servicio de cartas no está disponible."});
+  if(!process.env.GROQ_API_KEY&&!process.env.GEMINI_API_KEY)return res.status(503).json({error:"La IA de cartas no está configurada."});
+  const token=String(req.query.token||"");
+  if(!/^[A-Za-z0-9_-]{40,100}$/.test(token))return res.status(400).json({error:"Enlace de sorpresa no válido."});
+  const tokenHash=crypto.createHash("sha256").update(token).digest("hex");
+  const db=admin();
+  const {data:link,error:linkError}=await db.from("song_preview_links").select("song_id").eq("token_hash",tokenHash).maybeSingle();
+  if(linkError)throw linkError;
+  if(!link?.song_id)return res.status(403).json({error:"Este enlace privado no es válido."});
+  const cached=surpriseLetterCache.get(link.song_id);
+  if(cached)return res.set("Cache-Control","no-store").json({ok:true,letter:cached});
+  const now=Date.now(),rate=surpriseLetterRate.get(tokenHash)||{start:now,count:0};
+  if(now-rate.start>60*60*1000){rate.start=now;rate.count=0;}
+  if(rate.count>=4)return res.status(429).json({error:"Espera un momento antes de volver a abrir la carta."});
+  rate.count++;surpriseLetterRate.set(tokenHash,rate);
+  const {data:song,error:songError}=await db.from("songs").select("id,audio_path,recipient,dedication").eq("id",link.song_id).maybeSingle();
+  if(songError)throw songError;
+  if(!song?.audio_path||!song.audio_path.endsWith("/"+song.id+".mp3"))return res.status(403).json({error:"La canción no corresponde a este enlace."});
+  const {data:order,error:orderError}=await db.from("customer_orders").select("recipient,relationship,occasion,story,special_phrase,buyer").eq("id",song.id).maybeSingle();
+  if(orderError)throw orderError;
+  const details=order||{};
+  const recipient=String(details.recipient||song.recipient||"persona especial").slice(0,120);
+  const source=String(details.story||song.dedication||"").slice(0,2500);
+  const prompt="Escribe una carta sorpresa personalizada en español latino, emotiva, elegante y natural, para acompañar una canción. Dirígete a la persona destinataria por su nombre. Usa solo los datos proporcionados; no inventes fechas, parentescos, promesas ni recuerdos. No menciones IA, tecnología ni que fue generada. No incluyas letras de canciones, versos copiados ni instrucciones. Entre 180 y 260 palabras, en párrafos breves, con saludo y cierre afectuoso. Devuelve solo el texto de la carta.\n\nDestinatario: "+recipient+"\nRelación: "+String(details.relationship||"no indicada").slice(0,150)+"\nOcasión: "+String(details.occasion||"no indicada").slice(0,150)+"\nHistoria y recuerdos: "+source+"\nFrase especial: "+String(details.special_phrase||"").slice(0,500)+"\nDe parte de: "+String(details.buyer||"alguien que te quiere").slice(0,120);
+  const result=await groqCompletion([{role:"system",content:"Eres escritor/a profesional de cartas de dedicatoria. Escribe con sensibilidad, claridad y calidez. Respeta estrictamente los hechos proporcionados."},{role:"user",content:prompt}],{maxTokens:650,temperature:.72});
+  const letter=String(result.content||"").trim().slice(0,3500);
+  if(!letter)throw new Error("La IA devolvió una carta vacía.");
+  surpriseLetterCache.set(link.song_id,letter);
+  return res.set("Cache-Control","no-store").json({ok:true,letter});
+ }catch(e){
+  console.error("Surprise letter:",e?.message||e);
+  return res.status(e?.status===429?429:502).json({error:"No se pudo preparar la carta en este momento."});
+ }
+});
+
 app.post("/api/lyrics/generate",async(req,res)=>{
  try{
   if(!process.env.GROQ_API_KEY&&!process.env.GEMINI_API_KEY)return res.status(503).json({error:"La IA de letras aún no está conectada. Configura un proveedor de IA en Render."});
