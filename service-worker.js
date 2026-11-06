@@ -6,9 +6,21 @@ self.addEventListener('push',event=>{
 self.addEventListener('notificationclick',event=>{
  event.notification.close();
  const target=new URL(event.notification.data?.url||'/admin.html',self.location.origin).href;
- event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
-  for(const client of list){if(new URL(client.url).origin===self.location.origin&&'focus'in client)return client.focus().then(c=>c.navigate(target));}
-  return clients.openWindow?clients.openWindow(target):undefined;
+ event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(async list=>{
+  const sameOrigin=list.filter(client=>new URL(client.url).origin===self.location.origin);
+  const adminTab=sameOrigin.find(client=>new URL(client.url).pathname==='/admin.html');
+  if(adminTab&&'focus'in adminTab){
+   await adminTab.focus();
+   adminTab.postMessage({type:'CCH_PUSH_NOTIFICATION_CLICK'});
+   return;
+  }
+  const existing=sameOrigin.find(client=>'focus'in client);
+  if(existing){
+   await existing.focus();
+   if('navigate'in existing)await existing.navigate(target);
+   return;
+  }
+  if(clients.openWindow)return clients.openWindow(target);
  }));
 });
 
