@@ -1056,7 +1056,8 @@ async function restoreCustomerOrderProgress(orderId){
    return;
   }
   if(!check.ok)return;
-  window.cchAutoSavedOrderId=orderId;
+  /* Restaurar el seguimiento anterior sin marcarlo como el pedido del nuevo formulario. */
+  window.cchRestoredOrderId=orderId;
   let restoredProgress=document.getElementById('customerAudioProgress');
   if(!restoredProgress){
    restoredProgress=document.createElement('section');restoredProgress.id='customerAudioProgress';
@@ -1617,12 +1618,10 @@ function mountCustomerOrderChat(){
   paint(5,'Conectando con el sistema para registrar tu pedido…');
   try{
    let saved;
-   const existing=window.cchAutoSavedOrderId;
-   if(existing){saved={orderId:existing};}
-   else{
-    if(typeof saveCustomerOrder!=='function')throw new Error('No se pudo iniciar el envío. Recarga la página.');
-    saved=await saveCustomerOrder(true);
-   }
+   /* Cada envío confirmado desde el formulario debe crear un pedido nuevo.
+      El ID restaurado al cargar la página pertenece a un pedido anterior. */
+   if(typeof saveCustomerOrder!=='function')throw new Error('No se pudo iniciar el envío. Recarga la página.');
+   saved=await saveCustomerOrder(true);
    const id=saved.orderId||saved.id;
    if(!id)throw new Error('El servidor no confirmó el número del pedido.');
    window.cchAutoSavedOrderId=id;
