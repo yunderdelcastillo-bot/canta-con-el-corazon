@@ -226,6 +226,17 @@ if(cartaMode){
 // La sorpresa ya no muestra letras; se ignora cualquier parámetro antiguo `letra`.
 
 const API_BASE='https://canta-corazon-private-api.onrender.com';
+ if(cartaMode&&previewLinkToken){
+  const dedication=document.getElementById('dedicationText');
+  if(dedication){
+   dedication.textContent='Estamos preparando una dedicatoria especial para ti…';
+   fetch(API_BASE+'/api/surprise-letter?token='+encodeURIComponent(previewLinkToken),{cache:'no-store'})
+    .then(response=>response.ok?response.json():Promise.reject(new Error('Carta no disponible')))
+    .then(data=>{if(data?.letter)dedication.textContent=data.letter;})
+    .catch(()=>{dedication.textContent=buildSurprisePoem(message);});
+  }
+ }
+
 let lyricAlignmentPromise=null;
 async function alignGiftLyrics(){
  if(lyricAlignmentPromise)return lyricAlignmentPromise;
