@@ -162,7 +162,7 @@ body.carta-opened #dedicationText{color:#6e5360!important}
 </main>
 <script>
 const params=new URLSearchParams(location.search);
-const name=params.get('para');const message=params.get('mensaje');const audio=params.get('audio');
+const name=params.get('para')||params.get('name')||'';const sender=params.get('de')||params.get('desde')||params.get('remitente')||params.get('from')||'';const message=params.get('mensaje')||params.get('message')||'';const audio=params.get('audio');
 const lyricText=params.get('letra');
 const previewLinkToken=params.get('previewLink')||'';
 const theme=params.get('tema')||'romantico';
@@ -205,7 +205,7 @@ function updateSyncedLyric(){
  const target=document.getElementById('lyricsCurrent');
  if(target&&target.textContent!==text)target.textContent=text;
 }
-if(name){document.getElementById('giftTitle').textContent='Para '+name}
+if(name){document.getElementById('giftTitle').textContent=(sender?'De '+sender+' · ':'')+'Para '+name}else if(sender){document.getElementById('giftTitle').textContent='De '+sender+' para ti'}
 if(message){const cleanMessage=message.replace(/\\\\n/g,'\n').replace(/\\n/g,'\n').split('\n').map(line=>line.trim()).filter(line=>line&&!/^parentesco o relación:/i.test(line)).map(line=>line.replace(/^amor\s+detalle adicional:\s*/i,'').replace(/^detalle adicional:\s*/i,''));document.getElementById('giftMessage').textContent=cleanMessage.join('\n');const dedication=document.getElementById('dedicationText');if(dedication)dedication.textContent=cleanMessage.join('\n')||'Esta canción guarda un sentimiento especial, preparado con cariño solo para ti.'}
 function buildSurprisePoem(rawStory){
  const story=String(rawStory||'').replace(/\\\\n/g,'\n').replace(/\\n/g,'\n').replace(/parentesco o relación:[^\n]*/gi,'').replace(/detalle adicional:/gi,'').trim();
@@ -213,8 +213,9 @@ function buildSurprisePoem(rawStory){
  const first=parts[0]||'cada recuerdo que guardan en el corazón';
  const second=parts[1]||'los momentos que han compartido';
  const third=parts[2]||'el cariño que permanece a pesar del tiempo';
- const who=name||'persona especial';
- return 'Para '+who+', con todo el corazón ♥\n\nHay historias que merecen flores,\nrecuerdos que merecen volver a brillar,\ny sentimientos tan grandes\nque ni mil palabras podrían contar.\n\nHay personas que llegan a nuestra vida\ny dejan una huella difícil de borrar;\ncon pequeños gestos llenan los días\ny hacen que todo pueda mejorar.\n\n'+first.charAt(0).toUpperCase()+first.slice(1)+',\nes parte de este hermoso caminar;\n'+second.charAt(0).toUpperCase()+second.slice(1)+',\nson recuerdos que siempre podrán abrazar.\n\nEn cada risa vive un instante,\nen cada abrazo una forma de cuidar;\ny aunque cambien los días y los caminos,\nlo que se siente de verdad permanece igual.\n\n'+third.charAt(0).toUpperCase()+third.slice(1)+',\nes un lazo que el tiempo no apagará;\nque nunca falten motivos para sonreír,\nni razones bonitas para volver a abrazar.\n\nQue la vida te regale mañanas tranquilas,\nsueños nuevos y fuerzas para continuar;\nque nunca te falte alguien que te escuche\ny un corazón al que puedas regresar.\n\nHoy esta sorpresa lleva tu nombre,\nuna canción y estas palabras para recordar\nque eres alguien muy especial\ny que mereces cariño, alegría y paz.\n\nCon todo mi cariño,\nCanta con el corazón ♥';
+ const who=name||'una persona muy especial';
+ const from=sender||'alguien que te quiere';
+ return 'DE '+from.toLocaleUpperCase('es-PE')+'\nPARA '+who.toLocaleUpperCase('es-PE')+' ♥\n\nCon todo el corazón\n\nHay historias que merecen flores,\nrecuerdos que merecen volver a brillar,\ny sentimientos tan grandes\nque ni mil palabras podrían contar.\n\nHay personas que llegan a nuestra vida\ny dejan una huella difícil de borrar;\ncon pequeños gestos llenan los días\ny hacen que todo pueda mejorar.\n\n'+first.charAt(0).toUpperCase()+first.slice(1)+',\nes parte de este hermoso caminar;\n'+second.charAt(0).toUpperCase()+second.slice(1)+',\nson recuerdos que siempre podrán abrazar.\n\nEn cada risa vive un instante,\nen cada abrazo una forma de cuidar;\ny aunque cambien los días y los caminos,\nlo que se siente de verdad permanece igual.\n\n'+third.charAt(0).toUpperCase()+third.slice(1)+',\nes un lazo que el tiempo no apagará;\nque nunca falten motivos para sonreír,\nni razones bonitas para volver a abrazar.\n\nQue la vida te regale mañanas tranquilas,\nsueños nuevos y fuerzas para continuar;\nque nunca te falte alguien que te escuche\ny un corazón al que puedas regresar.\n\nHoy esta sorpresa lleva tu nombre,\nuna canción y estas palabras para recordar\nque eres alguien muy especial\ny que mereces cariño, alegría y paz.\n\nCon todo mi cariño,\nCanta con el corazón ♥';
 }
 if(cartaMode){
  const poem=buildSurprisePoem(message);
@@ -464,7 +465,7 @@ const openGiftButton=document.getElementById('openGift');
    if(audio&&grantToken){
     if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&grant='+encodeURIComponent(grantToken);
     audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
-    audioPlayer.play().catch(()=>{audioNote.textContent='Tu canción está lista. Si no comenzó automáticamente, pulsa PLAY.';audioNote.classList.remove('hidden');});
+    audioPlayer.preload='auto';audioNote.textContent='Preparando tu canción…';audioNote.classList.remove('hidden');const startCartaAudio=()=>{const attempt=audioPlayer.play();if(attempt&&typeof attempt.then==='function'){attempt.then(()=>{audioNote.textContent='Esta canción es de '+(sender||'alguien especial')+' para '+(name||'ti')+'. Disfrútala ♥';}).catch(()=>{audioNote.textContent='Tu canción está lista. Toca PLAY para escucharla.';audioNote.classList.remove('hidden');});}};audioPlayer.addEventListener('canplay',startCartaAudio,{once:true});if(audioPlayer.readyState>=2)startCartaAudio();
    }else if(audio&&previewLinkToken){
     if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewLinkToken);
     audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
