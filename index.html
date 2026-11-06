@@ -996,9 +996,9 @@ async function watchCustomerOrderAudio(orderId){
       return;
      }
      if(data.status==='ready'&&data.previewUrl){
-      setProgress(90,'🎵 ¡Tu canción está lista! Ya puedes descargarla.');
+      setProgress(100,'🎧 ¡Tu muestra está lista! Toca el botón para escucharla.');
       let link=document.getElementById('customerAutomaticPreviewLink');
-      if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_self';link.rel='';link.textContent='⬇️ DESCARGAR MI CANCIÓN';link.setAttribute('aria-label','Tu canción está lista. Toca para abrir el regalo y descargarla.');progress.after(link);}
+      if(!link){link=document.createElement('a');link.id='customerAutomaticPreviewLink';link.className='btn full';link.style.cssText='display:block;text-align:center;margin:14px 0;text-decoration:none';link.target='_self';link.rel='';link.textContent='🎧 ESCUCHAR MI MUESTRA';link.setAttribute('aria-label','Tu muestra está lista. Toca para escucharla.');progress.after(link);}
       const previewUrl=new URL(data.previewUrl);
       const paymentContext=window.cchPaymentContext;
       if(paymentContext?.orderId===orderId&&paymentContext?.accessToken){
