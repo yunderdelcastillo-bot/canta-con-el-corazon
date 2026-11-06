@@ -1558,41 +1558,4 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
-<script>
-/* Reparación focalizada: asegurar que la dedicatoria se muestre al abrir la carta. */
-(function(){
- const params=new URLSearchParams(location.search);
- if(params.get('carta')!=='1')return;
- function showLetter(){
-  const revealed=document.getElementById('revealed');
-  const card=document.getElementById('dedicationCard');
-  const player=revealed&&revealed.querySelector('.player');
-  if(!revealed||!card||!player)return;
-  if(card.parentElement!==revealed)revealed.insertBefore(card,player);
-  card.classList.remove('hidden');
-  card.style.setProperty('display','block','important');
-  card.style.setProperty('visibility','visible','important');
-  card.style.setProperty('opacity','1','important');
-  const text=document.getElementById('dedicationText');
-  if(text&&!text.textContent.trim())text.textContent='Hay personas que iluminan nuestra historia con su cariño. Que cada recuerdo bonito te acompañe y que nunca te falten motivos para sonreír. Esta sorpresa fue preparada especialmente para ti, con todo el corazón. ♥';
-  const title=document.getElementById('cartaSongInvitation');
-  if(title&&title.parentElement!==revealed)revealed.insertBefore(title,player);
-  if(title)title.style.setProperty('display','block','important');
- }
- const style=document.createElement('style');
- style.textContent=`
- body.carta-opened #dedicationCard{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;margin:22px auto 30px!important;padding:clamp(28px,6vw,48px) clamp(20px,5vw,38px)!important;max-width:680px!important;border:1px solid #d9b99f!important;border-radius:28px!important;background:radial-gradient(ellipse at 8% 5%,#f8e3e7 0,transparent 32%),radial-gradient(ellipse at 95% 95%,#f5dfc7 0,transparent 34%),linear-gradient(145deg,#fffdf8,#f8eee2)!important;box-shadow:0 16px 42px rgba(87,43,62,.12)!important;text-align:center!important}
- body.carta-opened #dedicationText{display:block!important;white-space:pre-line!important;max-width:600px!important;margin:0 auto!important;color:#634457!important;font:clamp(1.2rem,4.8vw,1.55rem)/1.9 Georgia,serif!important;text-align:center!important}
- body.carta-opened #cartaSongInvitation{display:block!important;text-align:center!important;margin:22px auto!important}
- body.carta-opened #revealed .player{margin:0 auto 24px!important}
- `;
- document.head.appendChild(style);
- document.addEventListener('click',e=>{
-  if(e.target.closest('#openGift')||e.target.closest('#cartaSurpriseCover button')){
-   setTimeout(()=>{document.body.classList.add('carta-opened');showLetter();},80);
-  }
- });
- document.addEventListener('DOMContentLoaded',showLetter);
-})();
-</script>
 </body></html>
