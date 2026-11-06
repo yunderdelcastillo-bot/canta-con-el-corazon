@@ -1385,8 +1385,6 @@ app.post("/api/orders/:id/download-completed",async(req,res)=>{
   if(linkError||!link)return res.status(403).json({error:"Este enlace no es válido para la descarga."});
   const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",link.song_id).maybeSingle();
   if(songError||!song||song.id!==id||!song.audio_path||!song.audio_path.endsWith("/"+id+".mp3"))return res.status(403).json({error:"La canción no corresponde a este pedido."});
-  const {data:payment,error:paymentReadError}=await db.from("payment_submissions").select("payment_status").eq("order_id",id).maybeSingle();
-  if(paymentReadError)throw paymentReadError;
   if(!link.download_enabled&&payment?.payment_status!=="approved")return res.status(403).json({error:"El pago todavía no está aprobado y este pedido no tiene un regalo autorizado."});
   const {error:updateError}=await db.from("customer_orders").update({status:"entregado",updated_at:new Date().toISOString()}).eq("id",id);
   if(updateError)throw updateError;
