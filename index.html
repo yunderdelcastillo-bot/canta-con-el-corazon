@@ -926,7 +926,7 @@ async function watchCustomerOrderAudio(orderId){
  try{
   while(Date.now()<deadline){
    try{
-    const check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/audio-status',{cache:'no-store'});
+    const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);let check;try{check=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/audio-status',{cache:'no-store',signal:controller.signal});}finally{clearTimeout(timeout);}
     const data=await check.json().catch(()=>({}));
     if(check.ok){
      const value=Number(data.progress)||15;
