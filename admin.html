@@ -377,7 +377,8 @@ function cchOrderProgress(o){
  if(o.status==='en_proceso'){percent=Math.max(percent,72);label='En preparación';detail='La canción está en proceso de producción.';}
  if(o.status==='audio_subiendo'){percent=Math.max(percent,82);label='Subiendo audio';detail='Se está cargando el archivo de audio.';}
  if(o.status==='audio_subido'||o.audio_ready){percent=Math.max(percent,90);label='Canción lista';detail='El audio está guardado y listo para preparar la entrega.';}
- if(o.customer_listening){percent=100;label='Cliente escuchando la canción';detail='El cliente presionó reproducir y la canción comenzó a sonar en su dispositivo.';}\n if(o.status==='entregado'){percent=100;label='Paquete entregado';detail='El pedido figura como entregado.';}
+ if(o.customer_listening){percent=100;label='Cliente escuchando la canción';detail='El cliente presionó reproducir y la canción comenzó a sonar en su dispositivo.';}
+ if(o.status==='entregado'){percent=100;label='Paquete entregado';detail='El pedido figura como entregado.';}
  if(o.status==='cancelado'){label='Pedido cancelado';detail='Este pedido fue cancelado.';}
  return {percent,label,detail};
 }
