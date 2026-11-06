@@ -1585,4 +1585,62 @@ function mountCustomerOrderChat(){
 })();
 </script>
 
+<script>
+/* Seguimiento visual del pedido para el cliente; no modifica pagos ni desbloqueos. */
+(function(){
+ const style=document.createElement('style');
+ style.textContent='#customerOrderTimeline{margin-top:16px;padding:15px 14px;border:1px solid #e8c5d3;border-radius:16px;background:linear-gradient(145deg,#fffaf7,#fcecf2);color:#49263a}#customerOrderTimeline h3{margin:0 0 13px;font-size:1rem;color:#713653}#customerOrderTimeline .cch-step{display:flex;gap:11px;align-items:flex-start;position:relative;padding:0 0 14px;min-height:42px}#customerOrderTimeline .cch-step:last-child{padding-bottom:0}#customerOrderTimeline .cch-dot{width:25px;height:25px;flex:0 0 25px;border-radius:50%;display:grid;place-items:center;background:#eadde3;color:#806675;font-size:12px;font-weight:800;z-index:1}#customerOrderTimeline .cch-step.done .cch-dot{background:#4d9a75;color:white}#customerOrderTimeline .cch-step.current .cch-dot{background:#d66a9a;color:white;box-shadow:0 0 0 4px #f7dce8}#customerOrderTimeline .cch-copy strong{display:block;font-size:.88rem;color:#63354e}#customerOrderTimeline .cch-copy small{display:block;color:#866d7b;font-size:.76rem;line-height:1.4;margin-top:2px}#customerOrderTimeline .cch-step:before{content:"";position:absolute;left:12px;top:25px;bottom:0;width:2px;background:#eadde3}#customerOrderTimeline .cch-step.done:before{background:#9bcbb2}#customerOrderTimeline .cch-step:last-child:before{display:none}';
+ document.head.appendChild(style);
+ const steps=[
+  ['Pedido recibido','Recibimos tus datos y tu dedicatoria.'],
+  ['Canción en creación','Estamos trabajando en tu canción.'],
+  ['Muestra lista','Ya puedes escuchar la muestra de tu canción.'],
+  ['Muestra escuchada','Terminaste de escuchar tu muestra.'],
+  ['Voucher recibido','Recibimos tu comprobante de pago.'],
+  ['Pago aprobado','Tu pago quedó registrado como aprobado.'],
+  ['MP3 listo para descargar','Tu canción está lista para ti.']
+ ];
+ function mount(box){
+  if(!box||box.querySelector('#customerOrderTimeline'))return;
+  const panel=document.createElement('section');panel.id='customerOrderTimeline';
+  panel.innerHTML='<h3>💗 Seguimiento de tu canción</h3><div class="cch-steps"></div><p class="cch-timeline-note" style="font-size:.75rem;color:#866d7b;margin:12px 0 0">Te mostraremos cada avance de tu pedido.</p>';
+  box.appendChild(panel);
+  render(box,readState(box));
+ }
+ function readState(box){
+  const pct=parseInt(box.querySelector('#customerAudioPercent')?.textContent||'0',10)||0;
+  const msg=(box.querySelector('#customerAudioStage')?.textContent||'').toLowerCase();
+  let index=pct>=100?6:pct>=90?2:pct>=50?1:0;
+  if(msg.includes('escuch')||msg.includes('terminaste de escuchar'))index=Math.max(index,3);
+  if(msg.includes('voucher')||msg.includes('comprobante recibido')||msg.includes('comprobante enviado'))index=Math.max(index,4);
+  if(msg.includes('aprobado')||msg.includes('aceptado automáticamente'))index=Math.max(index,5);
+  if(msg.includes('mp3')&&(/desbloque|descarg|habilitad/.test(msg)))index=6;
+  return {index,pct,msg};
+ }
+ function render(box,state){
+  const host=box.querySelector('#customerOrderTimeline .cch-steps');if(!host)return;
+  host.replaceChildren();
+  steps.forEach((step,i)=>{
+   const row=document.createElement('div');row.className='cch-step'+(i<state.index?' done':i===state.index?' current':'');
+   const dot=document.createElement('span');dot.className='cch-dot';dot.textContent=i<state.index?'✓':String(i+1);
+   const copy=document.createElement('span');copy.className='cch-copy';
+   const strong=document.createElement('strong');strong.textContent=step[0];
+   const small=document.createElement('small');small.textContent=step[1];
+   copy.append(strong,small);row.append(dot,copy);host.appendChild(row);
+  });
+  const note=box.querySelector('.cch-timeline-note');
+  if(note)note.textContent=state.msg.includes('voucher')||state.msg.includes('comprobante')?'Tu comprobante está siendo procesado según el estado que muestra el sistema.':state.index===6?'¡Gracias por confiar en Canta con el corazón! 💗':'El seguimiento se actualiza automáticamente conforme avanza tu pedido.';
+ }
+ function scan(){
+  document.querySelectorAll('#customerAudioProgress').forEach(box=>{
+   mount(box);render(box,readState(box));
+  });
+ }
+ const observer=new MutationObserver(scan);
+ observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['style','class']});
+ scan();
+ setInterval(scan,2500);
+})();
+</script>
+
 </body></html>
