@@ -1519,7 +1519,7 @@ async function sendAdminPushNotification(db,values){
   webpush.setVapidDetails(process.env.VAPID_SUBJECT,process.env.VAPID_PUBLIC_KEY,process.env.VAPID_PRIVATE_KEY);
   const {data:subs,error}=await db.from("cch_push_subscriptions").select("id,subscription").limit(500);
   if(error){console.warn("Push subscriptions unavailable:",error.message);return;}
-  const payload=JSON.stringify({title:values.title||"Canta con el corazón",body:values.body||"Tienes una nueva notificación.",url:"/admin.html",tag:values.event_type||"cch-admin"});
+  const payload=JSON.stringify({title:values.title||"Canta con el corazón",body:values.body||"Tienes una nueva notificación.",url:"/admin.html?pedido="+encodeURIComponent(values.order_id||"")+"#customerOrders",tag:values.event_type||"cch-admin"});
   await Promise.all((subs||[]).map(async row=>{try{await webpush.sendNotification(row.subscription,payload,{TTL:60,urgency:"high"});}catch(e){if(e.statusCode===404||e.statusCode===410){await db.from("cch_push_subscriptions").delete().eq("id",row.id);}else console.warn("Push delivery:",e.statusCode||e.message);}}));
  }catch(e){console.warn("Push notification error:",e?.message||e);}
 }
