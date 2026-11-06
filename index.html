@@ -214,7 +214,7 @@ function buildSurprisePoem(rawStory){
  const second=parts[1]||'los momentos que han compartido';
  const third=parts[2]||'el cariño que permanece a pesar del tiempo';
  const who=name||'persona especial';
- return 'Para '+who+', con todo el corazón\n\nHay historias que merecen flores,\nrecuerdos que merecen volver a brillar,\ny sentimientos tan grandes\nque solo el corazón sabe explicar.\n\n'+first.charAt(0).toUpperCase()+first.slice(1)+',\nes parte de este hermoso caminar;\n'+second.charAt(0).toUpperCase()+second.slice(1)+',\nson momentos que nadie podrá borrar.\n\n'+third.charAt(0).toUpperCase()+third.slice(1)+',\nes un lazo que el tiempo no apagará;\nque nunca falten motivos para sonreír,\nni razones bonitas para volver a abrazar.\n\nQue estas palabras te recuerden\nlo mucho que significas de verdad.\nHoy esta sorpresa lleva tu nombre\ny un cariño que quiere durar.\n\nCon amor,\nCanta con el corazón ♥';
+ return 'Para '+who+', con todo el corazón ♥\n\nHay historias que merecen flores,\nrecuerdos que merecen volver a brillar,\ny sentimientos tan grandes\nque ni mil palabras podrían contar.\n\nHay personas que llegan a nuestra vida\ny dejan una huella difícil de borrar;\ncon pequeños gestos llenan los días\ny hacen que todo pueda mejorar.\n\n'+first.charAt(0).toUpperCase()+first.slice(1)+',\nes parte de este hermoso caminar;\n'+second.charAt(0).toUpperCase()+second.slice(1)+',\nson recuerdos que siempre podrán abrazar.\n\nEn cada risa vive un instante,\nen cada abrazo una forma de cuidar;\ny aunque cambien los días y los caminos,\nlo que se siente de verdad permanece igual.\n\n'+third.charAt(0).toUpperCase()+third.slice(1)+',\nes un lazo que el tiempo no apagará;\nque nunca falten motivos para sonreír,\nni razones bonitas para volver a abrazar.\n\nQue la vida te regale mañanas tranquilas,\nsueños nuevos y fuerzas para continuar;\nque nunca te falte alguien que te escuche\ny un corazón al que puedas regresar.\n\nHoy esta sorpresa lleva tu nombre,\nuna canción y estas palabras para recordar\nque eres alguien muy especial\ny que mereces cariño, alegría y paz.\n\nCon todo mi cariño,\nCanta con el corazón ♥';
 }
 if(cartaMode){
  const poem=buildSurprisePoem(message);
@@ -461,10 +461,18 @@ const openGiftButton=document.getElementById('openGift');
   revealed.style.display='block';
   window.scrollTo({top:0,behavior:'smooth'});
   if(cartaMode){
-   // En la carta sorpresa nunca iniciar audio al abrir: el cliente usa los controles Play del reproductor.
-   audioPlayer.pause();
-   if(audio&&grantToken){audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');}
-   else if(audio&&previewLinkToken){audioNote.textContent='Tu canción está lista. Pulsa PLAY cuando quieras escucharla.';audioNote.classList.remove('hidden');}
+   if(audio&&grantToken){
+    if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&grant='+encodeURIComponent(grantToken);
+    audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
+    audioPlayer.play().catch(()=>{audioNote.textContent='Tu canción está lista. Si no comenzó automáticamente, pulsa PLAY.';audioNote.classList.remove('hidden');});
+   }else if(audio&&previewLinkToken){
+    if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewLinkToken);
+    audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
+    audioPlayer.play().catch(()=>{audioNote.textContent='Tu canción está lista. Si no comenzó automáticamente, pulsa PLAY.';audioNote.classList.remove('hidden');});
+   }else{
+    audioNote.textContent='Tu dedicatoria está lista. La canción se reproducirá cuando el acceso esté habilitado.';
+    audioNote.classList.remove('hidden');
+   }
   }else if(audio&&grantToken){
    audioPlayer.play().catch(()=>{audioNote.textContent='Tu regalo está abierto. Pulsa reproducir para escuchar la canción.';audioNote.classList.remove('hidden')});
   }else if(audio&&previewLinkToken){
