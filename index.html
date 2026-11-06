@@ -979,11 +979,22 @@ async function generateCustomerLyrics(){
  try{
   const response=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   const data=await response.json();if(!response.ok)throw new Error(data.error||'No se pudo generar la letra.');
-  document.getElementById('customerLyricsText').value=data.lyrics;result.classList.remove('hidden');status.textContent='💗 ¡Tu letra está lista! Revísala, puedes editarla y luego enviarla por WhatsApp.';
+  document.getElementById('customerLyricsText').value=data.lyrics;result.classList.remove('hidden');status.textContent='💗 ¡Tu letra está lista! Revísala, edítala si deseas y usa los botones para copiarla o enviar tu pedido automáticamente.';
  }catch(error){status.textContent='No se pudo generar: '+error.message;}
  finally{btn.disabled=false;document.getElementById('regenerateCustomerLyrics').disabled=false;}
 }
 window.generateCustomerLyrics=generateCustomerLyrics;
+/* Conectar explícitamente los botones de generar y regenerar letra. */
+const cchGenerateButton=document.getElementById('generateCustomerLyrics');
+const cchRegenerateButton=document.getElementById('regenerateCustomerLyrics');
+if(cchGenerateButton)cchGenerateButton.addEventListener('click',()=>generateCustomerLyrics());
+if(cchRegenerateButton)cchRegenerateButton.addEventListener('click',()=>{
+ const result=document.getElementById('customerLyricsResult');
+ if(result)result.classList.add('hidden');
+ const field=document.getElementById('customerLyricsText');
+ if(field)field.value='';
+ generateCustomerLyrics();
+});
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
 async function watchCustomerOrderAudio(orderId){
  const progress=document.getElementById('customerAudioProgress');
