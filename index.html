@@ -1494,7 +1494,7 @@ function mountCustomerOrderChat(){
   if(form&&!form.reportValidity())return;
   busy=true;btn.disabled=true;btn.textContent='⏳ Enviando pedido…';
   const fallback=$('sendCustomerLyricsWhatsApp');if(fallback)fallback.classList.add('hidden');
-  const p=progressBox();setProgress(5,'📨 Enviando tu pedido de forma segura…');
+  const p=progressBox();setProgress(5,'📨 Enviando tu pedido de forma segura…');p.scrollIntoView({behavior:'smooth',block:'center'});
   try{
    const payload={buyer:val('buyer'),contact:val('contact'),recipient:val('recipient'),relationship:val('relationship'),occasion:val('occasion'),story:val('story'),style:val('style'),customGenre:val('customGenre'),voice:val('voice'),specialPhrase:val('specialPhrase'),lyricDuration:val('lyricDuration'),lyricTone:val('lyricTone'),package:val('package'),urgency:val('urgency'),lyrics};
    const controller=new AbortController();const requestTimer=setTimeout(()=>controller.abort(),45000);let r;try{r=await fetch(API+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});}finally{clearTimeout(requestTimer);}
@@ -1509,8 +1509,9 @@ function mountCustomerOrderChat(){
     if(typeof window.mountCustomerOrderChat==='function')window.mountCustomerOrderChat();
    }
    btn.textContent='✅ Pedido enviado';status.textContent='💗 ¡Pedido registrado! La creación de tu canción ya fue iniciada.';
-   setProgress(15,'💗 Pedido registrado. La IA está iniciando la composición de tu canción.');
-   track(d.orderId);
+   setProgress(15,'💗 ¡Pedido recibido correctamente! No vuelvas a enviarlo. Estamos preparando tu canción; puedes dejar esta pantalla abierta y consultar el avance.');
+   p.scrollIntoView({behavior:'smooth',block:'center'});
+   void track(d.orderId);
   }catch(e){
    setProgress(0,'No se pudo enviar el pedido: '+e.message+'. Corrige los datos o inténtalo nuevamente.');
    status.textContent='No se pudo registrar: '+e.message;
