@@ -984,11 +984,11 @@ async function generateCustomerLyrics(){
 window.generateCustomerLyrics=generateCustomerLyrics;
 document.getElementById('copyCustomerLyrics').addEventListener('click',async()=>{const value=orderValue('customerLyricsText');try{await navigator.clipboard.writeText(value);document.getElementById('customerLyricsStatus').textContent='¡Letra copiada!'}catch{document.getElementById('customerLyricsText').focus();document.getElementById('customerLyricsText').select();document.getElementById('customerLyricsStatus').textContent='Selecciona y copia la letra.'}});
 async function watchCustomerOrderAudio(orderId){
+ const progress=document.getElementById('customerAudioProgress');
+ if(!progress)return;
  window.cchAudioWatchers=window.cchAudioWatchers||new Set();
  if(window.cchAudioWatchers.has(orderId))return;
  window.cchAudioWatchers.add(orderId);
- const progress=document.getElementById('customerAudioProgress');
- if(!progress)return;
  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
  const setProgress=(n,message)=>{const value=Math.max(0,Math.min(100,Math.round(n)));if(percent)percent.textContent=value+'%';if(bar)bar.style.width=value+'%';if(stage)stage.textContent=message;if(value>=100){const heading=progress.querySelector('div strong');if(heading)heading.textContent='🎉 ¡Tu muestra está lista!';progress.style.borderColor='#e6b85c';}};
  const deadline=Date.now()+7*24*60*60*1000;
