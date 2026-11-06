@@ -292,9 +292,11 @@ app.get("/api/audio",async(req,res)=>{
    const {data:g}=await db.from("download_grants").select("id,song_id,expires_at,can_mp3").eq("token_hash",grantHash).eq("song_id",song.id).gt("expires_at",new Date().toISOString()).maybeSingle();
    grantAuthorized=!!g?.can_mp3;
   }
+  // Una fila de permisos antigua no basta: se exige pago aprobado o regalo explícito.
   if(!grantAuthorized){
-   const {data:packagePermission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",song.id).maybeSingle();
-   if(packagePermission?.can_mp3)grantAuthorized=true;
+   const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status").eq("order_id",song.id).maybeSingle();
+   if(paymentError)throw paymentError;
+   grantAuthorized=payment?.payment_status==="approved";
   }
   const replaySequence=Number(req.query.replay||0);
   if(!grantAuthorized&&Number.isSafeInteger(replaySequence)&&replaySequence>0){
@@ -1373,9 +1375,12 @@ app.post("/api/orders/:id/download-completed",async(req,res)=>{
   if(paymentError)throw paymentError;
   if(payment?.payment_status!=="approved")return res.status(403).json({error:"El pago todavía no está aprobado."});
   const {data:link,error:linkError}=await db.from("song_preview_links").select("id,song_id,download_enabled").eq("token_hash",hash).maybeSingle();
-  if(linkError||!link||!link.download_enabled)return res.status(403).json({error:"Este enlace no tiene permiso de descarga."});
+  if(linkError||!link)return res.status(403).json({error:"Este enlace no es válido para la descarga."});
   const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",link.song_id).maybeSingle();
   if(songError||!song||song.id!==id||!song.audio_path||!song.audio_path.endsWith("/"+id+".mp3"))return res.status(403).json({error:"La canción no corresponde a este pedido."});
+  const {data:payment,error:paymentReadError}=await db.from("payment_submissions").select("payment_status").eq("order_id",id).maybeSingle();
+  if(paymentReadError)throw paymentReadError;
+  if(!link.download_enabled&&payment?.payment_status!=="approved")return res.status(403).json({error:"El pago todavía no está aprobado y este pedido no tiene un regalo autorizado."});
   const {error:updateError}=await db.from("customer_orders").update({status:"entregado",updated_at:new Date().toISOString()}).eq("id",id);
   if(updateError)throw updateError;
   orderAudioStatus.set(id,{status:"downloaded",progress:100,updatedAt:Date.now()});
@@ -1704,10 +1709,19 @@ app.get("/api/admin/orders",async(req,res)=>{
      const payment=paymentByOrder.get(order.id)||null;
      const {data:packagePermission,error:permissionReadError}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
      if(permissionReadError)throw permissionReadError;
-     const giftUnlocked=!!packagePermission?.can_mp3&&payment?.payment_status!=="approved";
-     const benefitsEnabled=payment?.payment_status==="approved"
+     const paymentApproved=payment?.payment_status==="approved";
+     // Restaurar permisos heredados de pedidos pendientes; no confundirlos con regalos.
+     if(!paymentApproved&&packagePermission?.can_mp3){
+      const {error:revokeError}=await db.from("song_package_permissions").update({can_mp3:false,updated_at:new Date().toISOString()}).eq("song_id",song.id);
+      if(revokeError)throw revokeError;
+     }
+     if(!paymentApproved){
+      const {error:linkResetError}=await db.from("song_preview_links").update({download_enabled:false}).eq("song_id",song.id);
+      if(linkResetError)throw linkResetError;
+     }
+     const benefitsEnabled=paymentApproved
       ? await syncApprovedOrderBenefits(db,order.id,song,user.id)
-      : giftUnlocked;
+      : false;
      const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
      const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:benefitsEnabled});
      if(!linkError){
@@ -1720,9 +1734,13 @@ app.get("/api/admin/orders",async(req,res)=>{
    }
    const listedPayment=paymentByOrder.get(order.id)||null;
    let giftUnlocked=false;
-   if(audioReady){
+   if(audioReady&&listedPayment?.payment_status!=="approved"){
     const {data:ownedSong}=await db.from("songs").select("id").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
-    if(ownedSong){const {data:permission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",ownedSong.id).maybeSingle();giftUnlocked=!!permission?.can_mp3&&listedPayment?.payment_status!=="approved";}
+    if(ownedSong){
+     const {data:giftLink,error:giftLinkError}=await db.from("song_preview_links").select("id").eq("song_id",ownedSong.id).eq("download_enabled",true).limit(1).maybeSingle();
+     if(giftLinkError)throw giftLinkError;
+     giftUnlocked=!!giftLink;
+    }
    }
    orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
