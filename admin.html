@@ -450,36 +450,28 @@ async function loadCustomerOrders(){
     giftButton.disabled=!!o.gift_unlocked||o.payment?.payment_status==='approved';
     if(o.payment?.payment_status==='approved')giftButton.textContent='✓ MP3 ya desbloqueado por pago';
     giftButton.onclick=async()=>{if(!confirm('¿Deseas regalar esta canción y habilitar la descarga MP3 sin voucher ni pago?'))return;giftButton.disabled=true;giftButton.textContent='⏳ Desbloqueando regalo…';try{const response=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id)+'/gift-unlock',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo desbloquear el regalo.');o.gift_unlocked=true;giftButton.textContent='🎁 Regalo desbloqueado';giftButton.disabled=true;const note=document.createElement('p');note.className='status';note.textContent='🎁 Regalo autorizado. El MP3 está disponible para el cliente. El estado del pago y el voucher no fueron modificados.';previewCard.appendChild(note);}catch(error){giftButton.disabled=false;giftButton.textContent='🎁 REGALAR Y DESBLOQUEAR MP3';alert(error.message);}};
-    const giftShareButton=document.createElement('button');giftShareButton.type='button';giftShareButton.className='btn';giftShareButton.style.cssText='display:block;width:100%;margin-top:10px;background:linear-gradient(90deg,#8e2468,#c24c87);color:#fff';giftShareButton.textContent='💌 Crear carta sorpresa y compartir';
-    giftShareButton.onclick=async()=>{
-     const paid=o.payment?.payment_status==='approved';
-     if(!paid&&!o.gift_unlocked&&!confirm('Este pedido todavía no tiene el pago aprobado. ¿Deseas regalar la canción y habilitar el MP3 sin cobrar? El voucher y el estado del pago no cambiarán.'))return;
-     giftShareButton.disabled=true;giftShareButton.textContent='⏳ Preparando carta sorpresa…';
-     let waWindow=null;
-     try{
-      if(o.contact)waWindow=window.open('about:blank','_blank');
-      if(!paid&&!o.gift_unlocked){
-       const unlock=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id)+'/gift-unlock',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({})});
-       const unlocked=await unlock.json();if(!unlock.ok)throw new Error(unlocked.error||'No se pudo habilitar el regalo.');
-       o.gift_unlocked=true;
-      }
-      const giftUrl=new URL(o.preview_url);
-      giftUrl.searchParams.set('para',String(o.recipient||'').slice(0,100));
-      giftUrl.searchParams.set('mensaje',String(o.special_phrase||o.story||('Esta canción fue creada especialmente para ti. Disfrútala con todo mi cariño.')).slice(0,1800));
-      giftUrl.searchParams.set('letra',String(o.lyrics||'').slice(0,7000));
-      const occasion=String(o.occasion||'').toLowerCase();
-      const theme=/cumple/.test(occasion)?'cumpleanos':/anivers|bodas/.test(occasion)?'aniversario':/serenata/.test(occasion)?'serenata':/homenaje|despedida/.test(occasion)?'homenaje':/amistad/.test(occasion)?'amistad':'romantico';
-      giftUrl.searchParams.set('tema',theme);
-      const shareUrl=giftUrl.toString();
-      try{await navigator.clipboard.writeText(shareUrl)}catch{}
-      const phone=String(o.contact||'').replace(/\D/g,'');
-      const textMessage='💌 ¡Tu carta sorpresa está lista! Comparte este enlace con '+(o.recipient||'esa persona especial')+'. Al abrirlo descubrirá su carta, la letra y la canción completa: '+shareUrl;
-      if(phone&&waWindow){waWindow.location='https://wa.me/'+(phone.startsWith('51')?phone:'51'+phone)+'?text='+encodeURIComponent(textMessage);giftShareButton.textContent='✓ Carta creada · WhatsApp abierto';}
-      else{if(waWindow)waWindow.close();window.prompt('Copia y comparte este enlace de regalo:',shareUrl);giftShareButton.textContent='✓ Carta sorpresa creada';}
-      const note=document.createElement('p');note.className='status';note.textContent='💌 Enlace listo. La persona podrá abrir la carta, leer la dedicatoria y la letra, y reproducir la canción en línea.';previewCard.appendChild(note);
-     }catch(error){if(waWindow)waWindow.close();giftShareButton.disabled=false;giftShareButton.textContent='💌 Crear carta sorpresa y compartir';alert(error.message);}
-    };
-    previewCard.append(giftShareButton);
+    // La carta sorpresa usa el mismo enlace privado de muestra; aparece solo
+    // cuando el voucher está aprobado y el MP3 ya está listo.
+    if(o.payment?.payment_status==='approved'&&o.preview_url){
+     const surpriseUrl=new URL(o.preview_url);
+     surpriseUrl.searchParams.set('surprise','1');
+     const surpriseLink=document.createElement('a');
+     surpriseLink.href=surpriseUrl.toString();
+     surpriseLink.target='_blank';
+     surpriseLink.rel='noopener';
+     surpriseLink.className='btn';
+     surpriseLink.textContent='💌 Abrir carta sorpresa del cliente';
+     surpriseLink.style.cssText='display:block;width:100%;margin:10px 0;text-align:center;text-decoration:none;background:linear-gradient(90deg,#8e2468,#c24c87);color:#fff';
+     previewCard.appendChild(surpriseLink);
+     const copySurprise=document.createElement('button');
+     copySurprise.type='button';
+     copySurprise.className='btn alt';
+     copySurprise.textContent='📋 Copiar enlace de la sorpresa';
+     copySurprise.style.cssText='display:block;width:100%;margin:8px 0';
+     copySurprise.onclick=async()=>{try{await navigator.clipboard.writeText(surpriseUrl.toString());copySurprise.textContent='✓ Enlace copiado';}catch{window.prompt('Copia el enlace de la carta sorpresa:',surpriseUrl.toString());}};
+     previewCard.appendChild(copySurprise);
+    }
+
     previewCard.append(previewLink,previewActions,giftButton);card.appendChild(previewCard);
    }
    if(o.audio_ready){
