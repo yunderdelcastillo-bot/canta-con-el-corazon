@@ -1677,6 +1677,21 @@ app.post("/api/admin/orders/manual-whatsapp",async(req,res)=>{
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create WhatsApp manual order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido de WhatsApp."});}
 });
+app.post("/api/customer/listening",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const orderId=String(req.body?.orderId||""),audioPath=String(req.body?.audioPath||"");
+  if(!/^[0-9a-f-]{36}$/i.test(orderId)||!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audioPath))return res.status(400).json({error:"Pedido o audio no válido."});
+  const db=admin();
+  const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",orderId).eq("audio_path",audioPath).maybeSingle();
+  if(songError)throw songError;
+  if(!song)return res.status(404).json({error:"No se encontró la canción de este pedido."});
+  const {data:existing,error:existingError}=await db.from("system_notifications").select("id").eq("order_id",orderId).eq("event_type","customer_listening").eq("audience","admin").limit(1).maybeSingle();
+  if(existingError)throw existingError;
+  if(!existing)await createSystemNotification(db,{order_id:orderId,event_type:"customer_listening",audience:"admin",title:"El cliente comenzó a escuchar su canción",body:"El cliente presionó reproducir y comenzó la reproducción de la canción completa."});
+  res.set("Cache-Control","no-store").json({ok:true,listening:true});
+ }catch(e){console.error("Customer listening event:",e?.message||e);res.status(500).json({error:"No se pudo registrar el inicio de reproducción."});}
+});
 app.get("/api/admin/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
@@ -1688,6 +1703,9 @@ app.get("/api/admin/orders",async(req,res)=>{
   if(audioError)throw audioError;
   const audioNames=new Set((audioFiles||[]).map(file=>file.name));
   const orderIds=(data||[]).map(order=>order.id);
+  const {data:listeningEvents,error:listeningError}=orderIds.length?await db.from("system_notifications").select("order_id").eq("audience","admin").eq("event_type","customer_listening").in("order_id",orderIds):{data:[],error:null};
+  if(listeningError)throw listeningError;
+  const listeningOrderIds=new Set((listeningEvents||[]).map(event=>event.order_id));
   const {data:payments,error:paymentError}=orderIds.length?await db.from("payment_submissions").select("id,order_id,amount,package_name,payment_status,provider,voucher_path,song_id,created_at,updated_at").in("order_id",orderIds):{data:[],error:null};
   if(paymentError)throw paymentError;
   const paymentByOrder=new Map();
@@ -1747,7 +1765,7 @@ app.get("/api/admin/orders",async(req,res)=>{
      giftUnlocked=!!giftLink;
     }
    }
-   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
+   orders.push({...order,audio_ready:audioReady,customer_listening:listeningOrderIds.has(order.id),preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
