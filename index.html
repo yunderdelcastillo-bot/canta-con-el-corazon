@@ -1462,7 +1462,7 @@ function mountCustomerOrderChat(){
   const deadline=Date.now()+30*60*1000;
   while(Date.now()<deadline){
    try{
-    const r=await fetch(API+'/api/orders/'+encodeURIComponent(id)+'/audio-status?ts='+Date.now(),{cache:'no-store'});
+    const controller=new AbortController();const requestTimer=setTimeout(()=>controller.abort(),12000);let r;try{r=await fetch(API+'/api/orders/'+encodeURIComponent(id)+'/audio-status?ts='+Date.now(),{cache:'no-store',signal:controller.signal});}finally{clearTimeout(requestTimer);}
     const d=await r.json().catch(()=>({}));
     if(r.ok){
      setProgress(d.progress??15,d.message||'Tu pedido está registrado y la canción sigue en preparación.');
@@ -1497,7 +1497,7 @@ function mountCustomerOrderChat(){
   const p=progressBox();setProgress(5,'📨 Enviando tu pedido de forma segura…');
   try{
    const payload={buyer:val('buyer'),contact:val('contact'),recipient:val('recipient'),relationship:val('relationship'),occasion:val('occasion'),story:val('story'),style:val('style'),customGenre:val('customGenre'),voice:val('voice'),specialPhrase:val('specialPhrase'),lyricDuration:val('lyricDuration'),lyricTone:val('lyricTone'),package:val('package'),urgency:val('urgency'),lyrics};
-   const r=await fetch(API+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+   const controller=new AbortController();const requestTimer=setTimeout(()=>controller.abort(),45000);let r;try{r=await fetch(API+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});}finally{clearTimeout(requestTimer);}
    const d=await r.json().catch(()=>({}));
    if(!r.ok)throw new Error(d.error||'No se pudo registrar el pedido ('+r.status+').');
    if(!d.orderId)throw new Error('El servidor no devolvió el número del pedido.');
