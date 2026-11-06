@@ -207,11 +207,8 @@ function updateSyncedLyric(){
 }
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){const cleanMessage=message.replace(/\\\\n/g,'\n').replace(/\\n/g,'\n').split('\n').map(line=>line.trim()).filter(line=>line&&!/^parentesco o relación:/i.test(line)).map(line=>line.replace(/^amor\s+detalle adicional:\s*/i,'').replace(/^detalle adicional:\s*/i,''));document.getElementById('giftMessage').textContent=cleanMessage.join('\n');const dedication=document.getElementById('dedicationText');if(dedication)dedication.textContent=cleanMessage.join('\n')||'Esta canción guarda un sentimiento especial, preparado con cariño solo para ti.'}
-if(lyricText){
- const cleanLyrics=lyricText.replace(/\[(?:verso|coro|puente|intro|outro|pre[- ]?coro)[^\]]*\]/gi,'|').replace(/\r/g,'');
- lyricLines=cleanLyrics.split(/[|\n]+/).flatMap(part=>part.split(/(?<=[.!?])\s+/)).map(part=>part.replace(/^[-•\s]+|[-•\s]+$/g,'').trim()).filter(part=>part.length>2);
- if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent='♪'}
-}
+// La sorpresa ya no muestra letras; se ignora cualquier parámetro antiguo `letra`.
+
 const API_BASE='https://canta-corazon-private-api.onrender.com';
 let lyricAlignmentPromise=null;
 async function alignGiftLyrics(){
@@ -417,7 +414,7 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
  audioPlayer.addEventListener('seeking',()=>{if(!grantToken&&!downloadAllowed&&Math.abs(audioPlayer.currentTime-previewLastTime)>2)audioPlayer.currentTime=previewLastTime});
  audioPlayer.addEventListener('timeupdate',()=>{if(!grantToken&&!downloadAllowed)previewLastTime=Math.max(previewLastTime,audioPlayer.currentTime)});
  audioPlayer.addEventListener('ended',async()=>{
-  if(lyricLines.length)document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥';
+  if(lyricLines.length&&document.getElementById('lyricsCurrent'))document.getElementById('lyricsCurrent').textContent='♥ Gracias por escuchar con el corazón ♥';
   if(downloadAllowed){document.getElementById('replayGiftAudio').classList.remove('hidden');return}
   if(!grantToken){
    // Mostrar la pantalla de compra inmediatamente al terminar la muestra; no esperar la respuesta del servidor.
