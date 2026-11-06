@@ -970,44 +970,51 @@ async function watchCustomerOrderAudio(orderId){
   setProgress(0,'No pudimos confirmar el estado del pedido. Vuelve a conectarte para consultar su registro.');
  }finally{}
 }
-document.getElementById('sendCustomerLyrics').addEventListener('click',async()=>{
- const button=document.getElementById('sendCustomerLyrics'),fallback=document.getElementById('sendCustomerLyricsWhatsApp'),status=document.getElementById('customerLyricsStatus');
- if(!orderValue('customerLyricsText')){status.textContent='Primero genera tu letra personalizada.';return;}
- button.disabled=true;fallback.classList.add('hidden');
- const mainSubmit=document.getElementById('submitCustomerOrder');if(mainSubmit){mainSubmit.disabled=true;mainSubmit.textContent='⏳ Registrando pedido…';}
+document.getElementById('sendCustomerLyrics').addEventListener('click',async(event)=>{
+ event.preventDefault();
+ const button=document.getElementById('sendCustomerLyrics');
+ const fallback=document.getElementById('sendCustomerLyricsWhatsApp');
+ const status=document.getElementById('customerLyricsStatus');
+ const lyrics=orderValue('customerLyricsText');
+ if(!lyrics){status.textContent='Primero genera tu letra personalizada.';return;}
+ if(button.dataset.sending==='1')return;
+ button.dataset.sending='1';button.disabled=true;button.textContent='⏳ Registrando pedido…';
+ if(fallback)fallback.classList.add('hidden');
  let progress=document.getElementById('customerAudioProgress');
  if(!progress){
   progress=document.createElement('section');progress.id='customerAudioProgress';
   progress.style.cssText='margin:16px 0;padding:18px;border:1px solid #f6d78c;border-radius:18px;background:linear-gradient(135deg,#fff8f2,#fce8ef);color:#351b2b;box-shadow:0 8px 24px #12040c22';
-  progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">💗 Tu pedido fue recibido</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">0%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">Registrando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">Por favor, mantente en esta página y espera hasta que la barra llegue al 100 %. Cuando termine, aparecerá el botón para escuchar tu muestra. No envíes otro pedido mientras esperas.</p>';
+  progress.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px"><strong style="font-size:1.05rem">💗 Tu pedido</strong><strong id="customerAudioPercent" style="font-size:1.35rem;color:#681b43">5%</strong></div><div style="height:13px;background:#ead8e1;border-radius:99px;overflow:hidden"><div id="customerAudioBar" style="height:100%;width:5%;border-radius:99px;background:linear-gradient(90deg,#f6d78c,#e9a5bd);transition:width .8s ease"></div></div><p id="customerAudioStage" role="status" aria-live="polite" style="margin:12px 0 0;font-size:.92rem;line-height:1.5">📨 Estamos registrando tu pedido…</p><p style="margin:7px 0 0;font-size:.78rem;color:#765b69">No vuelvas a enviar el pedido. La barra se actualizará automáticamente.</p>';
   button.after(progress);
  }
- progress.classList.remove('hidden');
+ progress.classList.remove('hidden');progress.scrollIntoView({behavior:'smooth',block:'center'});
  try{
-  if(!window.cchAutoSavedOrderId){
+  let orderId=window.cchAutoSavedOrderId;
+  if(!orderId){
    const saved=await saveCustomerOrder(true);
-   window.cchAutoSavedOrderId=saved.orderId||'';
-   try{localStorage.setItem('cchLastCustomerOrderId',window.cchAutoSavedOrderId);}catch(e){}
+   orderId=saved.orderId;
+   if(!orderId)throw new Error('El servidor no devolvió el número del pedido.');
+   window.cchAutoSavedOrderId=orderId;
+   try{localStorage.setItem('cchLastCustomerOrderId',orderId);}catch(e){}
    if(saved.paymentReady&&saved.paymentAccessToken){
-    window.cchPaymentContext={orderId:saved.orderId,accessToken:saved.paymentAccessToken};
+    window.cchPaymentContext={orderId,accessToken:saved.paymentAccessToken};
     try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(e){}
-    mountCustomerOrderChat();
+    if(typeof window.mountCustomerOrderChat==='function')window.mountCustomerOrderChat();
    }
-   // El pago se solicita únicamente después de que el cliente escuche la muestra completa.
   }
-  if(!window.cchAutoSavedOrderId)throw new Error('No se recibió el número del pedido.');
-  status.textContent='💗 ¡Tu pedido llegó a nuestra plataforma! Mantente en espera hasta que la barra complete el 100 %. En ese momento aparecerá tu muestra para escucharla.';
-  button.textContent='✅ Pedido enviado';
-  button.disabled=true;
-  progress.scrollIntoView({behavior:'smooth',block:'center'});
-  watchCustomerOrderAudio(window.cchAutoSavedOrderId);
+  button.textContent='✅ Pedido enviado';button.disabled=true;
+  status.textContent='💗 ¡Pedido recibido correctamente! No lo envíes otra vez. Estamos preparando tu canción.';
+  if(document.getElementById('customerAudioPercent'))document.getElementById('customerAudioPercent').textContent='15%';
+  if(document.getElementById('customerAudioBar'))document.getElementById('customerAudioBar').style.width='15%';
+  if(document.getElementById('customerAudioStage'))document.getElementById('customerAudioStage').textContent='💗 ¡Pedido recibido! Estamos preparando tu canción y consultando su avance.';
+  void watchCustomerOrderAudio(orderId);
  }catch(error){
-  const percent=document.getElementById('customerAudioPercent'),bar=document.getElementById('customerAudioBar'),stage=document.getElementById('customerAudioStage');
-  if(percent)percent.textContent='—';
-  if(bar)bar.style.width='0%';
-  if(stage)stage.textContent='No pudimos registrar el pedido: '+error.message+'. Intenta nuevamente o envíanoslo por WhatsApp.';
-  fallback.classList.remove('hidden');button.disabled=false;
- } 
+  if(document.getElementById('customerAudioPercent'))document.getElementById('customerAudioPercent').textContent='—';
+  if(document.getElementById('customerAudioStage'))document.getElementById('customerAudioStage').textContent='No se pudo confirmar el envío: '+(error.message||'Error de conexión')+'. Si el pedido ya aparece en tu panel, no lo envíes otra vez.';
+  status.textContent='No se pudo confirmar el envío. Comprueba el panel antes de volver a intentarlo.';
+  button.disabled=false;button.dataset.sending='0';button.textContent='💗 Enviar mi pedido';
+  if(fallback)fallback.classList.remove('hidden');
+ }
 });
 document.getElementById('orderForm').addEventListener('input',()=>{
  if(window.cchAutoSavedOrderId){
