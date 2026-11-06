@@ -465,7 +465,7 @@ const openGiftButton=document.getElementById('openGift');
    if(audio&&grantToken){
     if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&grant='+encodeURIComponent(grantToken);
     audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
-    audioPlayer.preload='auto';audioNote.textContent='Preparando tu canción…';audioNote.classList.remove('hidden');const startCartaAudio=()=>{const attempt=audioPlayer.play();if(attempt&&typeof attempt.then==='function'){attempt.then(()=>{audioNote.textContent='Esta canción es de '+(sender||'alguien especial')+' para '+(name||'ti')+'. Disfrútala ♥';}).catch(()=>{audioNote.textContent='Tu canción está lista. Toca PLAY para escucharla.';audioNote.classList.remove('hidden');});}};audioPlayer.addEventListener('canplay',startCartaAudio,{once:true});if(audioPlayer.readyState>=2)startCartaAudio();
+    audioPlayer.preload='auto';audioNote.textContent='Preparando tu canción…';audioNote.classList.remove('hidden');const attempt=audioPlayer.play();if(attempt&&typeof attempt.then==='function'){attempt.then(()=>{audioNote.textContent='Esta canción es de '+(sender||'alguien especial')+' para '+(name||'ti')+'. Disfrútala ♥';}).catch(()=>{audioNote.textContent='Tu canción está lista. Toca PLAY para escucharla.';audioNote.classList.remove('hidden');});}
    }else if(audio&&previewLinkToken){
     if(!audioPlayer.src)audioPlayer.src=API_BASE+'/api/audio?path='+encodeURIComponent(audio)+'&preview='+encodeURIComponent(previewLinkToken);
     audioPlayer.controls=true;audioPlayer.classList.remove('hidden');audioNote.classList.add('hidden');
