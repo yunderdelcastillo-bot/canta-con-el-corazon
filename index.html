@@ -1589,5 +1589,64 @@ function mountCustomerOrderChat(){
 
 
 
+
+<script>
+/* Control independiente del envío: reemplaza el botón para retirar listeners antiguos y evitar bloqueos. */
+(function(){
+ const old=document.getElementById('sendCustomerOrderNew');
+ if(!old)return;
+ const button=old.cloneNode(true);
+ old.replaceWith(button);
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  if(button.dataset.busy==='1')return;
+  const $=id=>document.getElementById(id);
+  const status=$('customerLyricsStatus');
+  const lyrics=($('customerLyricsText')?.value||'').trim();
+  if(!lyrics){if(status)status.textContent='Primero genera tu letra personalizada.';return;}
+  button.dataset.busy='1';button.disabled=true;button.textContent='⏳ Registrando tu pedido…';
+  const main=$('submitCustomerOrder');if(main){main.disabled=true;main.textContent='⏳ Registrando pedido…';}
+  let box=$('customerAudioProgress');
+  if(!box){
+   box=document.createElement('section');box.id='customerAudioProgress';
+   box.innerHTML='<strong>💗 Seguimiento de tu pedido</strong><strong id="customerAudioPercent" style="float:right">5%</strong><div style="height:12px;background:#ead8e1;border-radius:20px;overflow:hidden;margin:12px 0"><div id="customerAudioBar" style="height:100%;width:5%;background:linear-gradient(90deg,#f6d78c,#e9a5bd)"></div></div><p id="customerAudioStage" role="status" aria-live="polite">Estamos registrando tu pedido. No cierres esta página.</p>';
+  }
+  box.style.cssText='display:block!important;visibility:visible!important;opacity:1!important;position:relative;width:100%;box-sizing:border-box;margin:16px 0;padding:18px;border:1px solid #e8c5d3;border-radius:16px;background:#fff4f6;color:#351b2b;z-index:2';
+  const result=$('customerLyricsResult');if(result&&result.parentNode)result.insertAdjacentElement('afterend',box);else button.insertAdjacentElement('afterend',box);
+  const paint=(n,msg)=>{const p=$('customerAudioPercent'),b=$('customerAudioBar'),t=$('customerAudioStage');if(p)p.textContent=n+'%';if(b)b.style.width=n+'%';if(t)t.textContent=msg;};
+  paint(5,'Conectando con el sistema para registrar tu pedido…');
+  try{
+   let saved;
+   const existing=window.cchAutoSavedOrderId;
+   if(existing){saved={orderId:existing};}
+   else{
+    if(typeof saveCustomerOrder!=='function')throw new Error('No se pudo iniciar el envío. Recarga la página.');
+    saved=await saveCustomerOrder(true);
+   }
+   const id=saved.orderId||saved.id;
+   if(!id)throw new Error('El servidor no confirmó el número del pedido.');
+   window.cchAutoSavedOrderId=id;
+   try{localStorage.setItem('cchLastCustomerOrderId',id);}catch(_){}
+   if(saved.paymentReady&&saved.paymentAccessToken){
+    window.cchPaymentContext={orderId:id,accessToken:saved.paymentAccessToken};
+    try{sessionStorage.setItem('cchPaymentContext',JSON.stringify(window.cchPaymentContext));}catch(_){}
+    if(typeof mountCustomerOrderChat==='function')mountCustomerOrderChat();
+   }
+   paint(15,'✅ ¡Pedido recibido correctamente! Estamos preparando tu canción.');
+   if(status)status.textContent='💗 ¡Tu pedido fue enviado correctamente!';
+   button.textContent='✅ Pedido enviado';
+   if(main){main.textContent='✅ Pedido enviado';main.disabled=true;}
+   if(typeof watchCustomerOrderAudio==='function')watchCustomerOrderAudio(id);
+  }catch(error){
+   paint(0,'No se pudo registrar: '+(error?.message||'Error de conexión'));
+   if(status)status.textContent='No se pudo enviar. Revisa tu conexión e inténtalo nuevamente.';
+   button.dataset.busy='0';button.disabled=false;button.textContent='💗 Enviar mi pedido';
+   if(main){main.disabled=false;main.textContent='💗 Enviar mi pedido';}
+  }
+ });
+ const assistant=$('cchAiOpen');
+ if(assistant)assistant.style.bottom='8px';
+})();
+</script>
 </body>
 </html>
