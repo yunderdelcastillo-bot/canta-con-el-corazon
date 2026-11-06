@@ -301,6 +301,9 @@ async function activateAdminSession(adminUser,{restored=false}={}){
  window.cchNotificationTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadNotifications()},15000);
  if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadAdminInbox()},15000);
  await cchRefreshPushStatus();
+ const pushOrder=new URLSearchParams(location.search).get('pedido');
+ if(pushOrder)setTimeout(()=>{if(user)window.cchOpenOrder(pushOrder);},350);
+
 }
 // Puente global para que los scripts de conexión externos usen la misma sesión y el mismo cliente del panel.
 window.cchActivateAdminSession=async function(client,adminUser,options={}){db=client;if(adminUser)await activateAdminSession(adminUser,options);};
@@ -591,6 +594,8 @@ async function cchOpenMessengerConversation(orderId,summary){
 }
 window.cchOpenMessengerOrder=async orderId=>{window.cchShowAdminPanel?.('messenger');await cchLoadAdminInbox();const item=Array.from(document.querySelectorAll('.messenger-item')).find(x=>x.textContent.includes(String(orderId).slice(0,8)));const token=await window.cchAdminGetToken();if(!token)return;const r=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(orderId)+'/messages',{headers:{Authorization:'Bearer '+token},cache:'no-store'});const d=await r.json();const orders=await fetch(API_BASE+'/api/admin/messages/inbox',{headers:{Authorization:'Bearer '+token}}).then(x=>x.json());const summary=(orders.conversations||[]).find(x=>x.id===orderId);await cchOpenMessengerConversation(orderId,summary);};
 window.cchOpenOrder=async orderId=>{window.cchShowAdminPanel?.('customerOrders');const search=$('orderSearch');if(search)search.value='';const filter=$('orderFilter');if(filter)filter.value='all';const source=$('orderSourceFilter');if(source)source.value='all';await loadCustomerOrders();const card=document.getElementById('order-'+orderId);if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.style.outline='3px solid #d78eaa';setTimeout(()=>card.style.outline='',3500);}else alert('No se encontró ese pedido en la lista. Actualiza los pedidos e inténtalo nuevamente.');};
+window.addEventListener('message',event=>{if(event.origin!==location.origin||event.data?.type!=='CCH_PUSH_NOTIFICATION_CLICK')return;try{const u=new URL(event.data.url||'/admin.html',location.origin);const id=u.searchParams.get('pedido');if(id&&user)window.cchOpenOrder(id);}catch(e){console.warn('Destino de notificación no válido:',e);}});
+
 $('refreshMessenger').onclick=cchLoadAdminInbox;
 $('refreshOrders').onclick=async()=>{const b=$('refreshOrders');if(b.disabled)return;b.disabled=true;const label=b.textContent;b.textContent='Actualizando…';try{await loadCustomerOrders();}finally{b.disabled=false;b.textContent=label;}};
 
