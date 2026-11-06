@@ -1682,8 +1682,12 @@ app.post("/api/customer/listening",async(req,res)=>{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const orderId=String(req.body?.orderId||""),audioPath=String(req.body?.audioPath||"");
   if(!/^[0-9a-f-]{36}$/i.test(orderId)||!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Pedido o audio no válido."});
+  if(!audioPath.endsWith("/"+orderId+".mp3"))return res.status(400).json({error:"El audio no corresponde al pedido."});
   const db=admin();
-  const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("id",orderId).eq("audio_path",audioPath).maybeSingle();
+  const {data:order,error:orderError}=await db.from("customer_orders").select("id").eq("id",orderId).maybeSingle();
+  if(orderError)throw orderError;
+  if(!order)return res.status(404).json({error:"No se encontró el pedido."});
+  const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
   if(songError)throw songError;
   if(!song)return res.status(404).json({error:"No se encontró la canción de este pedido."});
   const {data:existing,error:existingError}=await db.from("system_notifications").select("id").eq("order_id",orderId).eq("event_type","customer_listening").eq("audience","admin").limit(1).maybeSingle();
@@ -1750,7 +1754,7 @@ app.get("/api/admin/orders",async(req,res)=>{
      if(!linkError){
       const labels={esencial:"ESENCIAL",detalle:"DETALLE ESPECIAL",completo:"REGALO COMPLETO"};
       const u=new URL("https://canta-con-el-corazon.onrender.com/");
-      u.search=new URLSearchParams({para:song.recipient||order.recipient||"",mensaje:song.dedication||order.story||"",audio:song.audio_path,letra:String(song.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:song.theme||"romantico",paquete:labels[song.package_key]||"ESENCIAL",precio:String(song.package_price||20),precioTotal:String(payment?.amount||song.package_price||20),express:/express|expres|30 minutos|media hora/i.test(String(order.urgency||""))?"1":"0",surprise:"1",previewLink:token}).toString();
+      u.search=new URLSearchParams({para:song.recipient||order.recipient||"",mensaje:song.dedication||order.story||"",audio:song.audio_path,letra:String(song.lyrics||"").split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join("|"),tema:song.theme||"romantico",paquete:labels[song.package_key]||"ESENCIAL",precio:String(song.package_price||20),precioTotal:String(payment?.amount||song.package_price||20),express:/express|expres|30 minutos|media hora/i.test(String(order.urgency||""))?"1":"0",surprise:"1",orderId:order.id,previewLink:token}).toString();
       previewUrl=u.toString();
      }
     }
