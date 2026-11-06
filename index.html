@@ -1040,16 +1040,8 @@ async function watchCustomerOrderAudio(orderId){
   setProgress(0,'No pudimos confirmar el estado del pedido. Vuelve a conectarte para consultar su registro.');
  }finally{if(window.cchAudioWatchers)window.cchAudioWatchers.delete(orderId);}
 }
-document.getElementById('orderForm').addEventListener('input',()=>{
- if(window.cchAutoSavedOrderId){
-  window.cchAutoSavedOrderId='';
-  try{localStorage.removeItem('cchLastCustomerOrderId');}catch(e){}
-  const p=document.getElementById('customerAudioProgress');if(p)p.remove();
-  const link=document.getElementById('customerAutomaticPreviewLink');if(link)link.remove();
-  const send=document.getElementById('sendCustomerLyrics');if(send){send.disabled=false;send.textContent='💗 Enviar pedido y generar canción';}
-  const main=document.getElementById('submitCustomerOrder');if(main){main.disabled=false;main.textContent='💗 Enviar pedido y generar canción';}
- }
-});
+/* El seguimiento no debe borrarse por cambios/autocompletado de campos.
+   El pedido enviado permanece vinculado a su ID hasta iniciar uno nuevo expresamente. */
 async function restoreCustomerOrderProgress(orderId){
  if(!orderId||!/^[0-9a-f-]{36}$/i.test(orderId))return;
  try{
