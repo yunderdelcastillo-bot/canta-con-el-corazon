@@ -1396,7 +1396,7 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const state=orderAudioStatus.get(id);
   // Si ya se preparó la muestra en esta instancia, devolver el mismo enlace y no crear enlaces duplicados en cada consulta.
   if(order.status==="entregado")return res.set("Cache-Control","no-store").json({ok:true,status:"downloaded",progress:100,message:"🎉 ¡Pedido completado! Tu canción se descargó correctamente."});
-  if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla.",previewUrl:state.previewUrl});
+  if(state?.status==="ready"&&state.previewUrl)return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎧 ¡Tu muestra está lista! Escúchala; la descarga requiere voucher aprobado o regalo autorizado.",previewUrl:state.previewUrl});
   if(state?.status==="failed")return res.set("Cache-Control","no-store").json({ok:true,status:"failed",progress:0,message:state.message||"No se pudo generar la canción automáticamente."});
   if(state&&["processing","creating","uploading","saving"].includes(state.status))return res.set("Cache-Control","no-store").json({ok:true,status:state.status,progress:state.progress||20,message:state.message||"Estamos preparando tu canción."});
   const {data:files,error}=await db.storage.from("songs-audio").list("orders",{limit:1000,search:id+".mp3"});
@@ -1449,8 +1449,8 @@ app.get("/api/orders/:id/audio-status",async(req,res)=>{
   const previewUrl=giftUrl.toString();
   orderAudioStatus.set(id,{status:"ready",progress:90,previewUrl,updatedAt:Date.now()});
   await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"admin",title:"Muestra lista para el cliente",body:"La canción está guardada y el enlace privado de muestra ya está preparado."});
-  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"customer",title:"¡Tu canción está lista!",body:"Tu canción está lista y la descarga está habilitada. El pedido llegará al 100 % cuando completes la descarga."});
-  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎵 ¡Tu canción está lista! Ya puedes descargarla.",previewUrl});
+  await createSystemNotification(db,{order_id:id,event_type:"preview_ready",audience:"customer",title:"¡Tu canción está lista!",body:"Tu muestra de canción está lista. La descarga MP3 se habilitará después del voucher aprobado o de un regalo autorizado para este pedido."});
+  return res.set("Cache-Control","no-store").json({ok:true,status:"ready",progress:90,message:"🎧 ¡Tu muestra está lista! Escúchala; la descarga requiere voucher aprobado o regalo autorizado.",previewUrl});
  }catch(e){console.error("Customer audio status:",e?.message||e);res.status(500).json({error:"No se pudo preparar el enlace de muestra."});}
 });
 
