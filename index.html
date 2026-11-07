@@ -330,7 +330,7 @@ function showPaymentCta(){
    progress.style.display='block';progress.value=0;
    try{
     const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer la foto. Vuelve a seleccionarla.'));reader.onprogress=e=>{if(e.lengthComputable)status.textContent='📂 Leyendo imagen… '+Math.round(e.loaded/e.total*100)+'%';};reader.readAsDataURL(file);});
-    status.textContent='📤 Enviando voucher al servidor…';
+    status.textContent='📤 Enviando voucher al servidor…';cchSendCustomerActivity('payment_sent');
     const result=await new Promise((resolve,reject)=>{
      const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);progress.value=pct;status.textContent='📤 Enviando voucher… '+pct+'%';}};
@@ -350,6 +350,29 @@ function showPaymentCta(){
  }
  box.classList.remove('hidden');
 }
+
+async function cchSendCustomerActivity(event='online'){
+ try{
+  const q=new URLSearchParams(location.search),audioPath=q.get('audio')||'';
+  const id=q.get('pedido')||audioPath.split('/').pop()?.replace(/\.mp3$/i,'')||window.cchAutoSavedOrderId||'';
+  let saved=window.cchPaymentContext;
+  if(!saved){try{saved=JSON.parse(sessionStorage.getItem('cchPaymentContext')||'null')}catch(e){}}
+  const accessToken=q.get('acceso')||saved?.accessToken||'',previewToken=q.get('previewLink')||'';
+  if(!/^[0-9a-f-]{36}$/i.test(id)||(!accessToken&&!previewToken))return;
+  const player=document.getElementById('audioPlayer');
+  await fetch(API_BASE+'/api/orders/'+encodeURIComponent(id)+'/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({accessToken,previewToken,event,position:player?.currentTime||0,duration:player?.duration||0})});
+ }catch(e){}
+}
+(function(){
+ if(window.__cchActivityMonitorStarted)return;window.__cchActivityMonitorStarted=true;
+ cchSendCustomerActivity('online');
+ setInterval(()=>{const p=document.getElementById('audioPlayer');cchSendCustomerActivity(p&&!p.paused?'listening':'online')},20000);
+ document.addEventListener('visibilitychange',()=>cchSendCustomerActivity(document.hidden?'left':'online'));
+ window.addEventListener('pagehide',()=>cchSendCustomerActivity('left'));
+ const p=document.getElementById('audioPlayer');
+ if(p){p.addEventListener('play',()=>cchSendCustomerActivity('listening'));p.addEventListener('pause',()=>cchSendCustomerActivity('paused'));p.addEventListener('ended',()=>cchSendCustomerActivity('sample_finished'));}
+})();
+
 function lockPreview(message){
  audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
  const playButton=document.getElementById('playPreview');if(playButton)playButton.classList.add('hidden');
@@ -463,7 +486,7 @@ if(downloadAllowed){downloadButton.textContent='⬇️ Crear y descargar mi rega
 downloadMp3Button.addEventListener('click',async()=>{
  if(!downloadAllowed||!canDownloadMp3){mp3Notice.textContent='🔒 Tu paquete no tiene habilitada la descarga MP3 o el pago aún no está confirmado.';return}
  if(!audio||!resolvedAudioUrl){mp3Notice.textContent='Todavía no hay una canción disponible para descargar.';return}
- try{downloadMp3Button.disabled=true;mp3Notice.textContent='Preparando tu archivo MP3…';const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio.');const blob=await response.blob();if(!blob.size)throw new Error('El archivo MP3 está vacío.');const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=((name||'mi-regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()||'mi-regalo-musical')+'-canta-con-el-corazon.mp3';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);mp3Notice.textContent='¡Tu canción en MP3 está lista! Revisa la carpeta Descargas de tu celular.';if(previewLinkToken&&audio){const orderId=audio.split('/').pop().replace(/\\.mp3$/i,'');if(/^[0-9a-f-]{36}$/i.test(orderId)){try{const done=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/download-completed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({previewToken:previewLinkToken})});const result=await done.json().catch(()=>({}));if(done.ok&&result.completed){const notice=document.getElementById('mp3Notice');if(notice)notice.textContent='🎉 ¡Descarga completada! Tu pedido llegó al 100%. Gracias por confiar en Canta con el corazón.';}}catch(confirmError){console.warn('No se pudo confirmar la descarga:',confirmError?.message||confirmError);}}}}catch(err){mp3Notice.textContent='No se pudo descargar el MP3: '+(err.message||'inténtalo de nuevo')+'. Prueba con Chrome actualizado.'}finally{downloadMp3Button.disabled=false}
+ try{downloadMp3Button.disabled=true;mp3Notice.textContent='Preparando tu archivo MP3…';cchSendCustomerActivity('download_started');const response=await fetch(resolvedAudioUrl);if(!response.ok)throw new Error('No se pudo cargar el audio.');const blob=await response.blob();if(!blob.size)throw new Error('El archivo MP3 está vacío.');const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=((name||'mi-regalo-musical').replace(/[^a-z0-9áéíóúñ _-]/gi,'').trim()||'mi-regalo-musical')+'-canta-con-el-corazon.mp3';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);mp3Notice.textContent='¡Tu canción en MP3 está lista! Revisa la carpeta Descargas de tu celular.';if(previewLinkToken&&audio){const orderId=audio.split('/').pop().replace(/\\.mp3$/i,'');if(/^[0-9a-f-]{36}$/i.test(orderId)){try{const done=await fetch(API_BASE+'/api/orders/'+encodeURIComponent(orderId)+'/download-completed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({previewToken:previewLinkToken})});const result=await done.json().catch(()=>({}));if(done.ok&&result.completed){const notice=document.getElementById('mp3Notice');if(notice)notice.textContent='🎉 ¡Descarga completada! Tu pedido llegó al 100%. Gracias por confiar en Canta con el corazón.';}}catch(confirmError){console.warn('No se pudo confirmar la descarga:',confirmError?.message||confirmError);}}}}catch(err){mp3Notice.textContent='No se pudo descargar el MP3: '+(err.message||'inténtalo de nuevo')+'. Prueba con Chrome actualizado.'}finally{downloadMp3Button.disabled=false}
 });
 
 let generationWarningAccepted=false;
