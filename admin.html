@@ -847,6 +847,12 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   view.hidden=false;
   view.setAttribute('aria-hidden','false');
  }
+ window.addEventListener('message',event=>{
+  if(event.origin!==location.origin||event.data?.type!=='cch-payment-updated'||!event.data?.orderId)return;
+  const card=document.getElementById('order-'+event.data.orderId);
+  if(card){const status=document.createElement('p');status.className='status';status.textContent='✓ Voucher recibido desde la vista de prueba. Actualizando el pedido…';card.prepend(status);}
+  loadCustomerOrders();
+ });
  window.cchOpenCustomerPreview=openPreview;
  function openStore(){openPreview(location.origin+'/#order');}
  function returnAdmin(){
