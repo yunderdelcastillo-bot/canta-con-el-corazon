@@ -183,11 +183,13 @@ function buildLyricTimeline(duration){
 }
 function updateSyncedLyric(){
  const duration=audioPlayer.duration,current=audioPlayer.currentTime;
+ // Ajuste de calibración informado en prueba real: la voz se adelantaba más de 3 s.
+ const syncTime=current+3.5;
  if(!lyricLines.length||!Number.isFinite(duration)||duration<=0)return;
  if(!lyricTimeline.length||Math.abs((lyricTimeline.at(-1)?.end||0)-duration)>1)buildLyricTimeline(duration);
- let index=lyricTimeline.findIndex((slot,i)=>current>=slot.start&&(current<slot.end||i===lyricTimeline.length-1));
- if(current<lyricTimeline[0].start)index=-1;
- const spoken=spokenIntroCue&&current>=spokenIntroCue.start&&current<spokenIntroCue.end;
+ let index=lyricTimeline.findIndex((slot,i)=>syncTime>=slot.start&&(syncTime<slot.end||i===lyricTimeline.length-1));
+ if(syncTime<lyricTimeline[0].start)index=-1;
+ const spoken=spokenIntroCue&&syncTime>=spokenIntroCue.start&&syncTime<spokenIntroCue.end;
  const cue=spoken?spokenIntroCue:(index>=0?lyricTimeline[index]:null);
  const text=spoken?spokenIntroCue.text:(index<0?'♪':lyricLines[index]);
  const target=document.getElementById('lyricsCurrent');
@@ -207,10 +209,10 @@ function updateSyncedLyric(){
    target.dataset.syncKey=key;
   }
   target.querySelectorAll('span[data-word-start]').forEach(span=>{
-   const start=Number(span.dataset.wordStart),end=Number(span.dataset.wordEnd),active=current>=start&&current<=end;
+   const start=Number(span.dataset.wordStart),end=Number(span.dataset.wordEnd),active=syncTime>=start&&syncTime<=end;
    span.style.color=active?'#ffd36a':'#fff7d6';
    span.style.textShadow=active?'0 0 12px #ffd36a,0 0 26px rgba(246,215,140,.95)':'0 0 8px #f6d78c,0 0 16px rgba(246,215,140,.45)';
-   span.style.opacity=active?'1':(current>end?'.82':'.68');
+   span.style.opacity=active?'1':(syncTime>end?'.82':'.68');
   });
  }else if(target.textContent!==text||target.dataset.syncKey){
   target.textContent=text;delete target.dataset.syncKey;
