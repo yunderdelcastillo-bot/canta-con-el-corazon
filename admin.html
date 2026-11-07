@@ -470,7 +470,7 @@ async function loadCustomerOrders(){
     const previewTitle=document.createElement('strong');previewTitle.textContent=downloadAllowed?'🎵 Canción lista para el cliente · descarga MP3 habilitada':'🎧 Muestra lista para el cliente · descarga MP3 bloqueada';previewCard.appendChild(previewTitle);
     const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent=downloadAllowed?'⬇️ Abrir página de descarga':'▶️ Abrir muestra del cliente';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
      previewLink.addEventListener('click',async event=>{
-      event.preventDefault();
+      event.preventDefault();event.stopPropagation();
       previewLink.style.pointerEvents='none';previewLink.textContent='Preparando acceso seguro…';
       try{
        if(o.payment?.payment_status!=='approved'){
