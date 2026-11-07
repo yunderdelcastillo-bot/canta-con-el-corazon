@@ -394,7 +394,10 @@ function cchOrderProgress(o){
  return {percent,label,detail};
 }
 async function loadCustomerOrders(){
- const box=$('ordersList');box.textContent='Cargando pedidos…';
+ const box=$('ordersList');
+ const savedScroll=window.scrollY;
+ const savedOpen=new Set(Array.from(box.querySelectorAll('.order-card')).flatMap(card=>Array.from(card.querySelectorAll('details')).map((d,i)=>d.open?card.id+'|'+i:null).filter(Boolean)));
+ if(!box.querySelector('.order-card'))box.textContent='Cargando pedidos…';
  try{
   const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión nuevamente.');
   const r=await fetch(API_BASE+'/api/admin/orders',{headers:{Authorization:'Bearer '+token}});
@@ -607,6 +610,8 @@ async function loadCustomerOrders(){
   });
   const applyOrderFilters=()=>{const term=($('orderSearch')?.value||'').trim().toLowerCase(),filter=$('orderFilter')?.value||'all',source=$('orderSourceFilter')?.value||'all';let visible=0;box.querySelectorAll('.order-card').forEach(card=>{const matchesFilter=filter==='all'||card.dataset.filter===filter;const matchesText=!term||card.dataset.search.includes(term);const matchesSource=source==='all'||card.dataset.source===source;card.classList.toggle('hidden',!(matchesFilter&&matchesText&&matchesSource));if(matchesFilter&&matchesText&&matchesSource)visible++;});let empty=box.querySelector('.orders-empty');if(!visible){if(!empty){empty=document.createElement('p');empty.className='orders-empty muted';empty.textContent='No hay pedidos que coincidan con esa búsqueda o filtro.';box.appendChild(empty);}}else if(empty)empty.remove();let counter=$('ordersVisibleCount');if(counter)counter.textContent=visible+' pedido(s) visibles';};
   $('orderSearch').oninput=applyOrderFilters;$('orderFilter').onchange=applyOrderFilters;$('orderSourceFilter').onchange=applyOrderFilters;applyOrderFilters();
+ box.querySelectorAll('.order-card').forEach(card=>card.querySelectorAll('details').forEach((d,i)=>{if(savedOpen.has(card.id+'|'+i))d.open=true;}));
+ requestAnimationFrame(()=>window.scrollTo({top:savedScroll,behavior:'instant'}));
  }catch(e){box.textContent=e.message;}
 }
 let cchMessengerSelectedOrder=null,cchMessengerPoll=null;
