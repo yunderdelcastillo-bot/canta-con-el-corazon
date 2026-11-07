@@ -445,6 +445,13 @@ async function loadCustomerOrders(){
    const labels={listening:'🎧 Está escuchando la canción',paused:'⏸️ Tiene la canción en pausa',online:'Continúa en la página',sample_finished:'✅ Terminó de escuchar la muestra',payment_sent:'💳 Envió su voucher',download_started:'⬇️ Inició la descarga del MP3',download_completed:'🎉 Descarga confirmada por el sistema',left:'Salió de la página'};
    liveLine.textContent=(online?'🟢 EN LÍNEA · ':'⚪ SIN CONEXIÓN · ')+(labels[live.event_type]||'Todavía no hay actividad en tiempo real')+(seen?' · Última actividad: '+seen.toLocaleString('es-PE'):'');
    activityBox.appendChild(liveLine);
+   const eventHistory=o.customer_activity_events||[];
+   const historyBox=document.createElement('div');historyBox.style.cssText='margin-top:12px;display:grid;gap:7px';
+   const historyTitle=document.createElement('strong');historyTitle.textContent='🟢 HISTORIAL DE ACTIVIDAD';historyBox.appendChild(historyTitle);
+   const eventLabels={online:'Ingresó o continúa en la página',listening:'Comenzó a escuchar la canción',paused:'Pausó la reproducción',sample_finished:'Terminó de escuchar la muestra',payment_sent:'Envió el voucher',download_started:'Inició la descarga del MP3',download_completed:'Descarga confirmada por el sistema',left:'Salió de la página o pasó a segundo plano'};
+   if(eventHistory.length){eventHistory.forEach(ev=>{const line=document.createElement('div');line.style.cssText='padding:9px 11px;border-radius:10px;background:#e9f8ee;color:#176b3a;border:1px solid #b8e2c4;font-weight:650;line-height:1.45';line.textContent='🟢 '+(eventLabels[ev.event_type]||ev.event_type)+' · '+fmtActivity(ev.created_at);historyBox.appendChild(line);});}
+   else{const empty=document.createElement('p');empty.style.cssText='margin:0;color:#176b3a';empty.textContent='Todavía no hay movimientos registrados en el historial.';historyBox.appendChild(empty);}
+   activityBox.appendChild(historyBox);
    if(live.event_type==='listening'){const pos=document.createElement('small');pos.style.cssText='display:block;color:#76636d;margin-top:4px';pos.textContent='Reproducción: '+Math.floor(live.playback_position||0)+' s'+(live.playback_duration?' / '+Math.floor(live.playback_duration)+' s':'');activityBox.appendChild(pos);}
    card.appendChild(activityBox);
    const infoDetails=document.createElement('details');infoDetails.className='order-info-details';const infoSummary=document.createElement('summary');infoSummary.textContent='Ver historia y detalles del pedido';infoDetails.appendChild(infoSummary);const story=document.createElement('p');story.textContent='Historia: '+o.story;infoDetails.appendChild(story);
