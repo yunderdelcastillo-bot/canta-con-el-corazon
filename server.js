@@ -1682,10 +1682,12 @@ app.get("/api/admin/orders",async(req,res)=>{
   if(paymentError)throw paymentError;
   const paymentByOrder=new Map();
   // Si existen registros de pago históricos duplicados, priorizar el que contiene el voucher.
-  for(const payment of payments||[]){
+  const paymentRank=p=>[(p?.voucher_path?1:0),(p?.payment_status==="approved"?1:0),Date.parse(p?.updated_at||p?.created_at||0)||0];
+  const paymentCompare=(a,b)=>{const x=paymentRank(a),y=paymentRank(b);for(let i=0;i<x.length;i++){if(x[i]!==y[i])return y[i]-x[i];}return 0;};
+  const orderedPayments=[...(payments||[])].sort(paymentCompare);
+  for(const payment of orderedPayments){
    const previous=paymentByOrder.get(payment.order_id);
-   const score=p=>(p?.voucher_path?4:0)+(p?.payment_status==="approved"?2:0)+(p?.updated_at?1:0);
-   if(previous&&score(previous)>score(payment))continue;
+   if(previous)continue;
    let voucherUrl=null;
    if(payment.voucher_path){
     const {data:signed,error:signedError}=await db.storage.from("payment-vouchers").createSignedUrl(payment.voucher_path,600);
