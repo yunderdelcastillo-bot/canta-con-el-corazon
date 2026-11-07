@@ -13,8 +13,8 @@
 </main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
 (()=>{'use strict';
 const API='https://canta-corazon-private-api.onrender.com';
-$('backOrders').addEventListener('click',()=>{try{if(window.opener&&!window.opener.closed){window.opener.focus();window.close();return}}catch(e){}location.href='./admin.html'});
 const $=id=>document.getElementById(id);
+$('backOrders').addEventListener('click',()=>{try{if(window.opener&&!window.opener.closed){window.opener.focus();window.close();return}}catch(e){}location.href='./admin.html'});
 let orders=[];
 function status(s){$('status').textContent=s}
 async function load(){
