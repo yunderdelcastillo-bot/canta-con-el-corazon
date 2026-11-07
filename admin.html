@@ -129,7 +129,7 @@ body.cch-preview-open{overflow:hidden}
 @media(max-width:480px){.cch-preview-toolbar{min-height:58px;padding:7px 9px}.cch-preview-toolbar strong{font-size:.72rem}.cch-preview-toolbar button{font-size:.78rem;padding:9px 10px}}
 
 .order-lyrics-details{padding:8px 11px!important;margin:8px 0!important;background:#fff!important}.order-lyrics-details>summary{font-size:.92rem;padding:3px 0}.order-lyrics-details>p{font-size:.9rem;line-height:1.45;max-height:360px;overflow:auto}
-</style><meta name="cch-app-version" content="2026-11-07-preserve-client-test-form-v10"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+</style><meta name="cch-app-version" content="2026-11-07-female-voice-order-alert-v11"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
  <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
  <div class="mobile-shortcuts" aria-label="Accesos principales">
   <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
@@ -686,7 +686,13 @@ $('form').onsubmit=async e=>{e.preventDefault();if(!db||!user){msg('saveStatus',
 $('copyOrderLink').onclick=async()=>{const link=$('orderLink').value;try{await navigator.clipboard.writeText(link);msg('copyOrderLink','¡Enlace copiado!')}catch{prompt('Copia este enlace para tu cliente:',link)}};$('sendOrderLink').onclick=()=>{const link=$('orderLink').value;const text='¡Hola! 💗 Gracias por contactar a Canta con el corazón. Para pedir tu canción personalizada, llena tus datos en este enlace y sigue las instrucciones de pago con Yape: '+link;window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};$('refresh').onclick=load;init();
 
 let cchAlertSoundEnabled=localStorage.getItem('cch_alert_sound')==='on',cchKnownNotifications=new Set(),cchAudioUnlocked=false,cchNotificationsInitialized=false,cchAudioContext=null,cchOrderRepeatTimers=new Map();
-function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',form_started:'Atención. Un cliente comenzó a llenar el formulario de Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
+function cchAlertText(n){return ({new_order:'¡Atención, atención! ¡Tienes un nuevo pedido en Canta con el corazón! Un cliente acaba de enviar su solicitud de canción personalizada. Ingresa a tu panel de administración para revisar los datos y comenzar a atender este nuevo pedido. ¡No olvides revisar los detalles!',form_started:'Atención. Un cliente comenzó a llenar el formulario de Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
+function cchFemaleSpanishVoice(){
+ const voices=window.speechSynthesis?.getVoices?.()||[];
+ const spanish=voices.filter(v=>/^es([_-]|$)/i.test(v.lang));
+ const femaleHints=/female|mujer|femenin|paulina|monica|mónica|helena|sabina|lucia|lucía|sofia|sofía|camila|valentina|elena|laura|carmen|conchita|zira/i;
+ return spanish.find(v=>femaleHints.test(v.name))||spanish.find(v=>/^es-PE$/i.test(v.lang))||spanish[0]||null;
+}
 async function cchSpeakAlert(message){
  if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
  try{
@@ -694,14 +700,14 @@ async function cchSpeakAlert(message){
   if(Ctx){
    if(!cchAudioContext)cchAudioContext=new Ctx();
    if(cchAudioContext.state==='suspended')await cchAudioContext.resume();
-   const playTone=(frequency,at,duration)=>{const o=cchAudioContext.createOscillator(),g=cchAudioContext.createGain();o.type='sine';o.frequency.value=frequency;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.12,at+.025);g.gain.exponentialRampToValueAtTime(.001,at+duration);o.connect(g);g.connect(cchAudioContext.destination);o.start(at);o.stop(at+duration+.02)};
-   const now=cchAudioContext.currentTime;playTone(880,now,.22);playTone(1175,now+.28,.28);
+   const playTone=(frequency,at,duration)=>{const o=cchAudioContext.createOscillator(),g=cchAudioContext.createGain();o.type='sine';o.frequency.value=frequency;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.28,at+.025);g.gain.exponentialRampToValueAtTime(.001,at+duration);o.connect(g);g.connect(cchAudioContext.destination);o.start(at);o.stop(at+duration+.02)};
+   const now=cchAudioContext.currentTime;playTone(880,now,.28);playTone(1175,now+.32,.34);playTone(1320,now+.72,.28);
   }
   if('speechSynthesis'in window){
    window.speechSynthesis.cancel();
-   const u=new SpeechSynthesisUtterance(message);u.lang='es-PE';u.rate=.92;u.pitch=1.05;u.volume=1;
-   const voices=window.speechSynthesis.getVoices();u.voice=voices.find(v=>/^es-PE$/i.test(v.lang))||voices.find(v=>/^es/i.test(v.lang))||null;
-   u.onerror=()=>{$('alertSoundStatus').textContent='Tono activado. La voz no está disponible en este navegador.'};
+   const u=new SpeechSynthesisUtterance(message);u.lang='es-PE';u.rate=.88;u.pitch=1.18;u.volume=1;
+   u.voice=cchFemaleSpanishVoice();
+   u.onerror=()=>{$('alertSoundStatus').textContent='Alerta sonora activada. La voz no está disponible en este navegador.'};
    window.speechSynthesis.speak(u);
   }
  }catch(e){console.warn('Alert sound:',e);$('alertSoundStatus').textContent='No se pudo reproducir el aviso. Revisa el volumen multimedia del celular.'}
@@ -768,13 +774,13 @@ $('enableAlertSound').onclick=async()=>{
  cchAudioUnlocked=true;cchAlertSoundEnabled=true;localStorage.setItem('cch_alert_sound','on');
  try{const Ctx=window.AudioContext||window.webkitAudioContext;if(Ctx){if(!cchAudioContext)cchAudioContext=new Ctx();if(cchAudioContext.state==='suspended')await cchAudioContext.resume();}}
  catch(e){console.warn(e)}
- $('alertSoundStatus').textContent='Sonido y voz activados. Escucha la prueba.';
+ $('alertSoundStatus').textContent='Voz femenina y sonido activados al volumen máximo del navegador. Escucha la prueba.';
  await cchSpeakAlert('Aviso de prueba. Las alertas de nuevos pedidos están activadas.');
 };
 $('testAlertSound').onclick=async()=>{
  cchAudioUnlocked=true;cchAlertSoundEnabled=true;localStorage.setItem('cch_alert_sound','on');
  $('alertSoundStatus').textContent='Reproduciendo prueba de sonido y voz…';
- await cchSpeakAlert('Atención. Tienes un nuevo pedido en Canta con el corazón.');
+ await cchSpeakAlert('¡Atención, atención! ¡Tienes un nuevo pedido en Canta con el corazón! Un cliente acaba de enviar su solicitud de canción personalizada. Ingresa a tu panel para revisar los detalles. ¡Tienes un nuevo pedido!');
 };
 $('toggleAlertSound').onclick=()=>{cchAlertSoundEnabled=!cchAlertSoundEnabled;localStorage.setItem('cch_alert_sound',cchAlertSoundEnabled?'on':'off');if(!cchAlertSoundEnabled){for(const timer of cchOrderRepeatTimers.values())clearInterval(timer);cchOrderRepeatTimers.clear();}else{cchLoadNotifications();}$('alertSoundStatus').textContent=cchAlertSoundEnabled?'Sonido activado. Pulsa “Probar voz y sonido” para habilitarlo en este celular.':'Sonido silenciado.';};
 async function cchRefreshPushStatus(){
