@@ -748,16 +748,24 @@ $('testPushAlerts').onclick=async()=>{const b=$('testPushAlerts'),status=$('push
 async function cchAddOrderChat(card,order,token){const panel=document.createElement('details');panel.style.marginTop='12px';const summary=document.createElement('summary');summary.textContent='💬 Mensajes del cliente';panel.appendChild(summary);const thread=document.createElement('div');thread.className='status';thread.textContent='Abre para cargar la conversación.';const input=document.createElement('textarea');input.maxLength=1200;input.placeholder='Escribe tu respuesta al cliente…';const send=document.createElement('button');send.className='btn';send.type='button';send.textContent='Enviar respuesta';panel.append(thread,input,send);card.appendChild(panel);async function refresh(){const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok){thread.textContent=d.error||'No se pudo cargar el chat.';return;}thread.replaceChildren();(d.messages||[]).forEach(m=>{const p=document.createElement('p');const b=document.createElement('b');b.textContent=m.sender_role==='admin'?'Tú: ':'Cliente: ';const s=document.createElement('span');s.textContent=m.message;p.append(b,s);thread.appendChild(p)});thread.scrollTop=thread.scrollHeight;}send.onclick=async()=>{const message=input.value.trim();if(!message)return;send.disabled=true;try{const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');input.value='';await refresh();}catch(e){alert(e.message)}finally{send.disabled=false;}};panel.addEventListener('toggle',()=>{if(panel.open)refresh()});}
 
 
-/* Menú sencillo para evitar una página interminable */
+/* Navegación del panel: el botón Atrás del celular vuelve a la sección anterior sin cerrar sesión. */
 (function(){
  const ids=['mobileDashboard','messenger','customerOrders','whatsappManualOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
  const nav=document.querySelector('.panel-nav');
  const menuToggle=document.getElementById('panelMenuToggle');
  if(!nav)return;
+ let currentPanel='mobileDashboard',handlingPop=false;
  if(menuToggle){menuToggle.onclick=()=>{const opening=nav.classList.contains('menu-collapsed');nav.classList.toggle('menu-collapsed');menuToggle.setAttribute('aria-expanded',String(opening));menuToggle.textContent=opening?'✕ Cerrar menú':'☰ Menú del panel';};}
- const backButton=document.getElementById('backToDashboard');
- if(backButton)backButton.onclick=()=>{showPanel('mobileDashboard');nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}};
- function showPanel(id,shouldScroll=true){
+ function collapseMenu(){
+  nav.classList.add('menu-collapsed');
+  if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}
+ }
+ function showPanel(id,shouldScroll=true,fromHistory=false){
+   if(!ids.includes(id))return;
+   if(!fromHistory&&shouldScroll&&id!==currentPanel){
+    try{history.pushState({...history.state,cchAdminPanel:id},'',location.href);}catch(error){console.warn('No se pudo guardar la navegación del panel:',error);}
+   }
+   currentPanel=id;
    ids.forEach(x=>{const el=document.getElementById(x);if(el)el.classList.toggle('hidden',x!==id);});
    nav.querySelectorAll('a').forEach(a=>{
      const active=a.getAttribute('href')==='#'+id;
@@ -765,18 +773,25 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
    });
    const target=document.getElementById(id);
    if(target){target.classList.remove('hidden');if(shouldScroll)window.scrollTo({top:0,behavior:'smooth'});}
-   document.querySelectorAll('[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===id));
+   document.querySelectorAll('[data-panel]').forEach(button=>button.classList.toggle('active',button.dataset.panel===id));
  }
+ const backButton=document.getElementById('backToDashboard');
+ if(backButton)backButton.onclick=()=>{showPanel('mobileDashboard');collapseMenu();};
+ // La primera entrada conserva la URL actual; cada cambio de sección crea un paso atrás.
+ try{history.replaceState({...history.state,cchAdminPanel:currentPanel},'',location.href);}catch(error){console.warn(error);}
+ window.addEventListener('popstate',event=>{
+  const id=event.state&&event.state.cchAdminPanel;
+  if(id&&ids.includes(id)){showPanel(id,false,true);collapseMenu();}
+ });
  window.cchShowAdminPanel=showPanel;
- document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.panel)));
- nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>{
-   const id=(a.getAttribute('href')||'').slice(1);
+ document.querySelectorAll('[data-panel]').forEach(button=>button.addEventListener('click',()=>showPanel(button.dataset.panel)));
+ nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',event=>{
+   const id=(link.getAttribute('href')||'').slice(1);
    if(!ids.includes(id))return;
-   e.preventDefault();showPanel(id);nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}
+   event.preventDefault();showPanel(id);collapseMenu();
  }));
- // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
- showPanel('mobileDashboard',false);
- window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('mobileDashboard',false);});
+ showPanel('mobileDashboard',false,true);
+ window.addEventListener('cch-admin-session',event=>{if(event.detail&&event.detail.active)showPanel('mobileDashboard',false,true);});
 })();
 
 </script><script>
