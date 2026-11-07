@@ -973,19 +973,30 @@ app.post("/api/support/diagnose",async(req,res)=>{
 });
 
 app.post("/api/lyrics/align",async(req,res)=>{
- console.log("Lyric alignment request received:",{hasAudio:!!req.body?.audioBase64,lyricsCount:Array.isArray(req.body?.lyrics)?req.body.lyrics.length:0,duration:Number(req.body?.duration)||0});
+ console.log("Lyric alignment request received:",{hasAudio:!!req.body?.audioBase64,hasPath:!!req.body?.path,lyricsCount:Array.isArray(req.body?.lyrics)?req.body.lyrics.length:0,duration:Number(req.body?.duration)||0});
  try{
   const apiKey=String(process.env.GROQ_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"Groq Whisper no está configurado en el servidor."});
-  const body=req.body||{},audioBase64=String(body.audioBase64||"");
+  const body=req.body||{},audioBase64=String(body.audioBase64||""),audioPath=String(body.path||""),preview=String(body.previewToken||"");
   const lyrics=Array.isArray(body.lyrics)?body.lyrics.map(x=>String(x||"").trim()):[];
   const duration=Number(body.duration);
-  if(!audioBase64||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800)return res.status(400).json({error:"El audio, la letra o la duración no son válidos. El MP3 debe pesar menos de 18 MB."});
+  if((!audioBase64&&!audioPath)||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800)return res.status(400).json({error:"El audio, la letra o la duración no son válidos."});
+  let audio;
+  if(audioPath){
+   if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audioPath)||!preview)return res.status(400).json({error:"No se recibió una autorización válida para sincronizar."});
+   const tokenHash=crypto.createHash("sha256").update(preview).digest("hex"),db=admin();
+   const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
+   if(songError||!song)return res.status(404).json({error:"No se encontró la canción para sincronizar."});
+   const {data:session,error:sessionError}=await db.from("song_preview_links").select("started_at,completed_at,download_enabled").eq("song_id",song.id).eq("token_hash",tokenHash).maybeSingle();
+   if(sessionError||!session||!session.started_at||(!session.download_enabled&&session.completed_at))return res.status(403).json({error:"La autorización de esta muestra no está activa."});
+   const {data:file,error:fileError}=await db.storage.from("songs-audio").download(audioPath);
+   if(fileError||!file)return res.status(502).json({error:"No se pudo recuperar el audio privado para sincronizar."});
+   audio=Buffer.from(await file.arrayBuffer());
+  }else{audio=Buffer.from(audioBase64,"base64");}
   const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim(),now=Date.now(),record=lyricAlignLimits.get(ip)||{start:now,count:0};
   if(now-record.start>3600000){record.start=now;record.count=0;}
   if(record.count>=4)return res.status(429).json({error:"Se alcanzó el límite temporal de sincronización. Espera una hora antes de volver a intentarlo."});
   record.count++;lyricAlignLimits.set(ip,record);
-  const audio=Buffer.from(audioBase64,"base64");
   if(!audio.length||audio.length>18*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 18 MB para sincronización."});
   const form=new FormData();
   form.append("file",new Blob([audio],{type:"audio/mpeg"}),"canta-con-el-corazon.mp3");
