@@ -469,6 +469,24 @@ async function loadCustomerOrders(){
     const downloadAllowed=(o.payment?.payment_status==='approved'&&!!o.payment?.voucher_path)||!!o.gift_unlocked;
     const previewTitle=document.createElement('strong');previewTitle.textContent=downloadAllowed?'🎵 Canción lista para el cliente · descarga MP3 habilitada':'🎧 Muestra lista para el cliente · descarga MP3 bloqueada';previewCard.appendChild(previewTitle);
     const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent=downloadAllowed?'⬇️ Abrir página de descarga':'▶️ Abrir muestra del cliente';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
+     previewLink.addEventListener('click',async event=>{
+      event.preventDefault();
+      previewLink.style.pointerEvents='none';previewLink.textContent='Preparando acceso seguro…';
+      try{
+       if(o.payment?.payment_status!=='approved'){
+        let accessToken=cchPaymentLinkStore()[o.id]||'';
+        if(!accessToken){
+         const response=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id)+'/payment-link',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}});
+         const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo preparar el acceso seguro.');
+         accessToken=result.accessToken;cchRememberPaymentLink(o.id,accessToken);
+        }
+        const target=new URL(o.preview_url);target.searchParams.set('pago','1');target.searchParams.set('pedido',o.id);target.searchParams.set('acceso',accessToken);previewLink.href=target.toString();
+       }
+       if(typeof window.cchOpenCustomerPreview==='function')window.cchOpenCustomerPreview(previewLink.href);
+       else window.open(previewLink.href,'_blank');
+      }catch(error){alert(error.message||'No se pudo abrir la muestra segura.');}
+      finally{previewLink.style.pointerEvents='';previewLink.textContent=downloadAllowed?'⬇️ Abrir página de descarga':'▶️ Abrir muestra del cliente';}
+     });
     const previewActions=document.createElement('div');previewActions.className='row';
     const copyPreview=document.createElement('button');copyPreview.type='button';copyPreview.className='btn alt';copyPreview.textContent='Copiar enlace';copyPreview.onclick=async()=>{try{await navigator.clipboard.writeText(o.preview_url);copyPreview.textContent='¡Copiado!';}catch{alert('No se pudo copiar automáticamente. Abre el enlace y copia la dirección.')}};
     const sendPreview=document.createElement('a');sendPreview.className='btn alt';sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.href='https://wa.me/51'+String(o.contact||'').replace(/\\D/g,'')+'?text='+encodeURIComponent(downloadAllowed?'🎵 ¡Tu canción está lista y tu descarga MP3 está habilitada! Aquí tienes tu enlace: '+o.preview_url:'🎵 ¡Tu muestra está lista! Escúchala aquí. Para descargar el MP3, completa el pago y envía tu voucher: '+o.preview_url);sendPreview.textContent='Enviar por WhatsApp';
@@ -829,6 +847,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   view.hidden=false;
   view.setAttribute('aria-hidden','false');
  }
+ window.cchOpenCustomerPreview=openPreview;
  function openStore(){openPreview(location.origin+'/#order');}
  function returnAdmin(){
   if(!previewOpen){hidePreview();return;}
