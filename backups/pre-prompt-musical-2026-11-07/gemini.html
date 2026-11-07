@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Herramienta Gemini · Canta con el corazón</title>
+<style>
+:root{color-scheme:light}*{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;background:#f7f7fb;color:#222;margin:0;padding:24px}main{max-width:760px;margin:auto}.panel{background:#fff;border:1px solid #e4e4ed;border-radius:16px;padding:22px;margin:16px 0}h1{font-size:1.55rem;margin:0}h2{font-size:1.1rem}p{line-height:1.5;color:#50505d}button,a.action{display:inline-block;border:0;border-radius:10px;padding:12px 16px;background:#29294c;color:#fff;font-weight:700;cursor:pointer;text-decoration:none;margin:5px 6px 5px 0}button:disabled{opacity:.5;cursor:wait}textarea,select,input{width:100%;padding:12px;border:1px solid #bfc0cd;border-radius:9px;font:inherit}textarea{min-height:230px;resize:vertical}label{display:block;margin:12px 0 6px;font-weight:650}.muted{font-size:.88rem;color:#626272}#status{white-space:pre-wrap}.hidden{display:none}
+</style></head><body><main><h1>🎵 Crear canción con Gemini</h1>
+<p>Herramienta independiente de solo lectura. No cambia pedidos, pagos, vouchers, estados ni el panel administrativo.</p>
+<section class="panel"><h2>1. Elegir pedido</h2><p class="muted">Primero inicia sesión en tu panel administrativo en este mismo navegador. Esta herramienta reutiliza esa sesión; no solicita tu contraseña.</p>
+<button id="load">🔄 Cargar mis pedidos</button><a class="action" href="./admin.html" target="_blank" rel="noopener">Abrir panel</a>
+<label for="orders">Pedido</label><select id="orders"><option value="">Selecciona un pedido</option></select><p id="status" role="status" aria-live="polite"></p></section>
+<section class="panel"><h2>2. Revisar letra</h2><label for="lyrics">Letra del pedido (puedes editar esta copia sin afectar el pedido)</label><textarea id="lyrics" placeholder="Selecciona un pedido o pega aquí una letra..."></textarea>
+<button id="copy">📋 Copiar letra</button><button id="gemini">✨ Copiar y abrir Gemini</button><p class="muted">Gemini se abre en otra pestaña. Pega allí la letra. No se envía automáticamente ningún dato a Gemini.</p></section>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+(()=>{'use strict';
+const API='https://canta-corazon-private-api.onrender.com';
+const $=id=>document.getElementById(id);
+let orders=[];
+function status(s){$('status').textContent=s}
+async function load(){
+ $('load').disabled=true;status('Consultando pedidos…');
+ try{
+  const cfg=JSON.parse(localStorage.getItem('cc_config')||'{}');
+  if(!cfg.url||!cfg.key)throw Error('Abre primero tu panel e inicia sesión. Si ya lo hiciste, vuelve a esta página y pulsa Cargar mis pedidos.');
+  const db=window.supabase.createClient(cfg.url,cfg.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});
+  const {data:{session},error}=await db.auth.getSession();
+  if(error||!session?.access_token)throw Error('No hay una sesión activa. Inicia sesión en el panel y vuelve a intentarlo.');
+  const r=await fetch(API+'/api/admin/orders',{method:'GET',headers:{Authorization:'Bearer '+session.access_token},cache:'no-store'});
+  if(!r.ok)throw Error('No se pudieron consultar los pedidos ('+r.status+'). Comprueba tu sesión de administrador.');
+  const data=await r.json();orders=Array.isArray(data.orders)?data.orders:[];
+  const sel=$('orders');sel.replaceChildren(new Option('Selecciona un pedido',''));
+  orders.forEach((o,i)=>{const name=String(o.customer_name||o.customerName||o.recipient||o.recipient_name||o.name||'Cliente');sel.add(new Option(name+' · '+String(o.id||'').slice(0,12),String(i)))});
+  status('Pedidos disponibles: '+orders.length+'. Solo se consultaron datos; no se modificó ningún pedido.');
+  const requested=new URLSearchParams(location.search).get('order');if(requested){const idx=orders.findIndex(o=>String(o.id)===requested);if(idx>=0){$('orders').value=String(idx);$('orders').dispatchEvent(new Event('change'));}else status('No se encontró el pedido indicado. Actualiza la lista o selecciona uno manualmente.');}
+ }catch(e){status('⚠️ '+e.message)}finally{$('load').disabled=false}
+}
+$('load').addEventListener('click',load);
+$('orders').addEventListener('change',()=>{const i=$('orders').value;if(i==='')return;const o=orders[Number(i)];$('lyrics').value=typeof o?.lyrics==='string'?o.lyrics:'';status($('lyrics').value?'Letra cargada. Puedes copiarla.':'Este pedido no tiene letra guardada. Puedes escribirla o pegarla manualmente.')});
+async function copy(){const s=$('lyrics').value.trim();if(!s){status('Primero selecciona un pedido con letra o escribe una letra.');return false}try{await navigator.clipboard.writeText(s);status('✓ Letra copiada. Ahora pégala en Gemini.');return true}catch(e){$('lyrics').focus();$('lyrics').select();status('El navegador no permitió copiar automáticamente. Mantén pulsado el texto y elige Copiar.');return false}}
+$('copy').addEventListener('click',copy);
+$('gemini').addEventListener('click',()=>{if(!$('lyrics').value.trim()){status('Primero carga o escribe una letra.');return}const tab=window.open('https://gemini.google.com/app','_blank','noopener,noreferrer');copy();if(!tab)status('Permite ventanas emergentes y abre https://gemini.google.com/app después de copiar la letra.');});
+})();
+</script></body></html>
