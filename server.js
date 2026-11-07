@@ -1324,9 +1324,12 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const {error:uploadError}=await db.storage.from("payment-vouchers").upload(path,buffer,{contentType:mime,upsert:false,cacheControl:"3600"});
   if(uploadError)throw uploadError;
   const now=new Date().toISOString();
-  // Recibir un voucher NO confirma el ingreso del dinero. Mantener el pedido pendiente de revisión.
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"voucher_submitted",provider_payment_id:operationKey,updated_at:now,reviewed_at:null}).eq("id",payment.id);
+  // Regla automática limitada: voucher único + pedido/token válidos + importe registrado.
+  // No equivale a confirmación bancaria: no se consulta Yape ni se verifica el abono real.
+  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id);
   if(updateError)throw updateError;
+  const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
+  if(orderError)throw orderError;
   let downloadUnlocked=false;
   // Buscar la canción por el UUID del pedido, sin depender de ADMIN_OWNER_ID.
   // Los archivos se guardan como owner_id/order_id.mp3 y cada cuenta puede tener un owner_id distinto.
@@ -1351,9 +1354,9 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
     downloadUnlocked=true;
    }
   }
-  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Nuevo voucher recibido · pendiente de verificación",body:"El voucher se guardó. El pago permanece pendiente y el MP3 sigue bloqueado hasta confirmar el ingreso real del dinero."});
-  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"customer",title:"¡Recibimos tu comprobante!",body:"Guardamos tu voucher. Estamos verificando el pago; la descarga se habilitará cuando el abono esté confirmado."});
-  res.set("Cache-Control","no-store").json({ok:true,status:"voucher_submitted",saved:true,downloadUnlocked:false,message:"¡Comprobante recibido! El pago está pendiente de verificación y la descarga MP3 aún no está habilitada.",notice:"La carga del voucher no confirma el ingreso real del dinero en Yape o Plin."});
+  await createSystemNotification(db,{order_id:id,event_type:"voucher_received",audience:"admin",title:"Voucher único aceptado por controles automáticos",body:"El archivo pasó los controles técnicos: formato, tamaño, autorización, pedido e importe registrado; no se encontró la misma huella digital en otros vouchers. Esta regla no verifica el abono real en Yape/Plin."});
+  await createSystemNotification(db,{order_id:id,event_type:"payment_approved",audience:"customer",title:downloadUnlocked?"¡Tu canción está lista para descargar!":"¡Voucher recibido!",body:downloadUnlocked?"El comprobante pasó los controles automáticos y tu MP3 está habilitado.":"El comprobante pasó los controles automáticos; la descarga se habilitará cuando la canción esté lista."});
+  res.set("Cache-Control","no-store").json({ok:true,status:"approved",saved:true,downloadUnlocked,message:downloadUnlocked?"¡Comprobante aceptado por los controles automáticos! Tu canción MP3 está habilitada.":"¡Comprobante aceptado por los controles automáticos! La descarga se habilitará cuando la canción esté lista.",notice:"Aprobación automática técnica. No confirma el ingreso real del dinero en Yape o Plin."});
  }catch(e){console.error("Voucher upload:",e?.message||e);res.status(500).json({error:"No se pudo guardar el comprobante. Intenta nuevamente o escríbenos por WhatsApp."});}
 });
 
