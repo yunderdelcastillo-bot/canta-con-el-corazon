@@ -1699,10 +1699,16 @@ app.get("/api/admin/orders",async(req,res)=>{
   const orders=[];
   for(const order of data||[]){
    const audioReady=audioNames.has(order.id+".mp3");
-   let previewUrl=null;
+   let previewUrl=null,previewActivity={started_at:null,completed_at:null};
    if(audioReady){
     const {data:song}=await db.from("songs").select("id,owner_id,audio_path,recipient,dedication,lyrics,theme,package_key,package_price").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
     if(song?.audio_path){
+     const {data:previewSessions,error:previewSessionsError}=await db.from("song_preview_links").select("started_at,completed_at").eq("song_id",song.id);
+     if(previewSessionsError)throw previewSessionsError;
+     const sessions=previewSessions||[];
+     const activeSession=sessions.find(x=>x.started_at)||null;
+     const finishedSession=sessions.find(x=>x.completed_at)||null;
+     previewActivity={started_at:activeSession?.started_at||null,completed_at:finishedSession?.completed_at||null};
      const payment=paymentByOrder.get(order.id)||null;
      const {data:packagePermission,error:permissionReadError}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
      if(permissionReadError)throw permissionReadError;
@@ -1726,7 +1732,7 @@ app.get("/api/admin/orders",async(req,res)=>{
     const {data:ownedSong}=await db.from("songs").select("id").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
     if(ownedSong){const {data:permission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",ownedSong.id).maybeSingle();giftUnlocked=!!permission?.can_mp3&&listedPayment?.payment_status!=="approved";}
    }
-   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,payment:listedPayment,gift_unlocked:giftUnlocked});
+   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
