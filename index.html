@@ -162,7 +162,6 @@ document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 
 let lyricLines=[];
 let lyricTimeline=[];
-let spokenIntroCue=null;
 function estimateLyricWeight(line){
  const words=String(line||'').toLowerCase().match(/[a-záéíóúüñ0-9]+/gi)||[];
  // Approximate sung duration from syllables rather than assigning identical time to every line.
@@ -183,69 +182,51 @@ function buildLyricTimeline(duration){
 }
 function updateSyncedLyric(){
  const duration=audioPlayer.duration,current=audioPlayer.currentTime;
- // Las marcas de Whisper ya están expresadas en el reloj original del MP3.
- const syncTime=current;
  if(!lyricLines.length||!Number.isFinite(duration)||duration<=0)return;
  if(!lyricTimeline.length||Math.abs((lyricTimeline.at(-1)?.end||0)-duration)>1)buildLyricTimeline(duration);
- let index=lyricTimeline.findIndex((slot,i)=>syncTime>=slot.start&&(syncTime<slot.end||i===lyricTimeline.length-1));
- if(syncTime<lyricTimeline[0].start)index=-1;
- const spoken=spokenIntroCue&&syncTime>=spokenIntroCue.start&&syncTime<spokenIntroCue.end;
- const cue=spoken?spokenIntroCue:(index>=0?lyricTimeline[index]:null);
- const text=spoken?spokenIntroCue.text:(index<0?'♪':lyricLines[index]);
+ let index=lyricTimeline.findIndex((slot,i)=>current>=slot.start&&(current<slot.end||i===lyricTimeline.length-1));
+ if(current<lyricTimeline[0].start)index=-1;
+ const text=index<0?'♪':lyricLines[index];
  const target=document.getElementById('lyricsCurrent');
- if(!target)return;
- const words=Array.isArray(cue?.words)?cue.words.filter(w=>w&&typeof w.text==='string'):[];
- if(words.length){
-  const key=(spoken?'spoken':'line-'+index)+'-'+words.map(w=>w.text).join('|');
-  if(target.dataset.syncKey!==key){
-   target.replaceChildren();
-   words.forEach((word,i)=>{
-    if(i)target.appendChild(document.createTextNode(' '));
-    const span=document.createElement('span');span.textContent=word.text;
-    span.style.transition='color .12s,text-shadow .12s,opacity .12s';
-    span.dataset.wordStart=String(word.start);span.dataset.wordEnd=String(word.end);
-    target.appendChild(span);
-   });
-   target.dataset.syncKey=key;
-  }
-  target.querySelectorAll('span[data-word-start]').forEach(span=>{
-   const start=Number(span.dataset.wordStart),end=Number(span.dataset.wordEnd),active=syncTime>=start&&syncTime<=end;
-   span.style.color=active?'#ffd36a':'#fff7d6';
-   span.style.textShadow=active?'0 0 12px #ffd36a,0 0 26px rgba(246,215,140,.95)':'0 0 8px #f6d78c,0 0 16px rgba(246,215,140,.45)';
-   span.style.opacity=active?'1':(syncTime>end?'.82':'.68');
-  });
- }else if(target.textContent!==text||target.dataset.syncKey){
-  target.textContent=text;delete target.dataset.syncKey;
- }
+ if(target&&target.textContent!==text)target.textContent=text;
 }
 if(name){document.getElementById('giftTitle').textContent='Para '+name}
 if(message){document.getElementById('giftMessage').textContent=message}
 if(lyricText){
- const cleanLyrics=lyricText.replace(/\\[intro\\][^\\n]*(?:\\n|$)/gi,'|').replace(/\\[(?:verso|coro|puente|outro|pre[- ]?coro)[^\\]]*\\]/gi,'|').replace(/\\r/g,'');
- lyricLines=cleanLyrics.split(/[|\\n]+/).flatMap(part=>part.split(/(?<=[.!?])\\s+/)).map(part=>part.replace(/^[-•\\s]+|[-•\\s]+$/g,'').trim()).filter(part=>part.length>2);
+ const cleanLyrics=lyricText.replace(/\[(?:verso|coro|puente|intro|outro|pre[- ]?coro)[^\]]*\]/gi,'|').replace(/\r/g,'');
+ lyricLines=cleanLyrics.split(/[|\n]+/).flatMap(part=>part.split(/(?<=[.!?])\s+/)).map(part=>part.replace(/^[-•\s]+|[-•\s]+$/g,'').trim()).filter(part=>part.length>2);
  if(lyricLines.length){document.getElementById('lyricsBox').classList.remove('hidden');document.getElementById('lyricsCurrent').textContent='♪'}
 }
 const API_BASE='https://canta-corazon-private-api.onrender.com';
 let lyricAlignmentPromise=null;
 async function alignGiftLyrics(){
  if(lyricAlignmentPromise)return lyricAlignmentPromise;
- if(!lyricLines.length||!audio)return;
+ if(!lyricLines.length||!audioPlayer.src)return;
  lyricAlignmentPromise=(async()=>{
   const hint=document.getElementById('lyricsHint');
   try{
-   if(hint)hint.textContent='1/3 · Solicitando sincronización segura del audio…';
-   if(hint)hint.textContent='2/3 · Servidor recuperando la canción privada…';
-   if(hint)hint.textContent='3/3 · Analizando la voz con Groq Whisper…';
-   const result=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path:audio,previewToken:previewToken||previewLinkToken,lyrics:lyricLines,duration:audioPlayer.duration}),signal:AbortSignal.timeout(150000)},2);
-   const data=await result.json().catch(()=>({}));
-   if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
-   lyricTimeline=data.segments;
-   spokenIntroCue=data.spokenIntro&&typeof data.spokenIntro.text==="string"&&data.spokenIntro.text.trim()?data.spokenIntro:null;
-   updateSyncedLyric();
+   if(hint)hint.textContent='Sincronizando cada frase directamente con la voz…';
+   const response=await fetch(audioPlayer.src);
+   if(!response.ok)throw new Error('No se pudo leer el audio para sincronizar.');
+   const blob=await response.blob();
+   if(blob.size>18*1024*1024)throw new Error('El audio supera el tamaño permitido para la sincronización precisa.');
+   if(!lyricTimeline.length){
+    const audioBase64=await new Promise((resolve,reject)=>{
+     const reader=new FileReader();
+     reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+     reader.onerror=()=>reject(new Error('No se pudo preparar el audio.'));
+     reader.readAsDataURL(blob);
+    });
+    const result=await fetchWithSafeRetry(API_BASE+'/api/lyrics/align',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64,lyrics:lyricLines,duration:audioPlayer.duration})},2);
+    const data=await result.json().catch(()=>({}));
+    if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
+    lyricTimeline=data.segments;
+    updateSyncedLyric();
+   }
    if(hint)hint.textContent='Letra sincronizada con las marcas de tiempo de la voz.';
   }catch(error){
    console.warn('Sincronización de letra:',error?.message||error);
-   if(hint)hint.textContent='No se pudo sincronizar: '+String(error?.message||'error de conexión').slice(0,140)+'. La canción original sigue disponible.';
+   if(hint)hint.textContent='La sincronización vocal no estuvo disponible; se mantiene la reproducción de la canción.';
   }
  })();
  return lyricAlignmentPromise;
@@ -308,16 +289,9 @@ if(sharedVideoUrl){
    catch(e){caption.textContent='Tu sorpresa está aquí ♥ Pulsa reproducir en el video para escucharla';vp.controls=true}
    setTimeout(()=>{reveal.style.opacity='0';setTimeout(()=>{reveal.style.display='none'},1500)},4500);
   };
-  // Activación robusta para Android: click, pointer y toque directo.
-  play.type='button';play.style.pointerEvents='auto';play.style.position='relative';play.style.zIndex='100002';
-  play.onclick=e=>{e.preventDefault();e.stopPropagation();openSurprise()};
-  play.addEventListener('pointerup',e=>{e.preventDefault();e.stopPropagation();openSurprise()},{passive:false});
-  play.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();openSurprise()},{passive:false});
-  cover.onclick=e=>{if(e.target===cover||e.target===play||play.contains(e.target)){e.preventDefault();openSurprise()}};
+  play.addEventListener('click',openSurprise);
+  cover.addEventListener('click',openSurprise);
   cover.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSurprise()}});
-  cover.tabIndex=0;
-  cover.setAttribute('role','button');
-  cover.setAttribute('aria-label','Toca para descubrir tu sorpresa');
   cover.tabIndex=0;
   cover.setAttribute('role','button');
   cover.setAttribute('aria-label','Toca para descubrir tu sorpresa');
