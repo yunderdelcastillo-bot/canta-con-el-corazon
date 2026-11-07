@@ -1301,6 +1301,11 @@ app.post("/api/orders/:id/activity",async(req,res)=>{
   if(event==="download_started")row.download_started_at=now;if(event==="download_completed")row.download_completed_at=now;
   const {error:saveError}=await db.from("customer_order_activity").upsert(row,{onConflict:"order_id"});
   if(saveError)return res.status(503).json({error:"Ejecuta supabase-customer-activity.sql para activar el monitoreo."});
+  if(event!=="online"){
+   const {data:lastEvent}=await db.from("customer_order_activity_events").select("event_type,created_at").eq("order_id",id).order("created_at",{ascending:false}).limit(1).maybeSingle();
+   const duplicate=lastEvent?.event_type===event&&Date.now()-Date.parse(lastEvent.created_at||0)<12000;
+   if(!duplicate){const {error:eventError}=await db.from("customer_order_activity_events").insert({order_id:id,event_type:event,playback_position:Math.floor(position),playback_duration:Math.floor(duration),created_at:now});if(eventError)console.error("Customer activity history:",eventError.message||eventError);}
+  }
   res.set("Cache-Control","no-store").json({ok:true,status,lastSeenAt:now});
  }catch(e){console.error("Customer activity:",e?.message||e);res.status(500).json({error:"No se pudo registrar la actividad."});}
 });
@@ -1729,6 +1734,8 @@ app.get("/api/admin/orders",async(req,res)=>{
   const {data:activityRows,error:activityError}=orderIds.length?await db.from("customer_order_activity").select("*").in("order_id",orderIds):{data:[],error:null};
   if(activityError&&!/customer_order_activity/.test(activityError.message||""))throw activityError;
   const activityByOrder=new Map((activityRows||[]).map(row=>[row.order_id,row]));
+  let activityEventsByOrder=new Map();
+  if(orderIds.length){const {data:eventRows,error:eventError}=await db.from("customer_order_activity_events").select("order_id,event_type,playback_position,playback_duration,created_at").in("order_id",orderIds).order("created_at",{ascending:false}).limit(500);if(eventError&&!/customer_order_activity_events/.test(eventError.message||""))throw eventError;for(const eventRow of eventRows||[]){const list=activityEventsByOrder.get(eventRow.order_id)||[];if(list.length<30)list.push(eventRow);activityEventsByOrder.set(eventRow.order_id,list);}}
   const orders=[];
   for(const order of data||[]){
    const audioReady=audioNames.has(order.id+".mp3");
@@ -1763,7 +1770,7 @@ app.get("/api/admin/orders",async(req,res)=>{
    const listedPayment=paymentByOrder.get(order.id)||null;
    // No inferir un regalo a partir de permisos históricos: se requiere voucher aprobado.
    const giftUnlocked=false;
-   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,customer_activity:activityByOrder.get(order.id)||null,payment:listedPayment,gift_unlocked:giftUnlocked});
+   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,customer_activity:activityByOrder.get(order.id)||null,customer_activity_events:activityEventsByOrder.get(order.id)||[],payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
