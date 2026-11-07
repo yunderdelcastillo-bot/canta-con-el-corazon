@@ -973,6 +973,7 @@ app.post("/api/support/diagnose",async(req,res)=>{
 });
 
 app.post("/api/lyrics/align",async(req,res)=>{
+ console.log("Lyric alignment request received:",{hasAudio:!!req.body?.audioBase64,lyricsCount:Array.isArray(req.body?.lyrics)?req.body.lyrics.length:0,duration:Number(req.body?.duration)||0});
  try{
   const apiKey=String(process.env.GROQ_API_KEY||"").trim();
   if(!apiKey)return res.status(503).json({error:"Groq Whisper no está configurado en el servidor."});
@@ -991,10 +992,13 @@ app.post("/api/lyrics/align",async(req,res)=>{
   form.append("model","whisper-large-v3-turbo");form.append("response_format","verbose_json");
   form.append("timestamp_granularities[]","word");form.append("language","es");
   form.append("prompt",lyrics.join("\n").slice(0,900));
+  console.log("Groq Whisper request started:",{audioBytes:audio.length,lyricsCount:lyrics.length,model:"whisper-large-v3-turbo"});
   const response=await fetch("https://api.groq.com/openai/v1/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+apiKey},body:form,signal:AbortSignal.timeout(120000)});
+  console.log("Groq Whisper response:",{status:response.status,ok:response.ok});
   const transcript=await response.json().catch(()=>({}));
   if(!response.ok)throw Object.assign(new Error(String(transcript?.error?.message||"Groq Whisper no pudo transcribir el audio.")),{status:response.status});
   const words=(Array.isArray(transcript.words)?transcript.words:[]).map(item=>{const text=String(item.word||"").trim(),start=Number(item.start),end=Number(item.end),normalized=normalizeAlignWord(text);return normalized&&Number.isFinite(start)&&Number.isFinite(end)&&end>start?{text,normalized,start,end}:null;}).filter(Boolean);
+  console.log("Groq Whisper word timestamps:",{wordCount:words.length});
   if(!words.length)throw new Error("Groq Whisper no devolvió marcas de tiempo por palabra.");
   const segments=[];let cursor=0;
   for(let lineIndex=0;lineIndex<lyrics.length;lineIndex++){
