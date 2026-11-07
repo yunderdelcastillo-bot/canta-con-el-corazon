@@ -1248,6 +1248,32 @@ app.post("/api/assistant/chat",async(req,res)=>{
 const orderFields=["buyer","contact","recipient","relationship","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency","lyrics"];
 function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
 const orderAudioStatus=new Map();
+const activeCustomerForms=new Map();
+app.post("/api/forms/activity",async(req,res)=>{
+ try{
+  const sessionId=String(req.body?.sessionId||"");
+  const event=String(req.body?.event||"heartbeat");
+  if(!/^[0-9a-f-]{36}$/i.test(sessionId)||!["started","heartbeat","left","submitted"].includes(event))return res.status(400).json({error:"Sesión de formulario no válida."});
+  const now=Date.now(),previous=activeCustomerForms.get(sessionId);
+  if(event==="started"&&!previous){
+   activeCustomerForms.set(sessionId,{sessionId,startedAt:now,lastSeenAt:now,status:"completando formulario"});
+   await createSystemNotification(admin(),{order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body:"Hay una persona completando el formulario de Canta con el corazón. Aún no ha enviado el pedido."});
+  }else if(event==="heartbeat"&&previous){previous.lastSeenAt=now;previous.status="completando formulario";activeCustomerForms.set(sessionId,previous);}
+  else if(event==="left"&&previous){previous.lastSeenAt=now;previous.status="salió del formulario";previous.leftAt=now;activeCustomerForms.set(sessionId,previous);}
+  else if(event==="submitted"){activeCustomerForms.delete(sessionId);}
+  res.set("Cache-Control","no-store").json({ok:true});
+ }catch(e){console.error("Customer form activity:",e?.message||e);res.status(500).json({error:"No se pudo registrar la actividad del formulario."});}
+});
+app.get("/api/admin/forms/active",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
+  const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
+  const now=Date.now();
+  for(const [id,item] of activeCustomerForms){if(now-item.lastSeenAt>90000)activeCustomerForms.delete(id);}
+  const sessions=[...activeCustomerForms.values()].filter(x=>!x.leftAt&&now-x.lastSeenAt<75000).map(x=>({started_at:new Date(x.startedAt).toISOString(),last_seen_at:new Date(x.lastSeenAt).toISOString(),status:x.status}));
+  res.set("Cache-Control","no-store").json({ok:true,count:sessions.length,sessions});
+ }catch(e){console.error("Active customer forms:",e?.message||e);res.status(500).json({error:"No se pudo consultar la actividad de formularios."});}
+});
 app.post("/api/orders",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El registro de pedidos no está configurado. Escríbenos por WhatsApp para continuar."});
@@ -1552,7 +1578,7 @@ async function createSystemNotification(db,values){
  try{
   const {error}=await db.from("system_notifications").insert(values);
   if(error)console.warn("Notification not stored (run messaging migration):",error.message);
-  else if(["new_order","voucher_received","new_message","payment_approved","preview_finished","preview_ready","lyrics_ready","order_contacted","production_started","audio_uploading","song_ready","package_delivered"].includes(values.event_type))await sendAdminPushNotification(db,values);
+  else if(["new_order","form_started","voucher_received","new_message","payment_approved","preview_finished","preview_ready","lyrics_ready","order_contacted","production_started","audio_uploading","song_ready","package_delivered"].includes(values.event_type))await sendAdminPushNotification(db,values);
  }catch(e){console.warn("Notification unavailable:",e?.message||e);}
 }
 app.post("/api/orders/:id/messages",async(req,res)=>{
