@@ -129,7 +129,7 @@ body.cch-preview-open{overflow:hidden}
 @media(max-width:480px){.cch-preview-toolbar{min-height:58px;padding:7px 9px}.cch-preview-toolbar strong{font-size:.72rem}.cch-preview-toolbar button{font-size:.78rem;padding:9px 10px}}
 
 .order-lyrics-details{padding:8px 11px!important;margin:8px 0!important;background:#fff!important}.order-lyrics-details>summary{font-size:.92rem;padding:3px 0}.order-lyrics-details>p{font-size:.9rem;line-height:1.45;max-height:360px;overflow:auto}
-</style><meta name="cch-app-version" content="2026-11-07-stop-preview-audio-v9"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+</style><meta name="cch-app-version" content="2026-11-07-preserve-client-test-form-v10"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
  <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
  <div class="mobile-shortcuts" aria-label="Accesos principales">
   <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
@@ -815,7 +815,11 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   previewOpen=false;
  }
  function openPreview(url){
-  if(url)frame.src=url;
+  /* Conserva el documento del cliente y sus datos mientras solo se oculta el panel de prueba. */
+  if(url&&frame.dataset.cchLoadedUrl!==url){
+   frame.src=url;
+   frame.dataset.cchLoadedUrl=url;
+  }
   if(!previewOpen){
    previewOpen=true;
    try{history.pushState({...((history.state&&typeof history.state==='object')?history.state:{}),cchCustomerPreview:true},'',location.href);}
