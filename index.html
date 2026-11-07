@@ -341,7 +341,9 @@ function showPaymentCta(){
      xhr.send(JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64}));
     });
     progress.value=100;status.textContent='✅ Voucher recibido por el sistema. '+(result.message||'Tu pedido quedó registrado.');status.style.color='#b8ffd0';
-    button.textContent='Voucher enviado';button.disabled=true;return;
+    button.textContent='Voucher enviado';button.disabled=true;
+     try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'cch-payment-updated',orderId:ctx.orderId},location.origin);}catch(e){}
+     return;
    }catch(error){status.textContent='❌ No se pudo enviar: '+(error.message||'Error desconocido')+' Puedes volver a intentarlo.';status.style.color='#ffd0d0';progress.style.display='none';}
    finally{if(button.textContent!=='Voucher enviado'){button.disabled=false;button.textContent='📤 Reintentar envío del voucher';}}
   });
