@@ -162,6 +162,7 @@ document.body.dataset.theme=allowedThemes.includes(theme)?theme:'romantico';
 
 let lyricLines=[];
 let lyricTimeline=[];
+let spokenIntroCue=null;
 function estimateLyricWeight(line){
  const words=String(line||'').toLowerCase().match(/[a-záéíóúüñ0-9]+/gi)||[];
  // Approximate sung duration from syllables rather than assigning identical time to every line.
@@ -186,7 +187,8 @@ function updateSyncedLyric(){
  if(!lyricTimeline.length||Math.abs((lyricTimeline.at(-1)?.end||0)-duration)>1)buildLyricTimeline(duration);
  let index=lyricTimeline.findIndex((slot,i)=>current>=slot.start&&(current<slot.end||i===lyricTimeline.length-1));
  if(current<lyricTimeline[0].start)index=-1;
- const text=index<0?'♪':lyricLines[index];
+ let text=index<0?'♪':lyricLines[index];
+ if(spokenIntroCue&&current>=spokenIntroCue.start&&current<spokenIntroCue.end)text=spokenIntroCue.text;
  const target=document.getElementById('lyricsCurrent');
  if(target&&target.textContent!==text)target.textContent=text;
 }
@@ -221,6 +223,7 @@ async function alignGiftLyrics(){
     const data=await result.json().catch(()=>({}));
     if(!result.ok||!Array.isArray(data.segments)||data.segments.length!==lyricLines.length)throw new Error(data.error||'No se pudo alinear toda la letra.');
     lyricTimeline=data.segments;
+    spokenIntroCue=data.spokenIntro&&typeof data.spokenIntro.text==="string"&&data.spokenIntro.text.trim()?data.spokenIntro:null;
     updateSyncedLyric();
    }
    if(hint)hint.textContent='Letra sincronizada con las marcas de tiempo de la voz.';
