@@ -820,11 +820,27 @@ function buildCustomerOrderMessage(includeLyrics){
  return text;
 }
 
+// Monitoreo anónimo del formulario: no se transmiten los datos que el cliente escribe.
+(function(){
+ const form=document.getElementById('orderForm');if(!form||window.__cchFormTrackerStarted)return;
+ window.__cchFormTrackerStarted=true;
+ let sessionId=sessionStorage.getItem('cchFormSessionId');
+ if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem('cchFormSessionId',sessionId);}
+ let started=false,heartbeat=null;
+ const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionId,event})}).catch(()=>{});
+ const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},20000);};
+ form.addEventListener('input',begin,{once:true,capture:true});
+ form.addEventListener('change',begin,{once:true,capture:true});
+ form.addEventListener('focusin',begin,{once:true});
+ window.addEventListener('pagehide',()=>{if(started){send('left');if(heartbeat)clearInterval(heartbeat);}});
+ window.cchFormSubmitted=()=>{if(started)send('submitted');if(heartbeat)clearInterval(heartbeat);sessionStorage.removeItem('cchFormSessionId');};
+})();
 async function saveCustomerOrder(includeLyrics=true){
  const payload={buyer:orderValue('buyer'),contact:orderValue('contact'),recipient:orderValue('recipient'),relationship:orderValue('relationship'),occasion:orderValue('occasion'),story:orderValue('story'),style:orderValue('style'),customGenre:orderValue('customGenre'),voice:orderValue('voice'),specialPhrase:orderValue('specialPhrase'),lyricDuration:orderValue('lyricDuration'),lyricTone:orderValue('lyricTone'),package:orderValue('package'),urgency:orderValue('urgency'),lyrics:includeLyrics?orderValue('customerLyricsText'):''};
  const response=await fetchWithSafeRetry(API_BASE+'/api/orders',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)},1);
  const result=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
+ window.cchFormSubmitted?.();
  return result;
 }
 
