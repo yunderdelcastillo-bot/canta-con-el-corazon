@@ -1658,5 +1658,33 @@ function mountCustomerOrderChat(){
  if(assistant)assistant.style.bottom='8px';
 })();
 </script>
+
+<style>
+/* Ajustes visuales de la zona de letra en móviles */
+#sendCustomerOrderNew{
+ display:flex!important;width:100%!important;box-sizing:border-box!important;
+ appearance:none!important;-webkit-appearance:none!important;
+ border:0!important;border-radius:999px!important;
+ background:linear-gradient(90deg,#f6d78c,#f2b7c9)!important;
+ color:#351426!important;outline:none!important;
+ box-shadow:0 9px 24px #12040c50!important;
+ -webkit-tap-highlight-color:transparent;
+}
+#sendCustomerOrderNew:focus,#sendCustomerOrderNew:active{
+ outline:none!important;background:linear-gradient(90deg,#f6d78c,#f2b7c9)!important;
+}
+#cchAiOpen.cch-hidden-over-lyrics{display:none!important}
+</style>
+<script>
+(function(){
+ const result=document.getElementById('customerLyricsResult');
+ const assistant=document.getElementById('cchAiOpen');
+ if(!result||!assistant)return;
+ const sync=()=>assistant.classList.toggle('cch-hidden-over-lyrics',!result.classList.contains('hidden'));
+ sync();
+ new MutationObserver(sync).observe(result,{attributes:true,attributeFilter:['class']});
+})();
+</script>
+
 </body>
 </html>
