@@ -780,26 +780,38 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
 })();
 
 </script><script>
-/* Modo de prueba doble: la tienda se muestra dentro del panel y este permanece cargado. */
+/* Modo de prueba integrado: volver desde la muestra sin abandonar ni reiniciar el panel. */
 (function(){
  const openButton=document.getElementById('cchOpenCustomerPreview');
  const returnButton=document.getElementById('cchReturnAdmin');
  const view=document.getElementById('cchCustomerPreviewView');
  const frame=document.getElementById('cchCustomerPreviewFrame');
  if(!openButton||!returnButton||!view||!frame)return;
- let loaded=false;
+ let loaded=false,previewOpen=false;
+ function hidePreview(){
+  view.hidden=true;
+  view.setAttribute('aria-hidden','true');
+  document.body.classList.remove('cch-preview-open');
+  previewOpen=false;
+  window.scrollTo(0,0);
+ }
  function openStore(){
   if(!loaded){frame.src=location.origin+'/#order';loaded=true;}
+  if(!previewOpen){
+   previewOpen=true;
+   try{history.pushState({cchCustomerPreview:true},'',location.href);}catch(error){console.warn('No se pudo preparar el regreso de la muestra:',error);}
+  }
   document.body.classList.add('cch-preview-open');
   view.hidden=false;
   view.setAttribute('aria-hidden','false');
  }
  function returnAdmin(){
-  view.hidden=true;
-  view.setAttribute('aria-hidden','true');
-  document.body.classList.remove('cch-preview-open');
-  window.scrollTo(0,0);
+  if(!previewOpen){hidePreview();return;}
+  previewOpen=false;
+  try{history.back();}catch(error){console.warn(error);}
+  hidePreview();
  }
+ window.addEventListener('popstate',function(){if(previewOpen)hidePreview();});
  openButton.addEventListener('click',openStore);
  returnButton.addEventListener('click',returnAdmin);
 })();
