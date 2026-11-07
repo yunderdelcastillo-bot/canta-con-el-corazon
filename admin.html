@@ -427,7 +427,7 @@ async function loadCustomerOrders(){
    activityLine.textContent='🎧 Abrió/reprodujo la muestra: '+(previewActivity.started_at?fmtActivity(previewActivity.started_at):'Todavía no')+' · '+(previewActivity.completed_at?'Terminó de escuchar: '+fmtActivity(previewActivity.completed_at):'No ha terminado la muestra');
     if(o.payment?.payment_status==='approved'&&o.payment?.voucher_path){
      const paymentActivity=document.createElement('p');paymentActivity.style.cssText='margin:8px 0 0;line-height:1.55;color:#176b3a;font-weight:700';
-     paymentActivity.textContent='💚 Voucher recibido y pago aprobado automáticamente · Beneficios MP3 habilitados'+(o.audio_ready?' · Canción lista para descargar':' · Pendiente de terminar la canción');
+     paymentActivity.textContent='💚 ESTADO DEL CLIENTE: Pago confirmado · Voucher recibido · MP3 desbloqueado'+(o.audio_ready?' · Canción lista para descargar':' · Canción en preparación');
      activityBox.appendChild(paymentActivity);
     }
    activityBox.appendChild(activityLine);card.appendChild(activityBox);
