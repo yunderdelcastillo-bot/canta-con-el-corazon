@@ -1712,10 +1712,11 @@ app.get("/api/admin/orders",async(req,res)=>{
      const payment=paymentByOrder.get(order.id)||null;
      const {data:packagePermission,error:permissionReadError}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
      if(permissionReadError)throw permissionReadError;
-     const giftUnlocked=!!packagePermission?.can_mp3&&payment?.payment_status!=="approved";
-     const benefitsEnabled=payment?.payment_status==="approved"
+     // Un permiso MP3 antiguo no equivale a un regalo explícito ni a un pago.
+     // En este flujo, solo un voucher aprobado habilita la descarga automática.
+     const benefitsEnabled=payment?.payment_status==="approved"&&!!payment?.voucher_path
       ? await syncApprovedOrderBenefits(db,order.id,song,user.id)
-      : giftUnlocked;
+      : false;
      const token=crypto.randomBytes(32).toString("base64url"),tokenHash=crypto.createHash("sha256").update(token).digest("hex");
      const {error:linkError}=await db.from("song_preview_links").insert({song_id:song.id,token_hash:tokenHash,created_by:user.id,download_enabled:benefitsEnabled});
      if(!linkError){
@@ -1727,11 +1728,8 @@ app.get("/api/admin/orders",async(req,res)=>{
     }
    }
    const listedPayment=paymentByOrder.get(order.id)||null;
-   let giftUnlocked=false;
-   if(audioReady){
-    const {data:ownedSong}=await db.from("songs").select("id").eq("owner_id",user.id).eq("audio_path",user.id+"/"+order.id+".mp3").maybeSingle();
-    if(ownedSong){const {data:permission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",ownedSong.id).maybeSingle();giftUnlocked=!!permission?.can_mp3&&listedPayment?.payment_status!=="approved";}
-   }
+   // No inferir un regalo a partir de permisos históricos: se requiere voucher aprobado.
+   const giftUnlocked=false;
    orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
