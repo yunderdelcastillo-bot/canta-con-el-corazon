@@ -308,9 +308,16 @@ if(sharedVideoUrl){
    catch(e){caption.textContent='Tu sorpresa está aquí ♥ Pulsa reproducir en el video para escucharla';vp.controls=true}
    setTimeout(()=>{reveal.style.opacity='0';setTimeout(()=>{reveal.style.display='none'},1500)},4500);
   };
-  play.addEventListener('click',openSurprise);
-  cover.addEventListener('click',openSurprise);
+  // Activación robusta para Android: click, pointer y toque directo.
+  play.type='button';play.style.pointerEvents='auto';play.style.position='relative';play.style.zIndex='100002';
+  play.onclick=e=>{e.preventDefault();e.stopPropagation();openSurprise()};
+  play.addEventListener('pointerup',e=>{e.preventDefault();e.stopPropagation();openSurprise()},{passive:false});
+  play.addEventListener('touchend',e=>{e.preventDefault();e.stopPropagation();openSurprise()},{passive:false});
+  cover.onclick=e=>{if(e.target===cover||e.target===play||play.contains(e.target)){e.preventDefault();openSurprise()}};
   cover.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openSurprise()}});
+  cover.tabIndex=0;
+  cover.setAttribute('role','button');
+  cover.setAttribute('aria-label','Toca para descubrir tu sorpresa');
   cover.tabIndex=0;
   cover.setAttribute('role','button');
   cover.setAttribute('aria-label','Toca para descubrir tu sorpresa');
