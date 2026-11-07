@@ -1,0 +1,993 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Panel de canciones | Canta con el corazón</title><style>
+:root{--wine:#3b1028;--rose:#e9a5bd;--gold:#f6d78c;--cream:#fff7f2;--ink:#351b2b;--line:#ead8e1}*{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--ink);font-family:system-ui,sans-serif}.hero{background:linear-gradient(120deg,#3b1028,#681b43);color:white;padding:24px}.hero>div,main{max-width:980px;margin:auto}.hero h1{margin:0;font-family:Georgia,serif}.hero a{color:white;margin-right:12px}main{padding:16px 12px 50px}.card{background:white;border:1px solid var(--line);border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 8px 24px #3b102810}h2{margin-top:0;color:#681b43}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{width:100%;padding:12px;border:1px solid #d9c4cf;border-radius:10px;font:inherit}textarea{min-height:90px}.btn{border:0;border-radius:999px;background:#681b43;color:white;padding:12px 16px;font:inherit;font-weight:700;margin:10px 6px 0 0;cursor:pointer}.alt{background:#f6e7ed;color:#3b1028}.danger{background:#9f263a}.status{padding:12px;background:#f6e7ed;border-radius:10px;margin:12px 0;overflow-wrap:anywhere}.muted{color:#755b69;font-size:.9rem}.hidden{display:none!important}.song{border:1px solid var(--line);border-radius:12px;padding:14px;margin:10px 0}.song a{overflow-wrap:anywhere}.row{display:flex;flex-wrap:wrap;gap:6px}.notice{background:#fff5d7;border-radius:10px;padding:12px}.pill{background:#f6e7ed;border-radius:99px;padding:4px 8px;font-size:.8rem}audio{width:100%}.preview-frame{width:100%;height:680px;border:1px solid var(--line);border-radius:14px;background:#fff}.preview-actions{display:flex;flex-wrap:wrap;gap:8px}
+.panel-nav{position:sticky;top:0;z-index:20;display:flex;gap:8px;overflow-x:auto;padding:10px max(12px,calc((100% - 980px)/2));background:#fffafc;border-bottom:1px solid var(--line);box-shadow:0 4px 14px #3b102810}.panel-nav a{flex:0 0 auto;text-decoration:none;color:var(--wine);background:#f6e7ed;border:1px solid var(--line);border-radius:999px;padding:9px 13px;font-size:.88rem;font-weight:700}.panel-group-title{margin:24px 2px 8px;color:#681b43;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase}.section-help{background:#fff8fb;border-left:4px solid var(--rose);padding:12px 14px;border-radius:10px;margin:10px 0 14px;color:#755b69;font-size:.92rem}
+.panel-nav{scrollbar-width:thin}.panel-nav a:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #d78eaa;outline-offset:2px}
+.hero{position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:260px;height:260px;border:1px solid #ffffff22;border-radius:50%;right:-90px;top:-130px;pointer-events:none}
+.hero p{margin:8px 0 14px;color:#f7dce7}.hero a{display:inline-block;padding:7px 11px;border:1px solid #ffffff55;border-radius:999px;text-decoration:none;font-size:.9rem}
+.panel-nav{position:sticky;top:0;z-index:20;display:flex;gap:8px;overflow-x:auto;padding:10px max(12px,calc((100% - 980px)/2));background:#fffafc;border-bottom:1px solid var(--line);box-shadow:0 4px 14px #3b102810}
+.panel-nav a{flex:0 0 auto;text-decoration:none;color:var(--wine);background:#f6e7ed;border:1px solid var(--line);border-radius:999px;padding:9px 13px;font-size:.88rem;font-weight:700}
+.panel-group-title{margin:24px 2px 8px;color:#681b43;font-size:.82rem;letter-spacing:.08em;text-transform:uppercase}
+.section-help{background:#fff8fb;border-left:4px solid var(--rose);padding:12px 14px;border-radius:10px;margin:10px 0 14px;color:#755b69;font-size:.92rem}
+.order-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(180px,240px);gap:10px;margin:14px 0}
+.order-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.order-stat{background:#fff8fb;border:1px solid var(--line);border-radius:14px;padding:12px}
+.order-stat strong{display:block;font-size:1.45rem;color:#681b43;font-variant-numeric:tabular-nums}
+.order-stat span{font-size:.8rem;color:#755b69}
+.song.order-card{padding:18px;border-radius:16px;box-shadow:0 4px 16px #3b10280b}
+.order-card h3{margin:0 0 8px;font-size:1.12rem;color:#4a1732}
+.order-meta{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+.order-tag{display:inline-flex;align-items:center;border-radius:999px;background:#f6e7ed;color:#54223d;padding:5px 9px;font-size:.78rem;font-weight:700}
+.order-card .status{background:#fff8fb;border:1px solid #f0dfe7}
+.order-card progress{accent-color:#8b2857}
+.order-card .btn{min-height:42px}
+@media(max-width:560px){.order-toolbar{grid-template-columns:1fr}.order-stats{gap:7px}.order-stat{padding:9px}.order-stat strong{font-size:1.2rem}.order-stat span{font-size:.72rem}.card{padding:15px}}
+
+
+.messenger-layout{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:14px}.messenger-list,.messenger-thread{border:1px solid var(--line);border-radius:14px;padding:10px;background:#fffafd;min-height:160px;max-height:520px;overflow:auto}.messenger-item{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px;margin:0 0 8px;color:var(--ink);cursor:pointer}.messenger-item.active{border-color:#8b2857;background:#fbedf4}.messenger-item strong,.messenger-item small{display:block}.messenger-item small{color:#755b69;margin-top:4px}.messenger-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:99px;background:#c2185b;color:white;font-size:.72rem;font-style:normal}.messenger-bubble{padding:10px 12px;margin:8px 0;border-radius:12px;max-width:92%;white-space:pre-wrap;overflow-wrap:anywhere}.messenger-bubble.customer{background:#f0e9f8;margin-right:auto}.messenger-bubble.admin{background:#f9e5ef;margin-left:auto}.messenger-bubble small{display:block;opacity:.7;margin-top:5px;font-size:.72rem}.messenger-thread{display:flex;flex-direction:column}.messenger-thread .muted{margin:auto}.messenger-layout textarea{min-height:75px}@media(max-width:650px){.messenger-layout{grid-template-columns:1fr}.messenger-list{max-height:250px}.messenger-thread{max-height:340px}}
+/* Tipografía y controles profesionales: recuperar tamaño cómodo y legible */
+.hero{padding:22px 20px}
+.hero h1{font-size:1.65rem;line-height:1.25}
+.hero p{font-size:1rem;margin:8px 0 14px}
+main{padding:16px 14px 42px}
+.card{padding:20px;margin:13px 0;border-radius:16px}
+h2{font-size:1.28rem;line-height:1.35;margin:0 0 12px}
+p{line-height:1.55}
+label{font-size:1rem;margin:13px 0 7px}
+input,textarea,select{font-size:1rem;padding:12px 13px;border-radius:10px;line-height:1.4}
+textarea{min-height:100px}
+.btn{font-size:1rem;padding:12px 18px;min-height:46px;margin:9px 7px 0 0;letter-spacing:.01em}
+.status,.notice,.section-help{font-size:.96rem;line-height:1.5;padding:12px 14px;margin:11px 0}
+.grid{gap:12px}
+.song{padding:15px;margin:10px 0}
+.order-stat{padding:13px}
+.order-stat strong{font-size:1.5rem}
+.panel-nav{padding:10px 14px;gap:9px}
+.panel-nav a{font-size:.92rem;padding:10px 15px}
+#adminLyricsText{font-size:1rem!important;line-height:1.55;min-height:300px!important;height:320px}
+.preview-frame{height:600px}
+@media(max-width:560px){
+ .hero{padding:17px 14px}.hero h1{font-size:1.4rem}
+ main{padding:11px 10px 30px}
+ .card{padding:16px;margin:10px 0}
+ h2{font-size:1.18rem}
+ .grid{grid-template-columns:1fr;gap:8px}
+ .btn{font-size:.98rem;padding:12px 15px;min-height:46px}
+ .panel-nav a{font-size:.88rem;padding:9px 12px}
+ .order-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .order-stat{padding:10px}.order-stat strong{font-size:1.2rem}
+ #adminLyricsText{height:270px;min-height:250px!important}
+ .preview-frame{height:440px}
+}
+
+.panel-nav.menu-collapsed{display:none!important}.panel-nav{flex-wrap:wrap}.panel-nav a[aria-current="page"]{background:#681b43;color:#fff;border-color:#681b43}#panelMenuToggle{margin:0 0 8px}
+.order-info-details{margin:8px 0!important;background:#fff8fb;border:1px solid var(--line);border-radius:10px;padding:9px 11px}.order-info-details summary{font-weight:700;color:#681b43;cursor:pointer;padding:3px}.order-info-details p{margin:7px 0;font-size:.9rem;line-height:1.4;overflow-wrap:anywhere}.order-card h3{font-size:1.08rem!important;margin-bottom:5px}.order-card .order-quick-actions{gap:7px}.order-card .order-quick-actions .btn{min-height:42px}
+/* Modo de trabajo rápido: tarjetas compactas y controles visibles en móvil */
+.order-card{padding:13px!important;margin:8px 0!important}
+.order-card>p{margin:6px 0;font-size:.92rem;line-height:1.4}
+.order-card .status{padding:9px 11px;margin:8px 0;font-size:.9rem}
+.order-card .btn{min-height:39px;padding:9px 13px;margin:5px 5px 0 0;font-size:.9rem}
+.order-card details{margin:8px 0!important;background:#fff8fb;border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+.order-card details summary{font-weight:700;cursor:pointer;color:#681b43}
+.order-card details p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9rem;line-height:1.45}
+.order-card .order-quick-actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.order-card .order-quick-actions .btn{flex:1 1 auto}
+.order-toolbar{position:sticky;top:58px;z-index:10;background:#fffafc;padding:8px;border:1px solid var(--line);border-radius:12px}
+#ordersList{background:transparent;padding:0}
+#refreshOrders:disabled{opacity:.65;cursor:wait}
+@media(max-width:560px){.order-card{padding:11px!important}.order-card h3{font-size:1rem}.order-toolbar{top:52px}.order-card .order-quick-actions .btn{flex:1 1 44%}}
+
+/* CCH MOBILE DASHBOARD — rediseño vertical para teléfono */
+:root{--wine:#3a075f;--rose:#f20b91;--gold:#ffd76a;--cream:#fbf7ff;--ink:#29113c;--line:#eadcf4}
+body{background:#f7f2fb;color:#29113c;font-family:Inter,system-ui,-apple-system,sans-serif}
+.hero{padding:16px 15px 13px;background:radial-gradient(circle at 82% 10%,#9a36bb 0,transparent 32%),linear-gradient(135deg,#21003f,#52076f 55%,#8e0c83);border-radius:0 0 24px 24px;box-shadow:0 8px 22px #3c07502a}
+.hero:after{border-color:#ffffff18}.hero-inner{max-width:720px;margin:auto}.hero-brand{display:flex;align-items:center;gap:10px}.hero-mic{width:47px;height:47px;display:grid;place-items:center;border-radius:15px;background:#ffffff18;border:1px solid #ffffff45;font-size:27px}.hero-brand h1{font-size:clamp(1.15rem,5vw,1.6rem);font-family:Georgia,serif;line-height:1.1;color:#ffe08a}.hero-brand h1 small{font:500 .72em system-ui;color:white}.hero-brand p{font-size:.76rem;margin:5px 0 0;color:#f8dff8}.hero-note{margin-left:auto;color:#ffdc79;font-size:2.3rem}.hero-bottom{display:flex;justify-content:space-between;align-items:center;margin-top:13px;padding-top:10px;border-top:1px solid #ffffff30;color:#fff;font-size:.78rem;font-weight:750}.hero-bottom a{margin:0;padding:6px 9px;font-size:.75rem}
+.hero-access-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}.hero-access-btn{border:1px solid #ffffff70;background:#ffffff18;color:#fff;border-radius:999px;padding:7px 11px;font:750 .75rem system-ui;cursor:pointer;white-space:nowrap}.hero-access-secondary{background:#f6d78c;color:#3b1028;border-color:#f6d78c}@media(max-width:520px){.hero-bottom{align-items:flex-start;gap:8px}.hero-access-actions{gap:5px}.hero-access-btn{padding:7px 9px;font-size:.7rem}.hero-bottom a{padding:7px 9px}}
+.mobile-main{max-width:720px;padding:12px 11px 42px}.mobile-dashboard{background:transparent}.dashboard-greeting{display:flex;justify-content:space-between;align-items:center;padding:7px 3px 12px;gap:8px}.eyebrow{font-size:.63rem;letter-spacing:.12em;font-weight:900;color:#9a46ae}.dashboard-greeting h2{font-size:1.3rem;margin:3px 0;color:#391052}.dashboard-greeting p{font-size:.78rem;margin:0;color:#776283}.live-pill{white-space:nowrap;border:1px solid #bce9ce;background:#edfff3;color:#147c40;border-radius:99px;padding:6px 9px;font-size:.68rem;font-weight:800}.live-pill i{display:inline-block;width:7px;height:7px;background:#1bb65b;border-radius:50%;margin-right:4px}
+.mobile-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:5px 0 18px}.shortcut{min-width:0;border:1px solid #eadcf4;background:linear-gradient(145deg,#4b0872,#270043);color:#fff;border-radius:14px;min-height:75px;padding:9px 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font:750 .72rem system-ui;box-shadow:0 4px 10px #3b075018}.shortcut span{font-size:1.35rem}.shortcut.active{background:linear-gradient(145deg,#f20b91,#9c075e);border-color:#ed77bd}.dashboard-section-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 2px 9px}.dashboard-section-head h3{font-size:.98rem;margin:0;color:#40105c}.dashboard-section-head span{font-size:.64rem;color:#887494;text-align:right}.mobile-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.mobile-stat{min-width:0;background:white;border:1px solid #eadcf4;border-radius:14px;padding:10px 8px;display:flex;align-items:center;gap:7px;box-shadow:0 4px 12px #3b07500b}.stat-icon{width:30px;height:30px;flex:0 0 30px;border-radius:10px;display:grid;place-items:center;background:#f5e8ff;font-size:1rem}.mobile-stat small{display:block;font-size:.62rem;color:#786583;line-height:1.15}.mobile-stat strong{display:block;font-size:1.28rem;color:#39075a;font-variant-numeric:tabular-nums}.stat-pending .stat-icon{background:#fff0dc}.stat-ready .stat-icon{background:#e5f9ed}.dashboard-feature{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#fff;border:1px solid #eadcf4;border-radius:15px;padding:12px;margin-top:9px;box-shadow:0 4px 12px #3b07500b}.dashboard-feature>div{display:flex;align-items:center;gap:9px;min-width:0}.feature-icon{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:12px;background:#f7e5f7;font-size:1.2rem}.dashboard-feature strong,.dashboard-feature small{display:block}.dashboard-feature strong{font-size:.8rem;color:#391052}.dashboard-feature small{font-size:.66rem;color:#776283;line-height:1.3;margin-top:3px}.feature-action{white-space:nowrap;border:0;background:#fbe5f3;color:#a20b70;border-radius:99px;padding:8px 10px;font-size:.69rem;font-weight:850}.feature-action span{font-size:1rem}.dashboard-foot{display:flex;align-items:center;gap:9px;margin:14px 2px 2px;padding:11px;border-radius:14px;background:linear-gradient(100deg,#2b0347,#630b78);color:white}.dashboard-foot>span{font-size:1.4rem}.dashboard-foot strong,.dashboard-foot small{display:block}.dashboard-foot strong{font-size:.75rem}.dashboard-foot small{font-size:.64rem;color:#e9d4f3;margin-top:2px}
+#panelMenuToggle{width:100%;border-radius:12px;background:#4b0872;color:#fff;margin:3px 0 8px;min-height:42px}.panel-nav{position:static;padding:9px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;border-radius:14px;margin-bottom:12px;background:#fff}.panel-nav a{white-space:normal;text-align:center;border-radius:10px;font-size:.76rem;padding:10px 7px}.panel-nav.menu-collapsed{display:none!important}.mobile-main>.card{border-radius:16px;border-color:#eadcf4;box-shadow:0 5px 18px #3b07500d;padding:14px;margin:10px 0}.mobile-main .btn{border-radius:12px;min-height:43px;font-size:.88rem}.mobile-main h2{font-size:1.04rem}.mobile-main .section-help{font-size:.82rem}.mobile-main input,.mobile-main select,.mobile-main textarea{font-size:16px}.mobile-main .order-stats{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}.mobile-main .order-stat{border-radius:12px;padding:8px}.mobile-main .order-stat strong{font-size:1.18rem}.mobile-main .order-stat span{font-size:.66rem}.mobile-main .order-toolbar{top:5px;grid-template-columns:1fr}.mobile-main .order-toolbar input,.mobile-main .order-toolbar select{min-width:0}.mobile-main .order-card{border-radius:13px!important;background:#fff}.mobile-main .order-card .order-quick-actions .btn{flex:1 1 100%}
+@media(min-width:600px){.mobile-main{padding:18px 20px 50px}.mobile-shortcuts{grid-template-columns:repeat(6,minmax(0,1fr))}.mobile-stat{padding:14px}.mobile-stat strong{font-size:1.5rem}.panel-nav{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Evita que el navegador ancle y desplace la vista cuando el contenido del panel cambia. */
+html,body{overflow-anchor:none;scroll-behavior:auto;overscroll-behavior-y:none;}
+
+/* CCH Professional UI v1: polish visual sin alterar la lógica de los módulos. */
+:root{--cch-purple:#3a075f;--cch-purple-2:#5b1680;--cch-pink:#ed168d;--cch-soft:#f8f1fc;--cch-gold:#ffd76a;--cch-border:#e8d9f1;}
+.hero{position:relative;isolation:isolate}
+.hero-inner{width:100%}
+#panelToolbar{position:sticky;top:0;z-index:40;max-width:720px!important;margin:0 auto 10px!important;padding:9px 11px!important;background:rgba(247,242,251,.96);backdrop-filter:blur(12px);border-bottom:1px solid var(--cch-border);box-shadow:0 5px 16px #32104412}
+#panelToolbar .btn{flex:1 1 145px;min-height:44px;margin:0;border-radius:12px;font-size:.86rem;font-weight:800;box-shadow:0 3px 9px #32104412}
+#backToDashboard{background:linear-gradient(120deg,#4b0872,#76208e)!important;color:#fff!important}
+#panelMenuToggle{background:#fff!important;color:#4b0872!important;border:1px solid var(--cch-border)!important}
+.mobile-main{padding-top:8px}
+.mobile-dashboard{display:block}
+.dashboard-greeting{padding:12px 4px 15px}
+.mobile-shortcuts{gap:9px}
+.shortcut{border:1px solid #ffffff22;box-shadow:0 6px 14px #32104418;transition:transform .15s ease,box-shadow .15s ease}
+.shortcut:active{transform:scale(.98)}
+.mobile-stat,.dashboard-feature{border-color:var(--cch-border);box-shadow:0 5px 16px #3210440c}
+.mobile-stat{min-height:76px}
+.dashboard-feature{min-height:68px}
+.mobile-main>.card{border-radius:18px;border:1px solid var(--cch-border);box-shadow:0 7px 22px #3210440d}
+.mobile-main .card>h2{display:flex;align-items:center;gap:7px;color:#4b0872}
+.mobile-main .btn{font-weight:750;box-shadow:0 2px 7px #32104410}
+.mobile-main input,.mobile-main select,.mobile-main textarea{border-color:#dfcde9;background:#fff}
+.mobile-main input:focus,.mobile-main select:focus,.mobile-main textarea:focus{outline:3px solid #ed168d24;border-color:#b54a9b}
+.panel-nav{border:1px solid var(--cch-border);box-shadow:0 5px 16px #3210440b}
+.panel-nav a{min-height:42px;display:flex;align-items:center;justify-content:center;line-height:1.25}
+.panel-nav a[aria-current=page]{background:linear-gradient(120deg,#4b0872,#8b1684);border-color:#6d1680;color:#fff}
+button:focus-visible,a:focus-visible{outline:3px solid #ed168d66;outline-offset:2px}
+@media(max-width:420px){#panelToolbar{gap:6px!important;padding:8px!important}#panelToolbar .btn{flex:1 1 130px;font-size:.8rem;padding:10px 8px}.mobile-stat{gap:5px;padding:8px 6px}.stat-icon{width:27px;height:27px;flex-basis:27px}.mobile-stat strong{font-size:1.1rem!important}}
+@media(prefers-reduced-motion:reduce){.shortcut{transition:none!important;scroll-behavior:auto!important}}
+/* Vista integrada de prueba: conserva el panel en memoria y carga la tienda en un iframe del mismo origen. */
+#cchCustomerPreviewView[hidden]{display:none!important}
+#cchCustomerPreviewView{position:fixed;inset:0;z-index:99999;background:#fff;display:flex;flex-direction:column}
+.cch-preview-toolbar{min-height:54px;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px;background:#3b1028;color:#fff;box-shadow:0 2px 10px #0002}
+.cch-preview-toolbar strong{font-size:.82rem;line-height:1.25}
+.cch-preview-toolbar button{border:0;border-radius:10px;background:#fff;color:#3b1028;font-weight:800;padding:10px 13px;min-height:40px}
+#cchCustomerPreviewFrame{border:0;width:100%;flex:1;min-height:0;background:#fff}
+body.cch-preview-open{overflow:hidden}
+@media(max-width:480px){.cch-preview-toolbar{min-height:58px;padding:7px 9px}.cch-preview-toolbar strong{font-size:.72rem}.cch-preview-toolbar button{font-size:.78rem;padding:9px 10px}}
+
+.order-lyrics-details{padding:8px 11px!important;margin:8px 0!important;background:#fff!important}.order-lyrics-details>summary{font-size:.92rem;padding:3px 0}.order-lyrics-details>p{font-size:.9rem;line-height:1.45;max-height:360px;overflow:auto}
+</style><meta name="cch-app-version" content="2026-11-05-dashboard-navigation-fix-v7"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+ <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
+ <div class="mobile-shortcuts" aria-label="Accesos principales">
+  <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
+  <button type="button" class="shortcut" data-panel="messenger"><span>💬</span>Mensajes <i id="messengerUnreadBadge" class="messenger-badge hidden">0</i></button>
+  <button type="button" class="shortcut" data-panel="lyricsStudio"><span>🤖</span>Crear con IA</button>
+  <button type="button" class="shortcut" data-panel="library"><span>🎵</span>Canciones</button>
+  <button type="button" class="shortcut" data-panel="mediaLibrary"><span>🎞️</span>Multimedia</button>
+  <button type="button" class="shortcut" data-panel="systemAlerts"><span>🔔</span>Avisos</button>
+  <button type="button" class="shortcut" data-panel="integrationStatus"><span>⚙️</span>Config.</button>
+ </div>
+ <div class="dashboard-feature" id="customerSimulationEntry">
+  <div><span class="feature-icon">🧪</span><div><strong>Probar como cliente</strong><small>Abre la tienda del cliente aquí mismo, sin cerrar el panel administrativo.</small></div></div>
+  <button type="button" class="feature-action" id="cchOpenCustomerPreview">🛍️ Probar como cliente ↗</button>
+ </div>
+ <p class="muted" style="margin:4px 3px 12px;font-size:.72rem">La prueba usa el flujo real y puede registrar un pedido. No realices pagos reales ni subas comprobantes verdaderos.</p>
+ <div class="dashboard-section-head"><h3>Resumen de pedidos</h3><span>Datos de tus pedidos registrados</span></div>
+ <div class="mobile-stats">
+  <article class="mobile-stat stat-total"><span class="stat-icon">🛒</span><div><small>Total pedidos</small><strong id="mobileOrdersTotal">—</strong></div></article>
+  <article class="mobile-stat stat-pending"><span class="stat-icon">⏳</span><div><small>Por producir</small><strong id="mobileOrdersPending">—</strong></div></article>
+  <article class="mobile-stat stat-ready"><span class="stat-icon">✅</span><div><small>Muestras listas</small><strong id="mobileOrdersReady">—</strong></div></article>
+ </div>
+ <div class="dashboard-feature">
+  <div><span class="feature-icon">💌</span><div><strong>Pedidos de clientes</strong><small>Revisa pagos, prepara canciones y entrega regalos.</small></div></div>
+  <button type="button" class="feature-action" data-panel="customerOrders">Ver pedidos <span>→</span></button>
+ </div>
+ <div class="dashboard-feature">
+  <div><span class="feature-icon">💬</span><div><strong>Pedidos por WhatsApp</strong><small>Registra y administra solicitudes recibidas por chat.</small></div></div>
+  <button type="button" class="feature-action" data-panel="whatsappManualOrders">Abrir <span>→</span></button>
+ </div>
+ <div class="dashboard-foot"><span>🎶</span><div><strong>Canta con el corazón</strong><small>Tu espacio de trabajo, en un solo lugar.</small></div></div>
+</section>
+<div id="panelToolbar" style="max-width:980px;margin:10px auto;padding:0 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn alt" id="backToDashboard" type="button" style="margin:0;flex:1 1 150px">🏠 Volver al panel principal</button><button class="btn alt" id="panelMenuToggle" type="button" aria-expanded="false" aria-controls="panelMenu" style="margin:0;flex:1 1 130px">☰ Menú del panel</button><button class="btn" id="refreshAdminPanel" type="button" style="margin:0;flex:1 1 145px">🔄 Actualizar panel</button></div><nav class="panel-nav menu-collapsed" id="panelMenu" aria-label="Secciones del panel"><a href="#messenger">💬 Centro de mensajería</a><a href="#customerOrders">📥 Pedidos automáticos</a><a href="#whatsappManualOrders">💬 Pedidos WhatsApp</a><a href="#editor">🎵 Pedidos manuales</a><a href="#library">🎼 Biblioteca</a><a href="#lyricsStudio">🤖 Crear letras</a><a href="#mediaLibrary">🎞️ Multimedia</a><a href="#systemAlerts">🔔 Notificaciones</a></nav>
+<section class="card"><h2>📩 Enlace para clientes: pedido y pago</h2><p>Este es el enlace que debes enviar a tus clientes para que entren a tu web, llenen sus datos, elijan su canción y vean el QR de Yape para pagar.</p><label>Enlace público de pedidos</label><input id="orderLink" readonly value="https://canta-con-el-corazon.onrender.com/#order"><div class="row"><button class="btn" id="copyOrderLink" type="button">Copiar enlace para cliente</button><button class="btn" id="sendOrderLink" type="button">Enviar enlace por WhatsApp</button><a class="btn" style="text-decoration:none;display:inline-block" href="https://canta-con-el-corazon.onrender.com/#order" target="_blank" rel="noopener">Probar formulario</a></div><div class="status">El cliente llenará el formulario y podrá ver las instrucciones de pago con Yape. La constancia y el pago se revisan manualmente por WhatsApp.</div></section>
+<section class="card hidden" id="supabaseConfigPanel"><h2>☁️ Configuración de almacenamiento</h2><p>Esta conexión permite guardar los MP3 en la nube para que los clientes puedan escucharlos desde cualquier celular. Primero configura Supabase siguiendo la guía SQL.</p><div class="grid"><div><label>URL de Supabase</label><input id="url" placeholder="https://tu-proyecto.supabase.co"></div><div><label>Clave pública (anon / publishable)</label><input id="key" placeholder="Clave pública; nunca service_role"></div></div><button class="btn" id="connect" type="button">Guardar y comprobar conexión</button><div class="status" id="connStatus">No conectado.</div><p class="muted">La configuración queda guardada solo en este navegador. No ingreses contraseñas secretas ni claves service_role.</p></section>
+<section class="card hidden" id="adminLoginPanel"><h2>🔐 Acceso administrativo</h2><div class="grid"><div><label>Correo administrador</label><input id="email" type="email" autocomplete="username"></div><div><label>Contraseña</label><input id="password" type="password" autocomplete="current-password"></div></div><div class="row"><button class="btn" id="login">Iniciar sesión</button><button class="btn alt" id="logout">Cerrar sesión</button></div><div class="status" id="authStatus">Conecta Supabase y luego inicia sesión.</div></section>
+
+<section class="card hidden" id="messenger"><div class="row" style="justify-content:space-between;align-items:center"><h2>💬 CENTRO DE MENSAJERÍA</h2><button class="btn alt" id="refreshMessenger" type="button">Actualizar</button></div><p class="section-help">Aquí llegan los pedidos nuevos y los mensajes de tus clientes. Cada conversación está vinculada a un pedido independiente.</p><div class="messenger-layout"><div><h3>📥 Pedidos y conversaciones</h3><div id="messengerConversationList" class="messenger-list">Cargando conversaciones…</div></div><div><h3 id="messengerThreadTitle">Selecciona un pedido</h3><div id="messengerThread" class="messenger-thread"><p class="muted">Elige un pedido para consultar y responder sus mensajes.</p></div><div id="messengerComposer" class="hidden"><textarea id="messengerReply" maxlength="1200" placeholder="Escribe tu respuesta al cliente…"></textarea><button class="btn" id="sendMessengerReply" type="button">Enviar respuesta</button><p class="muted" id="messengerStatus" aria-live="polite"></p></div></div></div></section>
+<section class="card hidden" id="systemAlerts"><h2>🔔 Centro de notificaciones</h2><p class="muted">Activa el sonido una vez en este celular. Mantén este panel abierto para recibir avisos de nuevos pedidos.</p><div class="row"><button class="btn" id="enableAlertSound" type="button">🔊 Activar sonido</button><button class="btn alt" id="testAlertSound" type="button">Probar voz y sonido</button><button class="btn alt" id="toggleAlertSound" type="button">Silenciar</button><button class="btn" id="enablePushAlerts" type="button">📲 Activar avisos con pantalla apagada</button><button class="btn alt" id="testPushAlerts" type="button">🧪 Enviar notificación de prueba</button></div><div class="status" id="pushAlertStatus">Avisos en segundo plano pendientes de activar en este celular.</div><div class="status" id="alertSoundStatus">Sonido pendiente de activar por el navegador.</div><div id="systemNotifications" class="status">Cargando notificaciones…</div></section><section class="card hidden" id="integrationStatus"><h2>⚙️ Integraciones futuras</h2><p class="muted">Estas conexiones quedan preparadas, pero no se activan hasta configurar las credenciales en Render.</p><div class="status" id="culqiStatus">Culqi: pendiente de configuración.</div><div class="status" id="whatsappApiStatus">WhatsApp API: pendiente de configuración. El chat interno y WhatsApp manual siguen funcionando.</div></section>
+
+<section class="card hidden" id="library"><div class="row" style="justify-content:space-between"><h2>🎼 Biblioteca de canciones</h2><button class="btn alt" id="refresh">Actualizar</button></div><div id="list">Tus canciones aparecerán aquí.</div></section>
+<section class="card hidden" id="mediaLibrary"><h2>🎞️ Biblioteca multimedia por ocasión</h2><p class="muted">Sube videos MP4/WebM/MOV o imágenes JPG/PNG/WEBP. Máximo 50 MB por archivo. Los archivos se mostrarán como fondos de los regalos según la ocasión seleccionada.</p><div class="grid"><div><label>Ocasión</label><select id="mediaCategory"><option value="romantico">Romántico</option><option value="cumpleanos">Cumpleaños</option><option value="aniversario">Aniversario</option><option value="serenata">Serenata</option><option value="homenaje">Homenaje</option><option value="amistad">Amistad</option><option value="familia">Familia</option><option value="dia-madre">Día de la madre</option><option value="dia-padre">Día del padre</option><option value="otros">Otros</option></select></div><div><label>Archivo multimedia</label><input id="mediaFile" type="file" accept="video/mp4,video/webm,video/quicktime,image/jpeg,image/png,image/webp"></div></div><div class="row"><button class="btn" id="uploadMedia" type="button">Subir a la biblioteca</button><button class="btn alt" id="refreshMedia" type="button">Actualizar biblioteca</button></div><div class="status" id="mediaStatus">Inicia sesión para administrar tus archivos multimedia.</div><div id="mediaItems"></div></section>\n<section class="card hidden" id="lyricsStudio">
+<h2>🤖 Herramientas · Generador profesional de letras con IA</h2>
+<p class="muted">Crea letras originales para tus clientes. Completa la historia, elige el género y genera una versión que podrás corregir, copiar, pasar al editor de canción o enviar por WhatsApp.</p>
+<div class="grid">
+ <div><label for="aiBuyer">Nombre del cliente</label><input id="aiBuyer" placeholder="Quién solicita la canción"></div>
+ <div><label for="aiRecipient">¿Para quién es? *</label><input id="aiRecipient" required placeholder="Nombre o apodo"></div>
+ <div><label for="aiOccasion">Ocasión *</label><select id="aiOccasion"><option>Cumpleaños</option><option>Aniversario</option><option>Declaración de amor</option><option>Reconciliación</option><option>Serenata</option><option>Homenaje</option><option>Agradecimiento</option><option>Amistad</option><option>Despedida</option><option>Otra ocasión</option></select></div>
+ <div><label for="aiStyle">Género musical *</label><select id="aiStyle"><option>Balada romántica</option><option>Cumbia peruana</option><option>Ranchera mexicana</option><option>Salsa</option><option>Bachata</option><option>Reguetón romántico</option><option>Huayno</option><option>Pop latino</option><option>Serenata mexicana</option><option>Otro género</option></select></div>
+ <div><label for="aiVoice">Tipo de voz</label><select id="aiVoice"><option>Voz femenina</option><option>Voz masculina</option><option>Dueto</option><option>Me da igual</option></select></div>
+ <div><label for="aiDuration">Duración</label><select id="aiDuration"><option>2 minutos</option><option selected>3 minutos</option><option>4 minutos</option></select></div>
+</div>
+<label for="aiStory">Historia, recuerdos y detalles reales *</label><textarea id="aiStory" maxlength="3500" placeholder="Escribe la historia completa, momentos importantes, cómo se conocieron, recuerdos y sentimientos..."></textarea>
+<div class="grid">
+ <div><label for="aiPhrase">Frase que debe incluir</label><input id="aiPhrase" maxlength="300" placeholder="Frase especial o apodo"></div>
+ <div><label for="aiTone">Emoción de la letra</label><select id="aiTone"><option>Según la historia</option><option>Muy romántica y emotiva</option><option>Alegre y festiva</option><option>Profunda y nostálgica</option><option>Esperanzadora</option><option>De agradecimiento</option><option>Divertida y cariñosa</option></select></div>
+</div>
+<label for="aiCustomGenre">Estilo adicional</label><input id="aiCustomGenre" maxlength="500" placeholder="Instrumentos, ritmo, ambiente o matices">
+<label for="aiInstructions">Indicaciones especiales</label><textarea id="aiInstructions" placeholder="Qué debe destacar, qué evitar o qué palabras no pueden faltar."></textarea>
+<div class="row"><button class="btn" id="adminGenerateLyrics" type="button">✨ Generar letra</button><button class="btn alt" id="adminRegenerateLyrics" type="button">🔄 Generar otra versión</button></div>
+<div class="status" id="adminLyricsStatus" aria-live="polite">Completa los datos y genera una letra.</div>
+<label for="adminLyricsText">Letra generada (editable)</label><textarea id="adminLyricsText" rows="18" style="min-height:360px" placeholder="La letra aparecerá aquí…"></textarea>
+<div class="card" style="background:#fff8fb;border:1px solid #e9a5bd;margin-top:14px">
+ <h3 style="margin:0;color:#681b43">🎶 Crear música con Gemini</h3>
+ <p class="muted">Flujo rápido: 1) Genera y guarda la letra en el pedido. 2) En Pedidos, pulsa “Preparar letra en Gemini (1 clic)”. 3) En Gemini, pega la letra copiada y genera la canción. 4) Descarga el MP3 y vuelve a la misma tarjeta para subirlo. El sistema lo vincula al pedido y prepara la muestra para el cliente. La generación y descarga dentro de Gemini requieren tu confirmación manual.</p>
+</div>
+<div class="row"><button class="btn alt" id="adminCopyLyrics" type="button">📋 Copiar letra</button><button class="btn alt" id="adminUseLyrics" type="button">Usar en el editor de canción</button><button class="btn" id="adminSendLyrics" type="button">💬 Enviar al cliente por WhatsApp</button></div>
+<p class="muted">La letra no se publica ni se envía automáticamente. Tú la revisas y decides qué hacer con ella.</p>
+</section>
+<div class="notice hidden" id="storageSecurityNotice">Importante: esta es una protección básica de la interfaz, no una protección segura del archivo. Los MP3 actuales usan URL pública y alguien con la URL directa podría acceder al audio. Para bloquear realmente la descarga hasta confirmar el pago, hay que configurar almacenamiento privado y enlaces firmados desde un servidor seguro.</div><section class="card hidden" id="supabaseGuidePanel"><h2>📘 Guía de configuración inicial</h2><ol><li>Abre <a href="https://supabase.com/dashboard" target="_blank" rel="noopener">Supabase</a> y crea un proyecto gratuito.</li><li>Abre <a href="/supabase-setup.sql">supabase-setup.sql</a>, copia el contenido en SQL Editor y ejecútalo.</li><li>Ejecuta el archivo <a href="/supabase-private-storage.sql">supabase-private-storage.sql</a> para convertir el bucket <b>songs-audio</b> en privado, límite 25 MB y tipo permitido audio/mpeg.</li><li>En Authentication crea tu usuario administrador.</li><li>Copia Project URL y la clave pública desde Project Settings → API y pégalas arriba.</li></ol><div class="notice">La web ya queda preparada para conectarse, pero la subida permanente no funcionará hasta completar estos pasos en tu cuenta de Supabase. Los audios se sirven mediante enlaces firmados temporales. Configura también las variables de entorno del servidor privado en Render.</div></section>
+<section class="card hidden" id="whatsappManualOrders"><h2>💬 PEDIDOS POR WHATSAPP</h2><p class="section-help">Registra aquí los pedidos que recibes por WhatsApp. Tú crearás la letra con IA, generarás la canción y subirás el MP3. El sistema preparará la misma muestra privada y podrás enviarla al cliente por WhatsApp.</p><div class="grid"><label>Nombre del cliente<input id="waOrderBuyer" maxlength="120" placeholder="Nombre"></label><label>WhatsApp del cliente<input id="waOrderContact" maxlength="40" placeholder="519XXXXXXXX"></label><label>¿Para quién es la canción?<input id="waOrderRecipient" maxlength="120" placeholder="Destinatario"></label><label>Ocasión<input id="waOrderOccasion" maxlength="100" placeholder="Cumpleaños, aniversario…"></label><label>Paquete<select id="waOrderPackage"><option>ESENCIAL — Solo audio — S/20</option><option>DETALLE ESPECIAL — Video con dedicatoria e imágenes ilustrativas — S/25</option><option>REGALO COMPLETO — Canción + video con fotos reales — desde S/30</option><option>Quiero que me orienten</option></select></label><label>Estilo musical<input id="waOrderStyle" maxlength="120" placeholder="Cumbia, balada…"></label><label>Voz<select id="waOrderVoice"><option>Femenina</option><option>Masculina</option><option>Según la historia</option></select></label><label>Duración<select id="waOrderDuration"><option>3 minutos</option><option>2 minutos</option><option>4 minutos</option></select></label></div><label>Historia y detalles<textarea id="waOrderStory" rows="4" maxlength="3500" placeholder="Escribe la historia que te contó el cliente…"></textarea></label><label>Frase especial (opcional)<input id="waOrderPhrase" maxlength="500" placeholder="Una frase que desea incluir"></label><button class="btn" id="pasteRegisterWhatsAppOrder" type="button">📋 Pegar pedido copiado de WhatsApp y registrar</button><p class="muted">Copia el mensaje completo del cliente en WhatsApp y pulsa este botón. El sistema leerá los datos y registrará el pedido automáticamente.</p><button class="btn" id="createWhatsAppOrder" type="button">➕ Registrar pedido de WhatsApp</button><p id="waOrderStatus" class="muted" aria-live="polite"></p></section><section class="card hidden" id="customerOrders"><div class="row" style="justify-content:space-between;align-items:center"><h2>📥 PEDIDOS AUTOMÁTICOS · Clientes de la web</h2><button class="btn alt" id="refreshOrders" type="button">Actualizar pedidos</button></div><p class="section-help">Aquí aparecen los pedidos recibidos desde la web. Revisa el pago, prepara la canción y sube el MP3 al pedido. El sistema guardará el audio y preparará la muestra privada para que aparezca en la página del cliente. También puedes copiar o enviar el enlace por WhatsApp cuando lo necesites.</p><div class="order-stats" id="orderStats"><div class="order-stat"><strong id="ordersTotal">—</strong><span>Pedidos recibidos</span></div><div class="order-stat"><strong id="ordersPending">—</strong><span>Esperando canción</span></div><div class="order-stat"><strong id="ordersReady">—</strong><span>Muestras listas</span></div></div><div class="order-toolbar"><input id="orderSearch" type="search" placeholder="Buscar por cliente, destinatario o WhatsApp…" aria-label="Buscar pedidos"><select id="orderFilter" aria-label="Filtrar pedidos"><option value="all">Todos los pedidos</option><option value="pending">Esperando canción</option><option value="ready">Muestra lista</option><option value="payment">Pago pendiente de revisión</option></select><select id="orderSourceFilter" aria-label="Filtrar origen"><option value="all">Web y WhatsApp</option><option value="web">Solo pedidos automáticos de la web</option><option value="whatsapp">Solo pedidos de WhatsApp</option></select></div><p id="ordersVisibleCount" class="muted" aria-live="polite"></p><div id="ordersList" class="status">Inicia sesión para consultar pedidos.</div></section>
+<section class="card hidden" id="editor"><h2>🎵 PEDIDOS MANUALES · Crear o subir canción</h2><p class="section-help">Usa este espacio para canciones que gestionas manualmente, fuera del flujo automático de pedidos de la web. Aquí conservas el control de crear el regalo, revisar el audio y compartir el enlace por WhatsApp.</p><p class="muted">En Android, toca “Elegir archivo” y selecciona tu MP3 desde Descargas o Archivos. Máximo 25 MB.</p><form id="form"><input type="hidden" id="sid"><div class="grid"><div><label>Título interno *</label><input id="title" required maxlength="120" placeholder="Ej. Mi Alicia, mi niña querida"></div><div><label>Nombre de quien recibe *</label><input id="recipient" required maxlength="100" placeholder="Nombre o apodo"></div></div><label>Dedicatoria que verá el cliente *</label><textarea id="dedication" required maxlength="1500" placeholder="Escribe el mensaje especial..."></textarea><label>Letra de la canción (opcional)</label><textarea id="lyrics" placeholder="Pega la letra; separa cada verso con salto de línea."></textarea><div class="grid"><div><label>Tema visual</label><select id="theme"><option value="romantico">Romántico</option><option value="cumpleanos">Cumpleaños</option><option value="aniversario">Aniversario</option><option value="serenata">Serenata</option><option value="homenaje">Homenaje</option><option value="amistad">Amistad</option></select></div><div><label>Archivo MP3 *</label><input id="file" type="file" accept=".mp3,audio/mpeg"><p class="muted" id="fileInfo">Selecciona un MP3 de tu celular.</p></div></div><div class="grid"><div><label>Paquete comprado</label><select id="giftPackage"><option value="esencial">ESENCIAL — Solo audio — S/20</option><option value="detalle">DETALLE ESPECIAL — Video ilustrativo — S/25</option><option value="completo">REGALO COMPLETO — Video con fotos reales — desde S/30</option></select></div><div><label>Precio acordado (S/)</label><input id="giftPrice" type="number" min="20" step="1" value="20"></div></div><div id="previewWrap" class="hidden"><label>Vista previa</label><audio id="preview" controls></audio></div><button class="btn" id="save" type="submit">Subir MP3 y crear enlace</button><button class="btn alt" type="button" id="clear">Limpiar formulario</button><div class="status" id="saveStatus">Completa los campos y elige el archivo.</div><div class="status hidden" id="giftPreviewWrap"><h3>Vista previa del regalo del cliente</h3><p class="muted">Así se verá el enlace que enviarás. Revisa el diseño, la dedicatoria y el reproductor antes de compartirlo.</p><div class="preview-actions"><a class="btn" id="openGiftPreview" href="#" target="_blank" rel="noopener" style="text-decoration:none;display:inline-block">Abrir vista previa completa</a></div><iframe class="preview-frame" id="giftPreview" title="Vista previa del regalo musical"></iframe></div></form></section>
+<section id="cchCustomerPreviewView" hidden aria-label="Vista de prueba de la tienda">
+ <div class="cch-preview-toolbar">
+  <strong>🛍️ MODO DE PRUEBA · TIENDA DEL CLIENTE</strong>
+  <button type="button" id="cchReturnAdmin">← Volver al panel</button>
+ </div>
+ <iframe id="cchCustomerPreviewFrame" title="Tienda pública para probar como cliente" loading="lazy" referrerpolicy="same-origin"></iframe>
+</section></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
+const API_BASE="https://canta-corazon-private-api.onrender.com";
+function cchPaymentLinkStore(){try{return JSON.parse(localStorage.getItem("cch_order_payment_links")||"{}")}catch{return {}}}
+function cchRememberPaymentLink(orderId,accessToken){if(!orderId||!accessToken)return;const links=cchPaymentLinkStore();links[orderId]=accessToken;localStorage.setItem("cch_order_payment_links",JSON.stringify(links));}
+function cchBuildPaymentLink(orderId,accessToken){return "https://canta-con-el-corazon.onrender.com/?pago=1&pedido="+encodeURIComponent(orderId)+"&acceso="+encodeURIComponent(accessToken)+"#pago";}const $=id=>document.getElementById(id);let db=null,user=null,file=null;window.cchAdminGetToken=async()=>{if(!db)return '';const {data:{session}}=await db.auth.getSession();return session?.access_token||''};const cfg=()=>{try{return JSON.parse(localStorage.getItem('cc_config')||'{}')}catch{return {}}};
+function msg(id,t){$(id).textContent=t}function previewTokenStore(){try{return JSON.parse(localStorage.getItem("cc_preview_tokens")||"{}")}catch{return {}}}function packageStore(){try{return JSON.parse(localStorage.getItem('cc_song_packages')||'{}')}catch{return {}}}function makeLink(s,grant=''){const data={para:s.recipient||'',mensaje:s.dedication||'',audio:s.audio_path||'',letra:(s.lyrics||'').split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join('|'),tema:s.theme||'romantico'};const keys={esencial:'ESENCIAL',detalle:'DETALLE ESPECIAL',completo:'REGALO COMPLETO'};const key=s.package_key||packageStore()[s.id]?.key||'esencial';data.paquete=keys[key]||'ESENCIAL';data.precio=s.package_price||packageStore()[s.id]?.price||({esencial:20,detalle:25,completo:30}[key]);if(grant)data.grant=grant;data.surprise='1';return 'https://canta-con-el-corazon.onrender.com/?'+new URLSearchParams(data).toString()}
+// Un solo cliente Supabase por proyecto y almacenamiento persistente explícito en el navegador.
+function cchCreateSupabaseClient(url,key){
+ const normalizedUrl=new URL(url).origin;
+ const existing=window.__cchSupabasePersistentClient;
+ if(existing&&existing.url===normalizedUrl&&existing.key===key){db=existing.client;return db;}
+ const projectRef=new URL(normalizedUrl).hostname.split('.')[0];
+ const client=window.supabase.createClient(normalizedUrl,key,{auth:{
+  persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,
+  storage:window.localStorage,storageKey:'sb-'+projectRef+'-auth-token'
+ }});
+ window.__cchSupabasePersistentClient={url:normalizedUrl,key,client};
+ db=client;return client;
+}
+function init(){const c=cfg();if(c.url&&c.key){$('url').value=c.url;$('key').value=c.key;msg('connStatus','Configuración guardada encontrada. Comprobando conexión con Supabase…');setTimeout(()=>{if(!$('connect').disabled)$('connect').click()},400);return;}msg('connStatus','Buscando configuración guardada…');setTimeout(()=>{const url=$('url').value.trim(),key=$('key').value.trim();if(url&&key){msg('connStatus','Se encontraron datos en los campos del navegador. Validando conexión con Supabase…');$('connect').click();}else{msg('connStatus','No se encontró una configuración guardada. Completa la URL y la clave pública de Supabase y pulsa “Guardar y comprobar conexión”.');}},1200);}
+$('connect').onclick=async()=>{
+ const rawUrl=$('url').value.trim(),key=$('key').value.trim();
+ let parsed;
+ try{parsed=new URL(rawUrl)}catch{msg('connStatus','La URL no es válida. Copia completa la Project URL de Supabase, por ejemplo https://xxxxx.supabase.co.');return}
+ if(parsed.protocol!=='https:'||!parsed.hostname||parsed.username||parsed.password||parsed.search||parsed.hash||parsed.pathname!=='/'){
+  msg('connStatus','La URL debe ser la Project URL completa de Supabase, empezando con https:// y sin rutas adicionales.');return;
+ }
+ if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){
+  msg('connStatus','La clave no tiene formato Publishable ni anon. Copia la clave pública completa desde Supabase → Project Settings → API Keys. No uses Secret/service_role.');return;
+ }
+ const url=parsed.origin,btn=$('connect');btn.disabled=true;msg('connStatus','Guardando la configuración y comprobando Supabase…');
+ try{
+  const client=cchCreateSupabaseClient(url,key);
+  localStorage.setItem('cc_config',JSON.stringify({url,key}));db=client;
+  const {data:{session:restoredSession},error:sessionError}=await client.auth.getSession();
+  if(sessionError)console.warn('No se pudo recuperar la sesión guardada:',sessionError.message);
+  if(restoredSession?.user)await activateAdminSession(restoredSession.user,{restored:true});
+  msg('connStatus','Configuración guardada. Comprobando acceso a la tabla songs…');
+  const {error}=await client.from('songs').select('id',{head:true}).limit(1);
+  if(error){
+   const detail=error.message||'Error sin descripción';
+   if(/permission|policy|row.level|rls|not found|does not exist|schema cache/i.test(detail)){
+    msg('connStatus','Supabase respondió y la configuración quedó guardada. La tabla songs o sus permisos requieren revisión: '+detail+' Puedes intentar iniciar sesión.');
+   }else if(/failed to fetch|network|timeout|load failed/i.test(detail)){
+    msg('connStatus','La URL y la clave se guardaron, pero el navegador no pudo completar la consulta. Revisa conexión a internet, dominio y que la clave sea del mismo proyecto. Detalle: '+detail);
+   }else{
+    msg('connStatus','La configuración se guardó, pero Supabase devolvió este error: '+detail);
+   }
+  }else{
+   msg('connStatus','¡Conexión correcta! URL y clave pública guardadas en este navegador. Ahora inicia sesión.');
+  }
+ }catch(e){
+  msg('connStatus','No se pudo iniciar la conexión: '+(e?.message||String(e))+' Revisa que el proyecto Supabase esté activo y que la URL y clave pertenezcan al mismo proyecto.');
+ }finally{btn.disabled=false}
+};
+async function adminAudioUrl(songId){const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('La sesión expiró. Inicia sesión nuevamente.');const response=await fetch(API_BASE+'/api/admin-audio-url?songId='+encodeURIComponent(songId),{headers:{'Authorization':'Bearer '+session.access_token}});const result=await response.json();if(!response.ok||!result.url)throw new Error(result.error||'No se pudo preparar el audio.');return result.url}
+async function load(){if(!db||!user)return;let {data,error}=await db.from('songs').select('*').eq('owner_id',user.id).order('updated_at',{ascending:false});if(error){$('list').textContent='Error: '+error.message;return}if(!data.length){$('list').textContent='Aún no tienes canciones. Crea la primera arriba.';return}$('list').innerHTML='';data.forEach((s,index)=>{let box=document.createElement('div');box.className='song';let h=document.createElement('h3');h.textContent=s.title+' — '+s.recipient;let a=document.createElement('a');const savedPreview=previewTokenStore()[s.id];const buildPreviewUrl=token=>{const u=new URL(makeLink(s));u.searchParams.set('previewLink',token);return u.toString()};a.href=savedPreview?.token?buildPreviewUrl(savedPreview.token):makeLink(s);a.target='_blank';a.rel='noopener';a.textContent='🎁 Abrir enlace del regalo';let audio=document.createElement('audio');audio.controls=true;audio.preload='metadata';audio.style.width='100%';if(s.audio_path){adminAudioUrl(s.id).then(url=>{audio.src=url;audio.load()}).catch(error=>{audio.title='No se pudo cargar el audio: '+error.message;console.error('Admin audio player:',error)})}let row=document.createElement('div');row.className='row';let b=document.createElement('button');b.className='btn';b.textContent='Copiar enlace';b.onclick=async()=>{await navigator.clipboard.writeText(a.href);b.textContent='¡Copiado!'};let ed=document.createElement('button');ed.className='btn alt';ed.textContent='Editar';ed.onclick=async()=>{$('sid').value=s.id;$('title').value=s.title;$('recipient').value=s.recipient;$('dedication').value=s.dedication;$('lyrics').value=s.lyrics||'';$('theme').value=s.theme||'romantico';const savedPackage=packageStore()[s.id];$('giftPackage').value=s.package_key||savedPackage?.key||'esencial';$('giftPrice').value=s.package_price||savedPackage?.price||({esencial:20,detalle:25,completo:30}[$('giftPackage').value]);file=null;$('file').value='';msg('fileInfo','Se conservará el MP3 actual si no eliges otro.');if(s.audio_path){try{$('preview').src=await adminAudioUrl(s.id);$('preview').load()}catch(audioError){msg('saveStatus','No se pudo cargar el MP3 para previsualizar: '+audioError.message)}}$('previewWrap').classList.remove('hidden');const previewLink=makeLink(s);$('giftPreview').src=previewLink;$('openGiftPreview').href=previewLink;$('giftPreviewWrap').classList.remove('hidden');$('editor').scrollIntoView({behavior:'smooth'})};let tog=document.createElement('button');tog.className='btn alt';tog.textContent=s.published?'Ocultar':'Publicar';tog.onclick=async()=>{let {error}=await db.from('songs').update({published:!s.published}).eq('id',s.id);if(error)alert(error.message);else load()};let del=document.createElement('button');del.className='btn danger';del.textContent='Eliminar';del.onclick=async()=>{if(!confirm('¿Eliminar esta canción? No se puede deshacer.'))return;let {error}=await db.from('songs').delete().eq('id',s.id);if(error){alert(error.message);return}await db.storage.from('songs-audio').remove([user.id+'/'+s.id+'.mp3']);load()};let makePreview=document.createElement('button');makePreview.className='btn alt';makePreview.textContent='🎧 Generar enlace de muestra';makePreview.onclick=async()=>{makePreview.disabled=true;makePreview.textContent='Generando…';try{const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Inicia sesión nuevamente.');const rr=await fetch(API_BASE+'/api/preview-links',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify({songId:s.id})});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo generar la muestra.');const store=previewTokenStore();store[s.id]={token:dd.token,createdAt:new Date().toISOString()};localStorage.setItem('cc_preview_tokens',JSON.stringify(store));const u=new URL(makeLink(s));u.searchParams.set('previewLink',dd.token);a.href=u.toString();makePreview.textContent='✓ Enlace de muestra listo';alert('Enlace de muestra creado. Ahora puedes pulsar “Enviar por WhatsApp” o “Copiar enlace”.');}catch(e){makePreview.textContent='🎧 Generar enlace de muestra';alert(e.message);}finally{makePreview.disabled=false;}};let refreshSong=document.createElement('button');refreshSong.className='btn alt';refreshSong.textContent='Actualizar';refreshSong.onclick=async()=>{if(!s.audio_path){alert('Esta canción no tiene un audio cargado.');return}refreshSong.disabled=true;refreshSong.textContent='Autorizando…';try{const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Inicia sesión nuevamente.');const response=await fetch(API_BASE+'/api/admin/replay',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({songId:s.id})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo autorizar.');refreshSong.textContent='✓ Cliente autorizado';alert('Listo. Se autorizó una nueva reproducción en el enlace original del cliente. Cuando tenga abierta la página, recibirá el permiso automáticamente.');}catch(e){refreshSong.textContent='Actualizar';alert('No se pudo autorizar: '+e.message)}finally{refreshSong.disabled=false;setTimeout(()=>{refreshSong.textContent='Actualizar'},2500)}};let wa=document.createElement('button');wa.className='btn';wa.textContent='Enviar por WhatsApp';wa.onclick=()=>{const text='Te preparé un regalo musical especialmente para ti 💗🎶\\n\\n'+s.recipient+'\\n'+s.dedication+'\\n\\nEscucha tu canción aquí: '+a.href;window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};const savedPack=packageStore()[s.id];const storedPrice=Number(s.package_price||savedPack?.price||20);const rawPack=s.package_key||savedPack?.key||'esencial';const pack=['esencial','detalle','completo'].includes(rawPack)?rawPack:(storedPrice>=30?'completo':storedPrice>=25?'detalle':'esencial');const packageLabels={esencial:'ESENCIAL · S/20 · Solo MP3',detalle:'DETALLE ESPECIAL · S/25 · MP3 + video ilustrativo',completo:'REGALO COMPLETO · S/30 · MP3 + video + fotos propias'};let packageInfo=document.createElement('p');packageInfo.className='muted';packageInfo.textContent='Paquete registrado: '+(packageLabels[pack]||packageLabels.esencial);let benefitsEnabled=false;let benefitsLoaded=false;let paidLink=document.createElement('button');paidLink.className='btn alt';paidLink.disabled=true;paidLink.textContent='Consultando beneficios…';paidLink.onclick=async()=>{if(!benefitsLoaded)return;const nextEnabled=!benefitsEnabled;const action=nextEnabled?'desbloquear':'bloquear';if(!confirm('¿Deseas '+action+' los beneficios?\\n\\n'+(packageLabels[pack]||packageLabels.esencial)+'\\n\\n'+(nextEnabled?'Se activarán únicamente los beneficios incluidos en este paquete.':'Se bloquearán MP3 y video en el enlace del cliente.')+'\\n\\nNo se cambiará el paquete comprado.'))return;paidLink.disabled=true;paidLink.textContent=nextEnabled?'Desbloqueando…':'Bloqueando…';try{const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Inicia sesión de nuevo.');const response=await fetch(API_BASE+'/api/grants',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({songId:s.id,enabled:nextEnabled})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo cambiar el permiso.');const expectedVideo=nextEnabled&&(pack==='detalle'||pack==='completo');if(!!result.canMp3!==nextEnabled||!!result.canVideo!==expectedVideo)throw new Error('El servidor devolvió permisos distintos al paquete. No se confirmó el cambio; revisa la canción.');benefitsEnabled=nextEnabled;paidLink.textContent=benefitsEnabled?'🔒 Bloquear beneficios':'🔓 Desbloquear beneficios';alert(benefitsEnabled?'Activado correctamente: '+(packageLabels[pack]||packageLabels.esencial):'Beneficios bloqueados. El paquete comprado se conserva.');}catch(e){alert('No se pudo confirmar el cambio: '+e.message);paidLink.textContent=benefitsEnabled?'🔒 Bloquear beneficios':'🔓 Desbloquear beneficios';}finally{paidLink.disabled=false}};if(s.audio_path){fetch(API_BASE+'/api/verify-grant?path='+encodeURIComponent(s.audio_path)+'&_='+Date.now(),{cache:'no-store'}).then(r=>r.json()).then(status=>{benefitsEnabled=!!status.canMp3;benefitsLoaded=true;paidLink.textContent=benefitsEnabled?'🔒 Bloquear beneficios':'🔓 Desbloquear beneficios';paidLink.disabled=false;}).catch(()=>{paidLink.textContent='No se pudo consultar · Reintentar';paidLink.disabled=false;paidLink.onclick=()=>load();});}row.append(b,wa,makePreview,refreshSong,paidLink,ed,tog,del);box.append(h,packageInfo,a,audio,row);$('list').append(box)})}
+
+
+async function mediaAuth(){const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Inicia sesión nuevamente.');return session.access_token}
+async function loadMedia(){if(!db||!user)return;const box=$('mediaItems');box.textContent='Cargando archivos…';try{const token=await mediaAuth();const r=await fetch(API_BASE+'/api/media',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo cargar.');box.innerHTML='';if(!d.items.length){box.textContent='Todavía no has subido videos ni imágenes.';return}d.items.forEach(item=>{const card=document.createElement('div');card.className='song';const title=document.createElement('strong');title.textContent=item.category+' · '+item.name;const preview=item.mimeType.startsWith('image/')?document.createElement('img'):document.createElement('video');preview.src=item.url;preview.style.width='100%';preview.style.maxHeight='220px';preview.style.objectFit='contain';if(preview.tagName==='VIDEO'){preview.controls=true;preview.muted=true}const del=document.createElement('button');del.className='btn danger';del.textContent='Eliminar';del.onclick=async()=>{if(!confirm('¿Eliminar este archivo de la biblioteca?'))return;del.disabled=true;try{const t=await mediaAuth();const q=new URLSearchParams({category:item.category,name:item.name});const rr=await fetch(API_BASE+'/api/media?'+q,{method:'DELETE',headers:{Authorization:'Bearer '+t}});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo eliminar');await loadMedia()}catch(e){alert(e.message);del.disabled=false}};card.append(title,preview,del);box.append(card)})}catch(e){box.textContent='Error: '+e.message}}
+$('uploadMedia').onclick=async()=>{const f=$('mediaFile').files[0];if(!f){msg('mediaStatus','Selecciona primero un video o una imagen.');return}if(f.size>50*1024*1024){msg('mediaStatus','El archivo supera 50 MB.');return}$('uploadMedia').disabled=true;msg('mediaStatus','Subiendo archivo… no cierres el panel.');try{const token=await mediaAuth();const q=new URLSearchParams({category:$('mediaCategory').value});const r=await fetch(API_BASE+'/api/media?'+q,{method:'PUT',headers:{Authorization:'Bearer '+token,'Content-Type':f.type},body:f});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo subir');$('mediaFile').value='';msg('mediaStatus','¡Archivo guardado en la biblioteca!');await loadMedia()}catch(e){msg('mediaStatus','Error: '+e.message)}finally{$('uploadMedia').disabled=false}};
+$('refreshMedia').onclick=loadMedia;
+const aiVal=id=>$(id).value.trim();
+let activeCustomerOrder=null;
+function themeForOccasion(value){const v=String(value||'').toLowerCase();if(/cumple/.test(v))return 'cumpleanos';if(/anivers|bodas/.test(v))return 'aniversario';if(/serenata/.test(v))return 'serenata';if(/homenaje|despedida/.test(v))return 'homenaje';if(/amistad/.test(v))return 'amistad';return 'romantico';}
+function selectByText(id,value){const el=$(id);if(!el||!value)return;const target=String(value).toLowerCase();const option=[...el.options].find(o=>o.text.trim().toLowerCase()===target||o.value.trim().toLowerCase()===target);if(option)el.value=option.value;}
+async function adminGenerateLyrics(){
+ const btn=$('adminGenerateLyrics'),status=$('adminLyricsStatus');
+ const body={buyer:aiVal('aiBuyer'),recipient:aiVal('aiRecipient'),occasion:aiVal('aiOccasion'),story:aiVal('aiStory'),style:aiVal('aiStyle'),voice:aiVal('aiVoice'),duration:aiVal('aiDuration'),phrase:aiVal('aiPhrase'),tone:aiVal('aiTone'),customGenre:aiVal('aiCustomGenre'),instruction:aiVal('aiInstructions')};
+ if(!body.recipient||!body.occasion||!body.story){msg('adminLyricsStatus','Completa destinatario, ocasión e historia.');return;}
+ btn.disabled=true;$('adminRegenerateLyrics').disabled=true;msg('adminLyricsStatus','✨ La IA está componiendo la letra…');
+ try{
+  const token=await mediaAuth();
+  const response=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||'No se pudo generar la letra.');
+  $('adminLyricsText').value=data.lyrics;
+  if(activeCustomerOrder?.id){
+   const saveLyrics=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(activeCustomerOrder.id),{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({lyrics:data.lyrics,status:'en_proceso'})});
+   const saved=await saveLyrics.json();if(!saveLyrics.ok)throw new Error(saved.error||'La letra se generó, pero no se pudo guardar en el pedido.');
+   activeCustomerOrder={...activeCustomerOrder,lyrics:data.lyrics,status:'en_proceso'};
+   msg('adminLyricsStatus','✓ Letra generada y guardada en el pedido. Ahora vuelve a Pedidos y pulsa “Crear música con esta letra”.');
+   await loadCustomerOrders();
+  }else msg('adminLyricsStatus','¡Letra generada! Puedes editarla, copiarla o enviarla al cliente.');
+ }catch(e){msg('adminLyricsStatus','Error: '+e.message)}
+ finally{btn.disabled=false;$('adminRegenerateLyrics').disabled=false}
+}
+$('adminGenerateLyrics').onclick=adminGenerateLyrics;$('adminRegenerateLyrics').onclick=adminGenerateLyrics;
+
+$('adminCopyLyrics').onclick=async()=>{try{await navigator.clipboard.writeText(aiVal('adminLyricsText'));msg('adminLyricsStatus','¡Letra copiada!')}catch{ $('adminLyricsText').focus();$('adminLyricsText').select();msg('adminLyricsStatus','Selecciona y copia la letra.')}};
+$('adminUseLyrics').onclick=()=>{if(!aiVal('adminLyricsText')){msg('adminLyricsStatus','Primero genera una letra.');return}const recipient=aiVal('aiRecipient'),occasion=aiVal('aiOccasion');$('lyrics').value=aiVal('adminLyricsText');$('recipient').value=recipient;$('title').value=(occasion?occasion+' - ':'')+'Canción para '+recipient;$('dedication').value=[aiVal('aiStory'),aiVal('aiPhrase')?'Frase especial: '+aiVal('aiPhrase'):''].filter(Boolean).join('\n\n');$('theme').value=themeForOccasion(occasion);msg('saveStatus','Datos y letra trasladados al editor. Cuando generes el MP3, el archivo también quedará seleccionado automáticamente.');$('editor').scrollIntoView({behavior:'smooth'});};
+$('adminSendLyrics').onclick=()=>{const lyrics=aiVal('adminLyricsText');if(!lyrics){msg('adminLyricsStatus','Primero genera una letra.');return}const text='Hola, '+(aiVal('aiBuyer')||'te comparto')+'. 💗\nTe envío la letra personalizada para '+aiVal('aiRecipient')+'.\nOcasión: '+aiVal('aiOccasion')+'\nGénero: '+aiVal('aiStyle')+' · '+aiVal('aiVoice')+'\n\n'+lyrics+'\n\nRevísala y dime si deseas algún cambio. — Canta con el corazón';window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};
+
+async function activateAdminSession(adminUser,{restored=false}={}){
+ if(!adminUser)return;
+ if(user?.id===adminUser.id)return;
+ user=adminUser;
+ $('headerLogout')?.classList.remove('hidden');
+ $('openAdminLogin')?.classList.add('hidden');
+ ['supabaseConfigPanel','adminLoginPanel','supabaseGuidePanel','storageSecurityNotice'].forEach(id=>$(id)?.classList.add('hidden'));
+ window.cchAdminGetToken=async()=>{if(!db)return '';const {data:{session}}=await db.auth.getSession();return session?.access_token||''};
+ window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:true}}));
+ msg('authStatus',(restored?'Sesión recuperada automáticamente: ':'Sesión iniciada: ')+user.email+' · Tu acceso se conservará en este navegador.');
+ ['editor','library','mediaLibrary','lyricsStudio','customerOrders','messenger','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.remove('hidden'));
+ await Promise.allSettled([load(),loadMedia(),loadCustomerOrders(),cchLoadNotifications(),cchLoadIntegrationStatus(),cchLoadAdminInbox()]);
+ if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);
+ window.cchNotificationTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadNotifications()},15000);
+ if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadAdminInbox()},15000);
+ await cchRefreshPushStatus();
+}
+// Puente global para que los scripts de conexión externos usen la misma sesión y el mismo cliente del panel.
+window.cchActivateAdminSession=async function(client,adminUser,options={}){db=client;if(adminUser)await activateAdminSession(adminUser,options);};
+
+$('login').onclick=async()=>{
+ const button=$('login');button.disabled=true;
+ try{
+  // Recupera la configuración guardada aunque la conexión no se haya inicializado aún.
+  if(!db){
+   let saved={};try{saved=JSON.parse(localStorage.getItem('cc_config')||'{}')}catch{}
+   const savedUrl=String(saved.url||$('url')?.value||'').trim();
+   const savedKey=String(saved.key||$('key')?.value||'').trim();
+   if(!savedUrl||!savedKey)throw new Error('No encuentro la configuración de Supabase en este navegador. Abre Configuración de almacenamiento y guarda la URL y la clave pública.');
+   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la librería de Supabase. Actualiza la página con internet.');
+   const parsed=new URL(savedUrl);
+   if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co'))throw new Error('La URL guardada de Supabase no es válida. Revisa la Project URL.');
+   if(!(savedKey.startsWith('sb_publishable_')||savedKey.startsWith('eyJ')))throw new Error('La clave guardada no parece ser una clave pública anon/publishable. No uses service_role.');
+   db=cchCreateSupabaseClient(parsed.origin,savedKey);
+  }
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password)throw new Error('Escribe el correo y la contraseña del administrador.');
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  await activateAdminSession(data.user);
+ }catch(error){msg('authStatus','No se pudo iniciar sesión: '+(error.message||'Revisa la configuración de Supabase y tus datos.'))}
+ finally{button.disabled=false}
+};
+
+
+document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',async()=>{
+ const button=document.getElementById('pasteRegisterWhatsAppOrder'),status=$('waOrderStatus');
+ button.disabled=true;status.textContent='Leyendo el pedido copiado…';
+ try{
+  if(!navigator.clipboard?.readText)throw new Error('Tu navegador no permite leer el portapapeles. Usa el formulario manual de abajo.');
+  const raw=await navigator.clipboard.readText();
+  if(!raw.trim())throw new Error('Primero copia el mensaje completo del pedido en WhatsApp.');
+  const fields={};
+  const labels={'Mi nombre':'buyer','Mi WhatsApp':'contact','Para':'recipient','Ocasión':'occasion','Historia/dedicatoria':'story','Género elegido':'style','Género o estilo adicional':'customGenre','Tipo de voz':'voice','Frase especial':'specialPhrase','Duración':'lyricDuration','Emoción':'lyricTone','Paquete elegido':'package','Plazo solicitado':'urgency'};
+  const lines=raw.split(/\r?\n/);
+  let current='';
+  for(const line of lines){
+   const m=line.match(/^([^:]+):\s*(.*)$/);
+   if(m&&labels[m[1].trim()]){current=labels[m[1].trim()];fields[current]=m[2].trim();}
+   else if(current&&(/Historia\/dedicatoria|story/.test(current))&&line.trim())fields[current]+='\n'+line.trim();
+  }
+  const payload={buyer:fields.buyer||'',contact:fields.contact||'',recipient:fields.recipient||'',occasion:fields.occasion||'',story:fields.story||'',style:fields.style||'',customGenre:fields.customGenre||'',voice:fields.voice||'Según la historia',specialPhrase:fields.specialPhrase==='No indicó'?'':(fields.specialPhrase||''),lyricDuration:fields.lyricDuration||'3 minutos',lyricTone:fields.lyricTone||'Según la historia',package:fields.package||'',urgency:fields.urgency||'Entrega normal (24–48 horas), por confirmar'};
+  if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story||!payload.package)throw new Error('El texto copiado no contiene todos los datos obligatorios. Copia el pedido completo que empieza con “Hola, quiero pedir una canción personalizada…”.');
+  const token=await window.cchAdminGetToken();
+  const response=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});
+  const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
+  if(result.paymentReady&&result.paymentAccessToken)cchRememberPaymentLink(result.orderId,result.paymentAccessToken);
+  status.textContent=result.paymentReady?'✓ Pedido registrado. Ya puedes compartir el enlace seguro de pago desde su tarjeta.':'✓ Pedido registrado, pero falta habilitar la configuración de pagos para crear el enlace seguro.';
+  await loadCustomerOrders();
+ }catch(error){status.textContent='No se pudo pegar el pedido: '+error.message;}
+ finally{button.disabled=false;}
+});
+document.getElementById('createWhatsAppOrder').addEventListener('click',async()=>{
+ const button=document.getElementById('createWhatsAppOrder'),status=document.getElementById('waOrderStatus');
+ const payload={buyer:$('waOrderBuyer').value.trim(),contact:$('waOrderContact').value.trim(),recipient:$('waOrderRecipient').value.trim(),occasion:$('waOrderOccasion').value.trim(),package:$('waOrderPackage').value,style:$('waOrderStyle').value.trim(),voice:$('waOrderVoice').value,lyricDuration:$('waOrderDuration').value,story:$('waOrderStory').value.trim(),specialPhrase:$('waOrderPhrase').value.trim()};
+ if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story){status.textContent='Completa los datos obligatorios del pedido.';return;}
+ button.disabled=true;status.textContent='Registrando pedido…';
+ try{const token=await window.cchAdminGetToken();const r=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo registrar');if(d.paymentReady&&d.paymentAccessToken)cchRememberPaymentLink(d.orderId,d.paymentAccessToken);status.textContent=d.paymentReady?'✓ Pedido de WhatsApp registrado. En su tarjeta encontrarás el enlace seguro para enviar al cliente.':'✓ Pedido registrado, pero falta habilitar la configuración de pagos para crear el enlace seguro.';['waOrderBuyer','waOrderContact','waOrderRecipient','waOrderOccasion','waOrderStyle','waOrderStory','waOrderPhrase'].forEach(id=>$(id).value='');await loadCustomerOrders();}catch(e){status.textContent='Error: '+e.message;}finally{button.disabled=false;}
+});
+function cchOrderProgress(o){
+ const paymentApproved=o.payment?.payment_status==='approved'||o.status==='pago_verificado';
+ let percent=10,label='Pedido recibido',detail='El pedido ingresó al sistema.';
+ if(o.status==='contactado'){percent=20;label='Cliente contactado';detail='El pedido ya fue revisado.';}
+ if(String(o.lyrics||'').trim()){percent=Math.max(percent,30);label='Letra lista';detail='La letra está disponible para revisión.';}
+ if(o.status==='muestra_lista'||o.audio_ready){percent=Math.max(percent,48);label='Muestra disponible';detail='La muestra está preparada para el cliente.';}
+ if(paymentApproved){percent=Math.max(percent,62);label='Pago aprobado';detail='El pago del pedido está confirmado.';}
+ if(o.status==='en_proceso'){percent=Math.max(percent,72);label='En preparación';detail='La canción está en proceso de producción.';}
+ if(o.status==='audio_subiendo'){percent=Math.max(percent,82);label='Subiendo audio';detail='Se está cargando el archivo de audio.';}
+ if(o.status==='audio_subido'||o.audio_ready){percent=Math.max(percent,90);label='Canción lista';detail='El audio está guardado y listo para preparar la entrega.';}
+ if(o.status==='entregado'){percent=100;label='Paquete entregado';detail='El pedido figura como entregado.';}
+ if(o.status==='cancelado'){label='Pedido cancelado';detail='Este pedido fue cancelado.';}
+ return {percent,label,detail};
+}
+async function loadCustomerOrders(){
+ const box=$('ordersList');box.textContent='Cargando pedidos…';
+ try{
+  const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión nuevamente.');
+  const r=await fetch(API_BASE+'/api/admin/orders',{headers:{Authorization:'Bearer '+token}});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'Error al cargar pedidos.');
+  const total=d.orders.length,readyCount=d.orders.filter(x=>x.audio_ready).length,pendingCount=d.orders.filter(x=>!x.audio_ready).length;$('ordersTotal').textContent=total;$('ordersPending').textContent=pendingCount;$('ordersReady').textContent=readyCount;['mobileOrdersTotal','mobileOrdersPending','mobileOrdersReady'].forEach((id,i)=>{const el=$(id);if(el)el.textContent=[total,pendingCount,readyCount][i]});if(!d.orders.length){box.textContent='Todavía no hay pedidos registrados.';return;}
+  let mySongs=[];if(d.orders.some(o=>o.payment&&o.payment.payment_status!=='approved')){const songsResult=await db.from('songs').select('id,title,recipient,package_key,package_price').eq('owner_id',user.id).order('updated_at',{ascending:false});if(songsResult.error)console.warn('No se pudo cargar la biblioteca para vincular canciones:',songsResult.error.message);mySongs=songsResult.data||[];}
+  box.innerHTML='';
+  d.orders.forEach(o=>{
+   const card=document.createElement('article');card.className='song order-card';card.id='order-'+o.id;card.dataset.orderId=o.id;card.dataset.filter=o.audio_ready?'ready':(o.payment?.payment_status==='approved'?'pending':'payment');card.dataset.source=String(o.story||'').startsWith('PEDIDO POR WHATSAPP')?'whatsapp':'web';card.dataset.search=[o.buyer,o.recipient,o.contact,o.occasion,o.package_name].join(' ').toLowerCase();const source=document.createElement('p');source.className='status';source.textContent=card.dataset.source==='whatsapp'?'💬 ORIGEN: Pedido recibido por WhatsApp':'🌐 ORIGEN: Pedido automático desde la página web';card.appendChild(source);
+   const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
+   const geminiButton=document.createElement('button');geminiButton.type='button';geminiButton.className='btn alt';geminiButton.textContent='✨ Crear canción con Gemini';geminiButton.addEventListener('click',()=>{const url=new URL('./gemini.html',window.location.href);url.searchParams.set('order',String(o.id));window.open(url.toString(),'_blank','noopener,noreferrer');});card.appendChild(geminiButton);
+   const p=document.createElement('p');p.textContent='Cliente: '+o.buyer+' · WhatsApp: '+o.contact+' · '+new Date(o.created_at).toLocaleString('es-PE');card.appendChild(p);
+   const progress=cchOrderProgress(o);
+   const progressBox=document.createElement('div');progressBox.className='status';progressBox.style.cssText='margin:12px 0;padding:13px;border:1px solid #ead8e1;border-radius:14px;background:#fff;';
+   const progressHeading=document.createElement('div');progressHeading.style.cssText='display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;font-weight:800;color:#681b43;';
+   const progressName=document.createElement('span');progressName.textContent='📊 AVANCE DEL PEDIDO · '+progress.label;
+   const progressValue=document.createElement('span');progressValue.textContent=progress.percent+'%';
+   progressHeading.append(progressName,progressValue);
+   const progressTrack=document.createElement('div');progressTrack.setAttribute('role','progressbar');progressTrack.setAttribute('aria-valuemin','0');progressTrack.setAttribute('aria-valuemax','100');progressTrack.setAttribute('aria-valuenow',String(progress.percent));progressTrack.setAttribute('aria-label','Avance del pedido: '+progress.label);progressTrack.style.cssText='height:13px;background:#f1e5eb;border-radius:99px;overflow:hidden;margin:10px 0 7px;';
+   const progressFill=document.createElement('div');progressFill.style.cssText='height:100%;width:'+progress.percent+'%;background:linear-gradient(90deg,#9e4771,#e4a4bf);border-radius:99px;transition:width .3s ease;';
+   progressTrack.appendChild(progressFill);
+   const progressDetail=document.createElement('div');progressDetail.style.cssText='font-size:.88rem;color:#604b56;';progressDetail.textContent=progress.detail;
+   const progressSteps=document.createElement('div');progressSteps.style.cssText='font-size:.78rem;line-height:1.6;color:#76636d;margin-top:7px;';progressSteps.textContent='Pedido recibido → Letra y muestra → Pago aprobado → Canción lista → Paquete entregado';
+   progressBox.append(progressHeading,progressTrack,progressDetail,progressSteps);card.appendChild(progressBox);
+   const activityBox=document.createElement('div');activityBox.className='status';activityBox.style.cssText='margin:12px 0;padding:13px;border:1px solid #ead8e1;border-radius:14px;background:#fffafd';
+   const activityTitle=document.createElement('strong');activityTitle.textContent='👀 ACTIVIDAD DEL CLIENTE';activityBox.appendChild(activityTitle);
+   const activityLine=document.createElement('p');activityLine.style.cssText='margin:8px 0 0;line-height:1.55';
+   const previewActivity=o.preview_activity||{};
+   const fmtActivity=value=>value?new Date(value).toLocaleString('es-PE'):'Aún no registrado';
+   activityLine.textContent='🎧 Abrió/reprodujo la muestra: '+(previewActivity.started_at?fmtActivity(previewActivity.started_at):'Todavía no')+' · '+(previewActivity.completed_at?'Terminó de escuchar: '+fmtActivity(previewActivity.completed_at):'No ha terminado la muestra');
+   activityBox.appendChild(activityLine);card.appendChild(activityBox);
+   const infoDetails=document.createElement('details');infoDetails.className='order-info-details';const infoSummary=document.createElement('summary');infoSummary.textContent='Ver historia y detalles del pedido';infoDetails.appendChild(infoSummary);const story=document.createElement('p');story.textContent='Historia: '+o.story;infoDetails.appendChild(story);
+   const detail=document.createElement('p');const orderTotal=Number(o.payment?.amount||0);const packageText=String(o.package_name||'').toLowerCase();const packagePrice=packageText.includes('completo')||packageText.includes('30')?30:packageText.includes('detalle')||packageText.includes('25')?25:packageText.includes('esencial')||packageText.includes('20')?20:Math.max(0,orderTotal);const urgencyText=String(o.urgency||'').toLowerCase();const isExpress=/express|expres|30 minutos|media hora/.test(urgencyText);const expressFee=isExpress?5:0;detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency+(orderTotal?' · Desglose: Paquete S/'+packagePrice.toFixed(2)+(expressFee?' + Express S/'+expressFee.toFixed(2):'')+' = Total S/'+orderTotal.toFixed(2):'');infoDetails.appendChild(detail);
+   const lyricsBox=document.createElement('details');lyricsBox.className='order-info-details order-lyrics-details';lyricsBox.style.marginTop='8px';
+   const lyricsSummary=document.createElement('summary');lyricsSummary.textContent='🎵 Letras · prompt musical + canción';lyricsBox.appendChild(lyricsSummary);
+   const musicPrompt=['Crea una canción original en español latino.','Género musical: '+(o.style||o.custom_genre||'según la historia'), 'Estilo adicional: '+(o.custom_genre||'No especificado'),'Tipo de voz: '+(o.voice||'A elección del productor'),'Ocasión: '+(o.occasion||'No especificada'),'Emoción y tono: '+(o.lyric_tone||'Según la historia'),'Duración aproximada: '+(o.lyric_duration||'3 minutos'),'Destinatario: '+(o.recipient||'No especificado'),'Frase especial: '+(o.special_phrase||'Ninguna'),'Usa instrumentos y arreglos propios del género; crea melodía memorable, estructura clara y producción equilibrada. No imites artistas ni voces existentes. Respeta la letra sin cambiar nombres ni hechos.'].join('\n');
+   const combinedText='PROMPT MUSICAL\n'+musicPrompt+'\n\nLETRA DE LA CANCIÓN\n'+String(o.lyrics||'').trim();
+   const lyricsText=document.createElement('p');lyricsText.style.whiteSpace='pre-wrap';lyricsText.style.overflowWrap='anywhere';lyricsText.style.margin='10px 0';lyricsText.textContent=String(o.lyrics||'').trim()?combinedText:'Este pedido todavía no tiene letra. El prompt musical se completará con los datos del pedido.';lyricsBox.appendChild(lyricsText);
+   if(String(o.lyrics||'').trim()){
+    const copyOriginal=document.createElement('button');copyOriginal.type='button';copyOriginal.className='btn alt';copyOriginal.textContent='📋 Copiar prompt + letra';
+    copyOriginal.onclick=async()=>{try{await navigator.clipboard.writeText(combinedText);copyOriginal.textContent='✓ Contenido completo copiado';setTimeout(()=>copyOriginal.textContent='📋 Copiar prompt + letra',2200);}catch{const area=document.createElement('textarea');area.value=combinedText;document.body.appendChild(area);area.select();try{document.execCommand('copy');copyOriginal.textContent='✓ Contenido completo copiado';}catch{alert('No se pudo copiar automáticamente. Selecciona el texto y cópialo manualmente.');}area.remove();}};
+    lyricsBox.appendChild(copyOriginal);
+   }
+   card.appendChild(lyricsBox);card.appendChild(infoDetails);
+   if(o.payment){
+    const pay=document.createElement('div');pay.className='status';
+    const paymentApproved= o.payment.payment_status==='approved' && !!o.payment.voucher_path;
+    const displayPaymentStatus=o.payment.payment_status==='approved'&&!o.payment.voucher_path?'pending':o.payment.payment_status;
+    const labels={pending:'Pendiente de comprobante',voucher_submitted:'Voucher recibido · pendiente de revisión',approved:'Voucher aprobado automáticamente · no verificado por banco',rejected:'Voucher rechazado'};
+    pay.textContent='💳 Pago: '+(labels[displayPaymentStatus]||displayPaymentStatus)+' · Importe: S/'+Number(o.payment.amount||0).toFixed(2)+' · Método: '+(o.payment.provider||'manual')+(o.payment.payment_status==='approved'?' · Aprobación automática técnica':'');
+    card.appendChild(pay);
+    if(o.payment.payment_status!=='approved'&&o.audio_ready&&o.preview_url){
+     const actions=document.createElement('div');actions.className='row';
+     const makePay=document.createElement('button');makePay.type='button';makePay.className='btn';makePay.textContent='🔗 Generar y enviar enlace de pago';
+     makePay.onclick=async()=>{makePay.disabled=true;makePay.textContent='⏳ Preparando enlace seguro…';try{
+      const rr=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id)+'/payment-link',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'}});
+      const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo generar el enlace.');
+      const u=new URL(o.preview_url);u.searchParams.set('pago','1');u.searchParams.set('pedido',dd.orderId);u.searchParams.set('acceso',dd.accessToken);
+      const payLink=u.toString();
+      try{await navigator.clipboard.writeText(payLink);makePay.textContent='✓ Enlace copiado';}catch{makePay.textContent='✓ Enlace generado';}
+      const phone=String(o.contact||'').replace(/\D/g,'');
+      if(phone){const wa='https://wa.me/'+(phone.startsWith('51')?phone:'51'+phone)+'?text='+encodeURIComponent('Hola, '+(o.buyer||'')+'. 💗 Aquí puedes continuar con el pago de tu pedido y adjuntar tu voucher sin volver a escuchar la muestra: '+payLink);window.open(wa,'_blank','noopener');}
+      else{window.prompt('Copia este enlace y envíaselo al cliente:',payLink);}
+     }catch(e){alert(e.message);makePay.textContent='🔗 Generar y enviar enlace de pago';}finally{makePay.disabled=false;}};
+     actions.appendChild(makePay);card.appendChild(actions);
+    }
+     if(o.payment.voucher_path){const voucherWrap=document.createElement('div');voucherWrap.className='status';voucherWrap.style.cssText='margin:12px 0;padding:12px;background:#fff;border:1px solid #ead8e1;border-radius:14px';const voucherTitle=document.createElement('strong');voucherTitle.textContent='🧾 Comprobante recibido';const voucherImage=document.createElement('img');voucherImage.alt='Comprobante de pago enviado por el cliente';voucherImage.loading='lazy';voucherImage.style.cssText='display:block;width:100%;max-width:520px;height:auto;max-height:75vh;object-fit:contain;margin:12px auto 0;border-radius:10px;background:#fff';if(o.payment.voucher_url){voucherImage.src=o.payment.voucher_url;}else{voucherImage.style.display='none';const retry=document.createElement('button');retry.type='button';retry.className='btn alt';retry.textContent='🔄 Cargar comprobante';retry.onclick=async()=>{retry.disabled=true;try{const vr=await fetch(API_BASE+'/api/admin/orders/'+o.id+'/voucher',{headers:{Authorization:'Bearer '+token},cache:'no-store'});const vd=await vr.json();if(!vr.ok||!vd.url)throw new Error(vd.error||'No se pudo abrir el comprobante.');voucherImage.src=vd.url;voucherImage.style.display='block';retry.remove();}catch(e){alert(e.message);retry.disabled=false;}};voucherWrap.appendChild(retry);}voucherWrap.prepend(voucherTitle);voucherWrap.appendChild(voucherImage);card.appendChild(voucherWrap);}else{const missing=document.createElement('p');missing.className='status';missing.textContent='📭 Todavía no hay voucher adjunto. Cuando el cliente lo envíe, aparecerá automáticamente aquí.';card.appendChild(missing);}
+     const automaticInfo=document.createElement('p');automaticInfo.className='muted';automaticInfo.textContent=o.payment.voucher_path?'El comprobante queda visible aquí y el sistema registra automáticamente el pago y habilita la descarga MP3.':'Al recibir el voucher, el sistema lo guardará, registrará el pago automáticamente y habilitará la descarga MP3 cuando la canción esté lista.';card.appendChild(automaticInfo);
+   }else{const noPay=document.createElement('p');noPay.className='muted';noPay.textContent='No hay registro de comprobante. Ejecuta la migración de pagos para habilitarlo.';card.appendChild(noPay);}
+   if(o.audio_ready&&o.preview_url){
+    const previewCard=document.createElement('div');previewCard.className='status';
+    const downloadAllowed=(o.payment?.payment_status==='approved'&&!!o.payment?.voucher_path)||!!o.gift_unlocked;
+    const previewTitle=document.createElement('strong');previewTitle.textContent=downloadAllowed?'🎵 Canción lista para el cliente · descarga MP3 habilitada':'🎧 Muestra lista para el cliente · descarga MP3 bloqueada';previewCard.appendChild(previewTitle);
+    const previewLink=document.createElement('a');previewLink.href=o.preview_url;previewLink.target='_blank';previewLink.rel='noopener';previewLink.className='btn';previewLink.textContent=downloadAllowed?'⬇️ Abrir página de descarga':'▶️ Abrir muestra del cliente';previewLink.style.cssText='display:block;text-align:center;margin:8px 0;text-decoration:none';
+    const previewActions=document.createElement('div');previewActions.className='row';
+    const copyPreview=document.createElement('button');copyPreview.type='button';copyPreview.className='btn alt';copyPreview.textContent='Copiar enlace';copyPreview.onclick=async()=>{try{await navigator.clipboard.writeText(o.preview_url);copyPreview.textContent='¡Copiado!';}catch{alert('No se pudo copiar automáticamente. Abre el enlace y copia la dirección.')}};
+    const sendPreview=document.createElement('a');sendPreview.className='btn alt';sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.href='https://wa.me/51'+String(o.contact||'').replace(/\\D/g,'')+'?text='+encodeURIComponent(downloadAllowed?'🎵 ¡Tu canción está lista y tu descarga MP3 está habilitada! Aquí tienes tu enlace: '+o.preview_url:'🎵 ¡Tu muestra está lista! Escúchala aquí. Para descargar el MP3, completa el pago y envía tu voucher: '+o.preview_url);sendPreview.textContent='Enviar por WhatsApp';
+    previewActions.append(copyPreview,sendPreview);
+    const giftButton=document.createElement('button');giftButton.type='button';giftButton.className='btn';giftButton.style.cssText='display:block;width:100%;margin-top:12px;background:linear-gradient(90deg,#f6d78c,#f2b7c9);color:#351426';
+    giftButton.textContent=o.gift_unlocked?'🎁 Regalo ya desbloqueado':'🎁 REGALAR Y DESBLOQUEAR MP3';
+    giftButton.disabled=!!o.gift_unlocked||o.payment?.payment_status==='approved';
+    if(o.payment?.payment_status==='approved'&&o.payment?.voucher_path)giftButton.textContent='✓ MP3 ya desbloqueado por pago';
+    giftButton.onclick=async()=>{if(!confirm('¿Deseas regalar esta canción y habilitar la descarga MP3 sin voucher ni pago?'))return;giftButton.disabled=true;giftButton.textContent='⏳ Desbloqueando regalo…';try{const response=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id)+'/gift-unlock',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo desbloquear el regalo.');o.gift_unlocked=true;giftButton.textContent='🎁 Regalo desbloqueado';giftButton.disabled=true;const note=document.createElement('p');note.className='status';note.textContent='🎁 Regalo autorizado. El MP3 está disponible para el cliente. El estado del pago y el voucher no fueron modificados.';previewCard.appendChild(note);}catch(error){giftButton.disabled=false;giftButton.textContent='🎁 REGALAR Y DESBLOQUEAR MP3';alert(error.message);}};
+    // La carta sorpresa usa el mismo enlace privado de muestra; aparece solo
+    // cuando el voucher está aprobado y el MP3 ya está listo.
+    if(o.payment?.payment_status==='approved'&&o.payment?.voucher_path&&o.preview_url){
+     const surpriseUrl=new URL(o.preview_url);
+     surpriseUrl.searchParams.delete('surprise');
+     surpriseUrl.searchParams.set('carta','1');
+     const surpriseLink=document.createElement('a');
+     surpriseLink.href=surpriseUrl.toString();
+     surpriseLink.target='_blank';
+     surpriseLink.rel='noopener';
+     surpriseLink.className='btn';
+     surpriseLink.textContent='💌 Abrir carta sorpresa del cliente';
+     surpriseLink.style.cssText='display:block;width:100%;margin:10px 0;text-align:center;text-decoration:none;background:linear-gradient(90deg,#8e2468,#c24c87);color:#fff';
+     previewCard.appendChild(surpriseLink);
+     const copySurprise=document.createElement('button');
+     copySurprise.type='button';
+     copySurprise.className='btn alt';
+     copySurprise.textContent='📋 Copiar enlace de la sorpresa';
+     copySurprise.style.cssText='display:block;width:100%;margin:8px 0';
+     copySurprise.onclick=async()=>{try{await navigator.clipboard.writeText(surpriseUrl.toString());copySurprise.textContent='✓ Enlace copiado';}catch{window.prompt('Copia el enlace de la carta sorpresa:',surpriseUrl.toString());}};
+     previewCard.appendChild(copySurprise);
+    }
+
+    previewCard.append(previewLink,previewActions,giftButton);card.appendChild(previewCard);
+   }
+   if(o.audio_ready){
+    const audioBtn=document.createElement("button");audioBtn.className="btn alt";audioBtn.type="button";audioBtn.textContent="🎧 Escuchar canción generada";
+    audioBtn.onclick=async()=>{audioBtn.disabled=true;audioBtn.textContent="Cargando audio…";try{const rr=await fetch(API_BASE+"/api/admin/orders/"+o.id+"/audio",{headers:{Authorization:"Bearer "+token}});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||"No se pudo abrir el audio.");let player=card.querySelector("audio.order-private-audio");if(!player){player=document.createElement("audio");player.className="order-private-audio";player.controls=true;player.style.width="100%";card.appendChild(player);}player.src=dd.url;player.load();await player.play().catch(()=>{});audioBtn.textContent="🎧 Canción lista";}catch(e){audioBtn.textContent="No se pudo abrir";alert(e.message);}finally{audioBtn.disabled=false;}};
+    card.appendChild(audioBtn);
+   }else{
+    const uploadBox=document.createElement("div");uploadBox.className="status";
+    const uploadTitle=document.createElement("strong");uploadTitle.textContent="🎵 Subir tu canción en MP3";uploadBox.appendChild(uploadTitle);
+    const uploadHelp=document.createElement("p");uploadHelp.className="muted";uploadHelp.textContent="Selecciona el MP3 que tú creaste desde tu celular. El nombre del archivo aparecerá debajo antes de subirlo.";uploadBox.appendChild(uploadHelp);
+    const fileLabel=document.createElement("label");fileLabel.textContent="🎵 SELECCIONAR TU MP3";fileLabel.style.cssText="display:block;font-weight:800;margin:14px 0 8px";uploadBox.appendChild(fileLabel);
+    const audioInput=document.createElement("input");audioInput.type="file";audioInput.accept=".mp3,audio/mpeg,audio/*";audioInput.setAttribute("aria-label","Seleccionar tu MP3");audioInput.style.cssText="display:block!important;visibility:visible!important;opacity:1!important;width:100%;min-height:54px;padding:12px;background:#fff;border:2px solid #681b43;border-radius:12px;font-size:16px";audioInput.addEventListener("click",()=>{window.cchSelectingOrderAudio=true;});audioInput.addEventListener("change",()=>{window.cchSelectingOrderAudio=false;});audioInput.addEventListener("cancel",()=>{window.cchSelectingOrderAudio=false;});uploadBox.appendChild(audioInput);
+    const selectedFileName=document.createElement("p");selectedFileName.className="status";selectedFileName.textContent="⚠️ Ningún archivo seleccionado";selectedFileName.style.cssText="font-weight:700;overflow-wrap:anywhere";uploadBox.appendChild(selectedFileName);
+    const showSelectedAudioFile=()=>{const selected=audioInput.files&&audioInput.files.length?audioInput.files[0]:null;if(selected){selectedFileName.textContent="✓ Archivo seleccionado: "+selected.name+" ("+(selected.size/1048576).toFixed(2)+" MB)";uploadStatus.textContent="Archivo recibido correctamente. Ya puedes subirlo.";uploadButton.disabled=false;}else{selectedFileName.textContent="⚠️ Ningún archivo seleccionado";uploadStatus.textContent="No se recibió ningún archivo. Vuelve a elegirlo desde Descargas.";}};audioInput.addEventListener("change",showSelectedAudioFile);audioInput.addEventListener("input",showSelectedAudioFile);audioInput.addEventListener("blur",()=>setTimeout(showSelectedAudioFile,250));window.addEventListener("focus",()=>setTimeout(showSelectedAudioFile,350));document.addEventListener("visibilitychange",()=>{if(!document.hidden)setTimeout(showSelectedAudioFile,350);});
+    const uploadProgress=document.createElement("progress");uploadProgress.max=100;uploadProgress.value=0;uploadProgress.style.cssText="display:block;width:100%;height:16px;margin:10px 0";uploadProgress.className="hidden";uploadBox.appendChild(uploadProgress);
+    const uploadStatus=document.createElement("p");uploadStatus.className="muted";uploadStatus.setAttribute("aria-live","polite");uploadStatus.textContent="Esperando el MP3.";uploadBox.appendChild(uploadStatus);
+    const uploadButton=document.createElement("button");uploadButton.type="button";uploadButton.className="btn";uploadButton.textContent="⬆️ Subir MP3 y preparar muestra";uploadButton.onclick=async()=>{
+     const audioFile=audioInput.files?.[0];if(!audioFile){alert("Selecciona primero el MP3 que tú creaste.");return;}
+     if(audioFile.type!=="audio/mpeg"&&!/\.mp3$/i.test(audioFile.name)){alert("Selecciona un archivo MP3.");return;}
+     if(audioFile.size<1000||audioFile.size>25*1024*1024){alert("El MP3 debe pesar más de 1 KB y máximo 25 MB.");return;}
+     uploadButton.disabled=true;audioInput.disabled=true;uploadProgress.classList.remove("hidden");uploadProgress.value=0;uploadStatus.textContent="Preparando el MP3…";
+     try{
+      const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||""));reader.onerror=()=>reject(new Error("No se pudo leer el MP3."));reader.readAsDataURL(audioFile);});
+      const audioBase64=dataUrl.split(",")[1];if(!audioBase64)throw new Error("El archivo no se pudo preparar.");
+      // No cambiar el estado del pedido durante la subida; la BD restringe los estados permitidos.
+      uploadStatus.textContent="Subiendo el audio a Supabase…";
+      await new Promise((resolve,reject)=>{
+       const xhr=new XMLHttpRequest();xhr.open("POST",API_BASE+"/api/admin/orders/"+encodeURIComponent(o.id)+"/audio");
+       xhr.setRequestHeader("Content-Type","application/json");xhr.setRequestHeader("Authorization","Bearer "+token);
+       xhr.upload.onprogress=e=>{if(e.lengthComputable){uploadProgress.value=Math.min(90,Math.round(e.loaded/e.total*90));uploadStatus.textContent="Subiendo MP3… "+Math.round(e.loaded/e.total*100)+"%";}};
+       xhr.onerror=()=>reject(new Error("Se interrumpió la subida. Inténtalo nuevamente."));
+       xhr.onload=()=>{let result={};try{result=JSON.parse(xhr.responseText||"{}")}catch{}if(xhr.status<200||xhr.status>=300)reject(new Error(result.error||"No se pudo guardar el MP3."));else resolve(result);};
+       xhr.send(JSON.stringify({audioBase64}));
+      });
+      uploadProgress.value=94;uploadStatus.textContent="Audio guardado. Preparando enlace privado de muestra…";
+      let ready=null;
+      for(let attempt=0;attempt<8;attempt++){
+       const statusResponse=await fetch(API_BASE+"/api/orders/"+encodeURIComponent(o.id)+"/audio-status",{cache:"no-store"});
+       const statusData=await statusResponse.json();if(!statusResponse.ok)throw new Error(statusData.error||"No se pudo preparar la muestra.");
+       if(statusData.status==="ready"&&statusData.previewUrl){ready=statusData;break;}
+       await new Promise(r=>setTimeout(r,1000));
+      }
+      if(!ready)throw new Error("El audio quedó guardado, pero el enlace de muestra aún no está listo. Pulsa Actualizar pedidos en unos segundos.");
+      uploadProgress.value=100;uploadStatus.textContent="✓ 100% · MP3 guardado en Supabase y muestra privada preparada.";
+      await loadCustomerOrders();
+     }catch(error){uploadStatus.textContent="No se completó: "+error.message;uploadButton.disabled=false;audioInput.disabled=false;}
+    };
+    uploadBox.appendChild(uploadButton);card.appendChild(uploadBox);
+   }
+   if(o.lyrics){const l=document.createElement('details');const sm=document.createElement('summary');sm.textContent='Ver letra aportada';const pre=document.createElement('p');pre.textContent=o.lyrics;l.append(sm,pre);const copyLyrics=document.createElement('button');copyLyrics.type='button';copyLyrics.className='btn alt';copyLyrics.textContent='📋 Copiar solo la letra';copyLyrics.onclick=async()=>{try{if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(o.lyrics);else{const ta=document.createElement('textarea');ta.value=o.lyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('No se pudo copiar');}copyLyrics.textContent='✓ Solo la letra copiada';setTimeout(()=>copyLyrics.textContent='📋 Copiar solo la letra',1600);}catch(e){alert('No se pudo copiar. Mantén pulsada la letra para copiarla.');}};l.append(sm,pre);card.appendChild(l);const quickActions=document.createElement('div');quickActions.className='order-quick-actions';quickActions.append(copyLyrics);card.appendChild(quickActions);}
+   cchAddOrderChat(card,o,token);
+   const prepare=document.createElement('button');prepare.className='btn';prepare.type='button';prepare.textContent='📋 Copiar letra para pegar';prepare.title='Copia únicamente la letra original del cliente al portapapeles';prepare.onclick=async()=>{
+    activeCustomerOrder=o;
+    const customerLyrics=String(o.lyrics||'').trim();
+    if(!customerLyrics){alert('Este pedido todavía no contiene la letra de la canción. No se copiará la historia ni se inventará una letra.');return;}
+    try{
+     if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(customerLyrics);
+     else{
+      const ta=document.createElement('textarea');ta.value=customerLyrics;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();const ok=document.execCommand('copy');ta.remove();if(!ok)throw new Error('El navegador no permitió copiar automáticamente.');
+     }
+     prepare.textContent='✓ Letra copiada · ya puedes pegarla';
+     prepare.style.background='#24734b';
+     setTimeout(()=>{prepare.textContent='📋 Copiar letra para pegar';prepare.style.background='';},3500);
+    }catch(e){alert('No se pudo copiar automáticamente. Mantén pulsada la letra visible en el pedido y selecciona Copiar. Detalle: '+e.message);}
+   };
+    $('aiBuyer').value=o.buyer||'';$('aiRecipient').value=o.recipient||'';selectByText('aiOccasion',o.occasion||'');selectByText('aiStyle',o.style||'');selectByText('aiVoice',o.voice||'');$('aiStory').value=String(o.story||'').replace(/^PEDIDO POR WHATSAPP\n/,'');$('aiPhrase').value=o.special_phrase||'';$('aiCustomGenre').value=o.custom_genre||'';selectByText('aiTone',o.lyric_tone||'Según la historia');selectByText('aiDuration',String(o.lyric_duration||'3 minutos'));$('adminLyricsText').value='';msg('adminLyricsStatus','Pedido cargado. La letra original se copiará a Gemini; no se modificará.');$('lyricsStudio').scrollIntoView({behavior:'smooth',block:'start'});   const sel=document.createElement('select');[['nuevo','Nuevo'],['contactado','Contactado'],['pago_verificado','Pago verificado'],['en_proceso','En proceso'],['audio_subiendo','Subiendo audio'],['audio_subido','Audio guardado'],['muestra_lista','Muestra lista'],['entregado','Entregado'],['cancelado','Cancelado']].forEach(([v,t])=>{const op=document.createElement('option');op.value=v;op.textContent=t;sel.appendChild(op)});sel.value=o.status;
+   const save=document.createElement('button');save.className='btn';save.textContent='Guardar estado';save.onclick=async()=>{save.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/orders/'+o.id,{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({status:sel.value})});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo guardar');save.textContent='Guardado';}catch(e){alert(e.message);save.disabled=false}};
+   const wa=document.createElement('a');wa.className='btn alt';wa.href='https://wa.me/51'+o.contact.replace(/\\D/g,'')+'?text='+encodeURIComponent('Hola '+o.buyer+', te escribimos de Canta con el corazón por tu pedido para '+o.recipient+'.');wa.target='_blank';wa.rel='noopener';wa.textContent='WhatsApp';if(o.audio_ready&&o.preview_url){const sendPreview=document.createElement('a');sendPreview.className='btn';sendPreview.href='https://wa.me/51'+o.contact.replace(/\\D/g,'')+'?text='+encodeURIComponent('¡Hola '+o.buyer+'! 💗 Tu muestra de canción personalizada ya está lista. Escúchala aquí: '+o.preview_url);sendPreview.target='_blank';sendPreview.rel='noopener';sendPreview.textContent='🎁 Enviar muestra por WhatsApp';card.appendChild(sendPreview);}
+   const removeOrder=document.createElement('button');removeOrder.type='button';removeOrder.className='btn danger';removeOrder.textContent='🗑️ Eliminar pedido';removeOrder.onclick=async()=>{if(!confirm('¿Eliminar definitivamente este pedido y sus comprobantes/mensajes? Esta acción no se puede deshacer. Las canciones ya creadas en la Biblioteca no se eliminarán.'))return;removeOrder.disabled=true;removeOrder.textContent='Eliminando…';try{const rr=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(o.id),{method:'DELETE',headers:{Authorization:'Bearer '+token}});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo eliminar.');card.remove();const remaining=box.querySelectorAll('.order-card').length;$('ordersTotal').textContent=remaining;const pending=box.querySelectorAll('.order-card:not([data-filter="ready"])').length;$('ordersPending').textContent=pending;$('ordersReady').textContent=remaining-pending;if(!remaining)box.textContent='Todavía no hay pedidos registrados.';}catch(e){alert(e.message);removeOrder.disabled=false;removeOrder.textContent='🗑️ Eliminar pedido';}};
+   card.append(prepare,sel,save,wa,removeOrder);box.appendChild(card);
+  });
+  const applyOrderFilters=()=>{const term=($('orderSearch')?.value||'').trim().toLowerCase(),filter=$('orderFilter')?.value||'all',source=$('orderSourceFilter')?.value||'all';let visible=0;box.querySelectorAll('.order-card').forEach(card=>{const matchesFilter=filter==='all'||card.dataset.filter===filter;const matchesText=!term||card.dataset.search.includes(term);const matchesSource=source==='all'||card.dataset.source===source;card.classList.toggle('hidden',!(matchesFilter&&matchesText&&matchesSource));if(matchesFilter&&matchesText&&matchesSource)visible++;});let empty=box.querySelector('.orders-empty');if(!visible){if(!empty){empty=document.createElement('p');empty.className='orders-empty muted';empty.textContent='No hay pedidos que coincidan con esa búsqueda o filtro.';box.appendChild(empty);}}else if(empty)empty.remove();let counter=$('ordersVisibleCount');if(counter)counter.textContent=visible+' pedido(s) visibles';};
+  $('orderSearch').oninput=applyOrderFilters;$('orderFilter').onchange=applyOrderFilters;$('orderSourceFilter').onchange=applyOrderFilters;applyOrderFilters();
+ }catch(e){box.textContent=e.message;}
+}
+let cchMessengerSelectedOrder=null,cchMessengerPoll=null;
+async function cchLoadAdminInbox(){
+ const list=$('messengerConversationList');if(!list)return;
+ try{
+  const token=await window.cchAdminGetToken();if(!token)return;
+  const r=await fetch(API_BASE+'/api/admin/messages/inbox',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo cargar la mensajería.');
+  const items=d.conversations||[],unread=items.filter(o=>o.status==='nuevo'||Number(o.unread_count)>0).length;
+  const badge=$('messengerUnreadBadge');if(badge){badge.textContent=unread>99?'99+':String(unread);badge.classList.toggle('hidden',unread===0);}
+  list.replaceChildren();
+  if(!items.length){list.textContent='Todavía no hay pedidos ni conversaciones.';return;}
+  items.forEach(o=>{
+   const b=document.createElement('button');b.type='button';b.className='messenger-item'+(cchMessengerSelectedOrder===o.id?' active':'');
+   const title=document.createElement('strong');title.textContent=(o.buyer||'Cliente')+' · '+(o.recipient||'Pedido');
+   const detail=document.createElement('small');detail.textContent=(o.status==='nuevo'?'🆕 Pedido nuevo · ':'')+(o.unread_count?o.unread_count+' mensaje(s) sin leer · ':'')+(o.last_message?.message||'Aún no hay mensajes');
+   const when=document.createElement('small');when.textContent=new Date(o.last_message?.created_at||o.created_at).toLocaleString('es-PE');
+   b.append(title,detail,when);b.onclick=()=>cchOpenMessengerConversation(o.id,o);const openOrder=document.createElement('span');openOrder.textContent='📥 Abrir en Pedidos automáticos';openOrder.style.cssText='display:inline-block;margin-top:8px;padding:6px 9px;border-radius:99px;background:#681b43;color:white;font-size:.78rem;font-weight:750';openOrder.setAttribute('role','button');openOrder.tabIndex=0;openOrder.onclick=e=>{e.stopPropagation();window.cchOpenOrder(o.id);};openOrder.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();window.cchOpenOrder(o.id);}};b.appendChild(openOrder);list.appendChild(b);
+  });
+ }catch(e){list.textContent=e.message;}
+}
+async function cchOpenMessengerConversation(orderId,summary){
+ const token=await window.cchAdminGetToken();if(!token)return;
+ cchMessengerSelectedOrder=orderId;
+ const title=$('messengerThreadTitle'),thread=$('messengerThread'),composer=$('messengerComposer');
+ title.textContent=(summary?.buyer||'Cliente')+' · Pedido '+String(orderId).slice(0,8);
+ composer.classList.remove('hidden');thread.textContent='Cargando conversación…';
+ async function refreshThread(){
+  const rr=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(orderId)+'/messages',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo cargar la conversación.');
+  thread.replaceChildren();
+  (dd.messages||[]).forEach(m=>{const bubble=document.createElement('div');bubble.className='messenger-bubble '+(m.sender_role==='admin'?'admin':'customer');const who=document.createElement('strong');who.textContent=m.sender_role==='admin'?'Tú · Administradora':'Cliente';const body=document.createElement('div');body.textContent=m.message;const time=document.createElement('small');time.textContent=new Date(m.created_at).toLocaleString('es-PE');bubble.append(who,body,time);thread.appendChild(bubble);});
+  if(!(dd.messages||[]).length)thread.textContent='Pedido recibido. Puedes enviar el primer mensaje al cliente desde aquí.';
+  thread.scrollTop=thread.scrollHeight;
+  await cchLoadAdminInbox();
+ }
+ try{await refreshThread();}catch(e){thread.textContent=e.message;return;}
+ const send=$('sendMessengerReply');send.onclick=async()=>{const input=$('messengerReply'),message=input.value.trim();if(!message)return;send.disabled=true;$('messengerStatus').textContent='Enviando…';try{const rr=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(orderId)+'/messages',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message})});const dd=await rr.json();if(!rr.ok)throw new Error(dd.error||'No se pudo enviar.');input.value='';$('messengerStatus').textContent='Respuesta enviada al cliente.';await refreshThread();}catch(e){$('messengerStatus').textContent=e.message;}finally{send.disabled=false;}};
+ if(cchMessengerPoll)clearInterval(cchMessengerPoll);cchMessengerPoll=setInterval(()=>{if(document.visibilityState==='visible'&&cchMessengerSelectedOrder===orderId)refreshThread().catch(()=>{});},8000);
+}
+window.cchOpenMessengerOrder=async orderId=>{window.cchShowAdminPanel?.('messenger');await cchLoadAdminInbox();const item=Array.from(document.querySelectorAll('.messenger-item')).find(x=>x.textContent.includes(String(orderId).slice(0,8)));const token=await window.cchAdminGetToken();if(!token)return;const r=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(orderId)+'/messages',{headers:{Authorization:'Bearer '+token},cache:'no-store'});const d=await r.json();const orders=await fetch(API_BASE+'/api/admin/messages/inbox',{headers:{Authorization:'Bearer '+token}}).then(x=>x.json());const summary=(orders.conversations||[]).find(x=>x.id===orderId);await cchOpenMessengerConversation(orderId,summary);};
+window.cchOpenOrder=async orderId=>{window.cchShowAdminPanel?.('customerOrders');const search=$('orderSearch');if(search)search.value='';const filter=$('orderFilter');if(filter)filter.value='all';const source=$('orderSourceFilter');if(source)source.value='all';await loadCustomerOrders();const card=document.getElementById('order-'+orderId);if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.style.outline='3px solid #d78eaa';setTimeout(()=>card.style.outline='',3500);}else alert('No se encontró ese pedido en la lista. Actualiza los pedidos e inténtalo nuevamente.');};
+$('refreshMessenger').onclick=cchLoadAdminInbox;
+$('refreshOrders').onclick=async()=>{const b=$('refreshOrders');if(b.disabled)return;b.disabled=true;const label=b.textContent;b.textContent='Actualizando…';try{await loadCustomerOrders();}finally{b.disabled=false;b.textContent=label;}};
+
+async function cchManualLogout(){if(db)await db.auth.signOut();user=null;$('headerLogout')?.classList.add('hidden');$('openAdminLogin')?.classList.remove('hidden');if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);window.cchNotificationTimer=null;if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=null;window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:false}}));['editor','library','mediaLibrary','lyricsStudio','customerOrders','messenger','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.add('hidden'));msg('authStatus','Sesión cerrada manualmente.')};$('logout').onclick=cchManualLogout;$('headerLogout').onclick=cchManualLogout;
+$('giftPackage').onchange=()=>{const prices={esencial:25};$('giftPrice').value=prices[$('giftPackage').value]||20};$('file').onchange=()=>{file=$('file').files[0]||null;if(!file){msg('fileInfo','Selecciona un MP3 de tu celular.');return}if(file.size>25*1024*1024||!(file.type==='audio/mpeg'||file.name.toLowerCase().endsWith('.mp3'))){file=null;$('file').value='';msg('fileInfo','El archivo debe ser MP3 y pesar máximo 25 MB.');return}msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB');$('preview').src=URL.createObjectURL(file);$('previewWrap').classList.remove('hidden')};
+$('clear').onclick=()=>{$('form').reset();$('sid').value='';file=null;$('previewWrap').classList.add('hidden');msg('fileInfo','Selecciona un MP3 de tu celular.');msg('saveStatus','Formulario limpio.');$('giftPreviewWrap').classList.add('hidden');$('giftPreview').src='';$('openGiftPreview').href='#'};
+$('form').onsubmit=async e=>{e.preventDefault();if(!db||!user){msg('saveStatus','Inicia sesión primero.');return}let id=$('sid').value||crypto.randomUUID();$('save').disabled=true;msg('saveStatus','Subiendo y guardando… no cierres esta página.');try{let audioBase64=null;if(file){const dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=()=>reject(new Error('No se pudo leer el MP3 del celular.'));reader.readAsDataURL(file)});audioBase64=dataUrl.split(',')[1]}const {data:{session}}=await db.auth.getSession();if(!session)throw new Error('Tu sesión expiró. Inicia sesión nuevamente.');const response=await fetch(API_BASE+'/api/songs',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},body:JSON.stringify({id,title:$('title').value.trim(),recipient:$('recipient').value.trim(),dedication:$('dedication').value.trim(),lyrics:$('lyrics').value.trim(),theme:$('theme').value,packageKey:$('giftPackage').value,packagePrice:Number($('giftPrice').value)||20,orderId:activeCustomerOrder?.id||null,audioBase64})});const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo guardar.');const row=result.song;const packageNames={esencial:'ESENCIAL',detalle:'DETALLE ESPECIAL',completo:'REGALO COMPLETO'};const packageMap=packageStore();packageMap[id]={key:$('giftPackage').value,name:packageNames[$('giftPackage').value],price:Number($('giftPrice').value)||20};localStorage.setItem('cc_song_packages',JSON.stringify(packageMap));row.package_key=result.song?.package_key||$('giftPackage').value;row.package_price=Number(result.song?.package_price||$('giftPrice').value)||20;let link=makeLink(row);msg('saveStatus',result.benefitsActivated?'¡Canción guardada y beneficios activados automáticamente según el pago del pedido! Enlace: '+link:'¡Guardada! Enlace para compartir: '+link);if(result.benefitsActivated)activeCustomerOrder=null;$('sid').value=id;$('giftPreview').src=link;$('openGiftPreview').href=link;$('giftPreviewWrap').classList.remove('hidden');file=null;$('file').value='';msg('fileInfo','MP3 guardado en la nube.');await load()}catch(err){msg('saveStatus','No se pudo guardar: '+err.message)}finally{$('save').disabled=false}};
+$('copyOrderLink').onclick=async()=>{const link=$('orderLink').value;try{await navigator.clipboard.writeText(link);msg('copyOrderLink','¡Enlace copiado!')}catch{prompt('Copia este enlace para tu cliente:',link)}};$('sendOrderLink').onclick=()=>{const link=$('orderLink').value;const text='¡Hola! 💗 Gracias por contactar a Canta con el corazón. Para pedir tu canción personalizada, llena tus datos en este enlace y sigue las instrucciones de pago con Yape: '+link;window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};$('refresh').onclick=load;init();
+
+let cchAlertSoundEnabled=localStorage.getItem('cch_alert_sound')==='on',cchKnownNotifications=new Set(),cchAudioUnlocked=false,cchNotificationsInitialized=false,cchAudioContext=null,cchOrderRepeatTimers=new Map();
+function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
+async function cchSpeakAlert(message){
+ if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
+ try{
+  const Ctx=window.AudioContext||window.webkitAudioContext;
+  if(Ctx){
+   if(!cchAudioContext)cchAudioContext=new Ctx();
+   if(cchAudioContext.state==='suspended')await cchAudioContext.resume();
+   const playTone=(frequency,at,duration)=>{const o=cchAudioContext.createOscillator(),g=cchAudioContext.createGain();o.type='sine';o.frequency.value=frequency;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.12,at+.025);g.gain.exponentialRampToValueAtTime(.001,at+duration);o.connect(g);g.connect(cchAudioContext.destination);o.start(at);o.stop(at+duration+.02)};
+   const now=cchAudioContext.currentTime;playTone(880,now,.22);playTone(1175,now+.28,.28);
+  }
+  if('speechSynthesis'in window){
+   window.speechSynthesis.cancel();
+   const u=new SpeechSynthesisUtterance(message);u.lang='es-PE';u.rate=.92;u.pitch=1.05;u.volume=1;
+   const voices=window.speechSynthesis.getVoices();u.voice=voices.find(v=>/^es-PE$/i.test(v.lang))||voices.find(v=>/^es/i.test(v.lang))||null;
+   u.onerror=()=>{$('alertSoundStatus').textContent='Tono activado. La voz no está disponible en este navegador.'};
+   window.speechSynthesis.speak(u);
+  }
+ }catch(e){console.warn('Alert sound:',e);$('alertSoundStatus').textContent='No se pudo reproducir el aviso. Revisa el volumen multimedia del celular.'}
+}
+function cchSyncOrderRepeatAlerts(notifications){
+ const repeatable=notifications.filter(n=>!n.is_read);
+ const active=new Set(repeatable.map(n=>n.id));
+ for(const [id,timer] of cchOrderRepeatTimers){if(!active.has(id)){clearInterval(timer);cchOrderRepeatTimers.delete(id);}}
+ if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
+ repeatable.forEach((n,index)=>{
+  if(cchOrderRepeatTimers.has(n.id))return;
+  const timer=setInterval(()=>{
+   if(!cchAlertSoundEnabled||!cchAudioUnlocked){clearInterval(timer);cchOrderRepeatTimers.delete(n.id);return;}
+   cchSpeakAlert('Recordatorio de pedido pendiente. '+cchAlertText(n)+' Para detener este aviso, marca la notificación como atendida en el centro de notificaciones.');
+  },30000+(index*2500));
+  cchOrderRepeatTimers.set(n.id,timer);
+ });
+}
+async function cchLoadNotifications(){
+ try{
+  const token=await window.cchAdminGetToken();if(!token)return;
+  const r=await fetch(API_BASE+'/api/admin/notifications',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudieron consultar alertas.');
+  const notifications=d.notifications||[],box=$('systemNotifications');box.replaceChildren();
+  if(!cchNotificationsInitialized){
+   notifications.forEach(n=>cchKnownNotifications.add(n.id));
+   cchNotificationsInitialized=true;
+  }else{
+   const fresh=notifications.filter(n=>!cchKnownNotifications.has(n.id));
+   notifications.forEach(n=>cchKnownNotifications.add(n.id));
+   if(fresh.length&&cchAlertSoundEnabled&&cchAudioUnlocked){
+    const spoken=fresh.slice().reverse().map(cchAlertText).join(' Siguiente aviso. ');
+    await cchSpeakAlert(spoken);
+   }
+   if(fresh.length&&$('alertSoundStatus'))$('alertSoundStatus').textContent=fresh.length+' nueva(s) notificación(es) detectada(s).';
+  }
+  cchSyncOrderRepeatAlerts(notifications);
+  notifications.forEach(n=>{
+   const p=document.createElement('div');p.style.cssText='padding:12px 8px;border-bottom:1px solid #ead8e1;cursor:pointer;border-radius:10px';p.setAttribute('role','button');p.tabIndex=0;p.setAttribute('aria-label','Abrir pedidos: '+(n.title||'nueva notificación'));
+   const openRelatedOrder=()=>{if(n.order_id&&n.event_type==='new_message'&&typeof window.cchOpenMessengerOrder==='function'){window.cchOpenMessengerOrder(n.order_id);return;}if(n.order_id&&typeof window.cchOpenOrder==='function'){window.cchOpenOrder(n.order_id);return;}if(typeof window.cchShowAdminPanel==='function')window.cchShowAdminPanel('customerOrders');else document.getElementById('customerOrders')?.scrollIntoView({behavior:'smooth',block:'start'});};
+   p.addEventListener('click',openRelatedOrder);p.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openRelatedOrder();}});
+   const strong=document.createElement('b');strong.textContent=n.title+' ';
+   const span=document.createElement('span');span.textContent=n.body+' · '+new Date(n.created_at).toLocaleString('es-PE');p.append(strong,span);
+   if(!n.is_read){const b=document.createElement('button');b.className='btn alt';b.textContent='Marcar atendida';b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{const rr=await fetch(API_BASE+'/api/admin/notifications/'+n.id+'/read',{method:'PATCH',headers:{Authorization:'Bearer '+token}});if(!rr.ok)throw new Error('No se pudo marcar como atendida.');const timer=cchOrderRepeatTimers.get(n.id);if(timer)clearInterval(timer);cchOrderRepeatTimers.delete(n.id);await cchLoadNotifications();}catch(e){b.disabled=false;alert(e.message)}};p.appendChild(b);}
+   box.appendChild(p);
+  });
+  if(!notifications.length)box.textContent='No hay notificaciones todavía.';
+ }catch(e){$('systemNotifications').textContent=e.message;}
+}
+async function cchLoadIntegrationStatus(){try{const token=await window.cchAdminGetToken();const r=await fetch(API_BASE+'/api/admin/integrations/status',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No disponible');$('culqiStatus').textContent='Culqi: '+(d.culqi.configured?'credenciales detectadas':'pendiente de configuración')+'. Los cobros automáticos siguen desactivados.';$('whatsappApiStatus').textContent='WhatsApp Cloud API: '+(d.whatsapp.configured?'credenciales detectadas':'pendiente de configuración')+'. WhatsApp manual y mensajería interna siguen disponibles.';}catch(e){$('culqiStatus').textContent='Estado de integraciones: '+e.message;}}
+$('enableAlertSound').onclick=async()=>{
+ cchAudioUnlocked=true;cchAlertSoundEnabled=true;localStorage.setItem('cch_alert_sound','on');
+ try{const Ctx=window.AudioContext||window.webkitAudioContext;if(Ctx){if(!cchAudioContext)cchAudioContext=new Ctx();if(cchAudioContext.state==='suspended')await cchAudioContext.resume();}}
+ catch(e){console.warn(e)}
+ $('alertSoundStatus').textContent='Sonido y voz activados. Escucha la prueba.';
+ await cchSpeakAlert('Aviso de prueba. Las alertas de nuevos pedidos están activadas.');
+};
+$('testAlertSound').onclick=async()=>{
+ cchAudioUnlocked=true;cchAlertSoundEnabled=true;localStorage.setItem('cch_alert_sound','on');
+ $('alertSoundStatus').textContent='Reproduciendo prueba de sonido y voz…';
+ await cchSpeakAlert('Atención. Tienes un nuevo pedido en Canta con el corazón.');
+};
+$('toggleAlertSound').onclick=()=>{cchAlertSoundEnabled=!cchAlertSoundEnabled;localStorage.setItem('cch_alert_sound',cchAlertSoundEnabled?'on':'off');if(!cchAlertSoundEnabled){for(const timer of cchOrderRepeatTimers.values())clearInterval(timer);cchOrderRepeatTimers.clear();}else{cchLoadNotifications();}$('alertSoundStatus').textContent=cchAlertSoundEnabled?'Sonido activado. Pulsa “Probar voz y sonido” para habilitarlo en este celular.':'Sonido silenciado.';};
+async function cchRefreshPushStatus(){
+ const status=$('pushAlertStatus');if(!status)return;
+ try{
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)){status.textContent='Este navegador no admite avisos Push. Usa Chrome actualizado.';return;}
+  const registration=await navigator.serviceWorker.getRegistration('/');
+  const subscription=registration?await registration.pushManager.getSubscription():null;
+  if(subscription&&Notification.permission==='granted'){
+   status.textContent='✅ Este celular tiene avisos en segundo plano registrados. Puedes probarlos con “Enviar notificación de prueba”.';
+   $('enablePushAlerts').textContent='✅ Avisos en segundo plano registrados';
+  }else{
+   status.textContent='Para recibir avisos cuando salgas del panel, activa una vez “Avisos con pantalla apagada”.';
+   $('enablePushAlerts').textContent='📲 Activar avisos con pantalla apagada';
+  }
+ }catch(error){status.textContent='No se pudo comprobar el registro de avisos: '+error.message;}
+}
+async function cchEnablePushAlerts(){
+ const status=$('pushAlertStatus'),button=$('enablePushAlerts');
+ try{
+  if(!('serviceWorker'in navigator)||!('PushManager'in window))throw new Error('Este navegador no admite notificaciones Push. Usa Chrome actualizado.');
+  if(!('Notification'in window))throw new Error('Este navegador no admite notificaciones.');
+  const permission=await Notification.requestPermission();if(permission!=="granted")throw new Error('Permiso de notificaciones denegado. Actívalo en los ajustes del navegador.');
+  const token=await window.cchAdminGetToken();if(!token)throw new Error('Primero inicia sesión como administradora.');
+  const keyResponse=await fetch(API_BASE+'/api/admin/push/public-key',{headers:{Authorization:'Bearer '+token},cache:'no-store'});const keyData=await keyResponse.json();if(!keyResponse.ok)throw new Error(keyData.error||'No se pudo conectar con el servicio Push.');
+  const registration=await navigator.serviceWorker.register('/service-worker.js',{scope:'/'});
+  await navigator.serviceWorker.ready;
+  const applicationServerKey=Uint8Array.from(atob(keyData.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+  let subscription=await registration.pushManager.getSubscription();
+  if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey});
+  const save=await fetch(API_BASE+'/api/admin/push/subscribe',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({subscription:subscription.toJSON()})});
+  const result=await save.json();if(!save.ok)throw new Error(result.error||'No se pudo guardar el dispositivo.');
+  status.textContent='✅ Este celular ya está registrado para recibir avisos aunque la pantalla esté apagada, sujeto a los ajustes de batería y notificaciones de Android.';
+  button.textContent='✅ Avisos en segundo plano activados';
+ }catch(e){status.textContent='No se pudo activar: '+e.message;console.warn('Push setup:',e);}
+}
+$('enablePushAlerts').onclick=cchEnablePushAlerts;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){/* No reconstruir las tarjetas al volver de Archivos de Android: podría borrar el File seleccionado. Los pedidos se actualizan con el botón manual. */cchLoadNotifications();}});
+$('testPushAlerts').onclick=async()=>{const b=$('testPushAlerts'),status=$('pushAlertStatus');b.disabled=true;b.textContent='Enviando prueba…';try{const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión como administradora.');const r=await fetch(API_BASE+'/api/admin/push/test',{method:'POST',headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');status.textContent='✅ Notificación de prueba enviada al dispositivo registrado. Bloquea la pantalla para comprobar la recepción.';}catch(e){status.textContent='No se pudo enviar la prueba: '+e.message;}finally{b.disabled=false;b.textContent='🧪 Enviar notificación de prueba';}};
+
+
+async function cchAddOrderChat(card,order,token){const panel=document.createElement('details');panel.style.marginTop='12px';const summary=document.createElement('summary');summary.textContent='💬 Mensajes del cliente';panel.appendChild(summary);const thread=document.createElement('div');thread.className='status';thread.textContent='Abre para cargar la conversación.';const input=document.createElement('textarea');input.maxLength=1200;input.placeholder='Escribe tu respuesta al cliente…';const send=document.createElement('button');send.className='btn';send.type='button';send.textContent='Enviar respuesta';panel.append(thread,input,send);card.appendChild(panel);async function refresh(){const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok){thread.textContent=d.error||'No se pudo cargar el chat.';return;}thread.replaceChildren();(d.messages||[]).forEach(m=>{const p=document.createElement('p');const b=document.createElement('b');b.textContent=m.sender_role==='admin'?'Tú: ':'Cliente: ';const s=document.createElement('span');s.textContent=m.message;p.append(b,s);thread.appendChild(p)});thread.scrollTop=thread.scrollHeight;}send.onclick=async()=>{const message=input.value.trim();if(!message)return;send.disabled=true;try{const r=await fetch(API_BASE+'/api/admin/orders/'+order.id+'/messages',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({message})});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');input.value='';await refresh();}catch(e){alert(e.message)}finally{send.disabled=false;}};panel.addEventListener('toggle',()=>{if(panel.open)refresh()});}
+
+
+/* Menú sencillo para evitar una página interminable */
+(function(){
+ const ids=['mobileDashboard','messenger','customerOrders','whatsappManualOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
+ const nav=document.querySelector('.panel-nav');
+ const menuToggle=document.getElementById('panelMenuToggle');
+ if(!nav)return;
+ if(menuToggle){menuToggle.onclick=()=>{const opening=nav.classList.contains('menu-collapsed');nav.classList.toggle('menu-collapsed');menuToggle.setAttribute('aria-expanded',String(opening));menuToggle.textContent=opening?'✕ Cerrar menú':'☰ Menú del panel';};}
+ const backButton=document.getElementById('backToDashboard');
+ if(backButton)backButton.onclick=()=>{showPanel('mobileDashboard');nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}};
+ function showPanel(id,shouldScroll=true){
+   ids.forEach(x=>{const el=document.getElementById(x);if(el)el.classList.toggle('hidden',x!==id);});
+   nav.querySelectorAll('a').forEach(a=>{
+     const active=a.getAttribute('href')==='#'+id;
+     if(active)a.setAttribute('aria-current','page');else a.removeAttribute('aria-current');
+   });
+   const target=document.getElementById(id);
+   if(target){target.classList.remove('hidden');if(shouldScroll)window.scrollTo({top:0,behavior:'smooth'});}
+   document.querySelectorAll('[data-panel]').forEach(b=>b.classList.toggle('active',b.dataset.panel===id));
+ }
+ window.cchShowAdminPanel=showPanel;
+ document.querySelectorAll('[data-panel]').forEach(b=>b.addEventListener('click',()=>showPanel(b.dataset.panel)));
+ nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',e=>{
+   const id=(a.getAttribute('href')||'').slice(1);
+   if(!ids.includes(id))return;
+   e.preventDefault();showPanel(id);nav.classList.add('menu-collapsed');if(menuToggle){menuToggle.setAttribute('aria-expanded','false');menuToggle.textContent='☰ Menú del panel';}
+ }));
+ // Deja a la vista solo pedidos al entrar; el menú permite cambiar de sección.
+ showPanel('mobileDashboard',false);
+ window.addEventListener('cch-admin-session',e=>{if(e.detail&&e.detail.active)showPanel('mobileDashboard',false);});
+})();
+
+</script><script>
+/* Modo de prueba doble: la tienda se muestra dentro del panel y este permanece cargado. */
+(function(){
+ const openButton=document.getElementById('cchOpenCustomerPreview');
+ const returnButton=document.getElementById('cchReturnAdmin');
+ const view=document.getElementById('cchCustomerPreviewView');
+ const frame=document.getElementById('cchCustomerPreviewFrame');
+ if(!openButton||!returnButton||!view||!frame)return;
+ let loaded=false;
+ function openStore(){
+  if(!loaded){frame.src=location.origin+'/#order';loaded=true;}
+  document.body.classList.add('cch-preview-open');
+  view.hidden=false;
+  view.setAttribute('aria-hidden','false');
+ }
+ function returnAdmin(){
+  view.hidden=true;
+  view.setAttribute('aria-hidden','true');
+  document.body.classList.remove('cch-preview-open');
+  window.scrollTo(0,0);
+ }
+ openButton.addEventListener('click',openStore);
+ returnButton.addEventListener('click',returnAdmin);
+})();
+/* Comprueba si se publicó una versión nueva del panel. Actualizar este marcador en cada publicación. */
+(function(){
+ const current=document.querySelector('meta[name="cch-app-version"]')?.content;
+ if(!current)return;
+ let updatePending=false,checking=false;
+ async function checkVersion(){
+  if(checking||window.cchSelectingOrderAudio)return;
+  checking=true;
+  try{
+   const response=await fetch(location.pathname+'?cch_version_check='+Date.now(),{cache:'no-store',headers:{'Cache-Control':'no-cache'}});
+   if(!response.ok)return;
+   const html=await response.text();
+   const match=html.match(/<meta\\s+name=["']cch-app-version["']\\s+content=["']([^"']+)["']/i);
+   if(match&&match[1]!==current){
+    if(document.visibilityState==='visible')location.reload();
+    else updatePending=true;
+   }
+  }catch(error){console.warn('No se pudo comprobar si hay una nueva versión:',error);}
+  finally{checking=false;}
+ }
+ setInterval(checkVersion,60000);
+ document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(window.cchSelectingOrderAudio)return;if(updatePending)location.reload();else checkVersion();}});
+})();
+</script><script>
+/* Accesos superiores para mantener la configuración y el login fuera de la vista principal. */
+(function(){
+ const login=document.getElementById('adminLoginPanel');
+ const config=document.getElementById('supabaseConfigPanel');
+ const guide=document.getElementById('supabaseGuidePanel');
+ const notice=document.getElementById('storageSecurityNotice');
+ const loginBtn=document.getElementById('openAdminLogin');
+ const configBtn=document.getElementById('openAdminConfig');
+ function show(which){
+  [login,config,guide,notice].forEach(el=>el?.classList.add('hidden'));
+  if(which==='login')login?.classList.remove('hidden');
+  if(which==='config'){config?.classList.remove('hidden');guide?.classList.remove('hidden');notice?.classList.remove('hidden');}
+  const target=which==='login'?login:config;
+  if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+ }
+ loginBtn?.addEventListener('click',()=>show('login'));
+ configBtn?.addEventListener('click',()=>show('config'));
+})();
+
+/* PWA Canta con el corazón: registro persistente del Service Worker sin bloquear el panel. */
+(function(){
+ if(!('serviceWorker' in navigator))return;
+ const register=()=>navigator.serviceWorker.register('/service-worker.js',{scope:'/'}).then(()=>navigator.serviceWorker.ready).catch(error=>console.warn('No se pudo registrar la aplicación instalable:',error));
+ if(document.readyState==='complete')register();else window.addEventListener('load',register,{once:true});
+})();
+</script><script>
+/* Actualización manual del panel: recarga la versión publicada sin interferir con el resto de controles. */
+(function(){
+ const button=document.getElementById('refreshAdminPanel');
+ if(!button)return;
+ button.addEventListener('click',()=>{
+  if(!window.confirm('¿Actualizar el panel ahora? Guarda primero cualquier texto o cambio que aún no hayas enviado.'))return;
+  button.disabled=true;
+  button.textContent='⏳ Actualizando…';
+  const url=new URL(window.location.href);
+  url.searchParams.set('actualizar',String(Date.now()));
+  window.location.replace(url.toString());
+ });
+})();
+</script><script>
+/* Inicio limpio: mantener visible el panel principal y bloquear el salto automático inicial. */
+(function(){
+ try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch{}
+ const started=Date.now();
+ let correcting=false;
+ function holdAtTop(){
+  if(Date.now()-started>5000){window.removeEventListener('scroll',onScroll,true);return;}
+  if(correcting||window.scrollY<=0)return;
+  correcting=true;
+  window.scrollTo(0,0);
+  requestAnimationFrame(()=>{correcting=false;});
+ }
+ function onScroll(){holdAtTop();}
+ window.addEventListener('scroll',onScroll,{capture:true,passive:true});
+ const reset=()=>{if(window.scrollY>0)window.scrollTo(0,0);};
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',reset,{once:true});else reset();
+ window.addEventListener('load',reset,{once:true});
+ setTimeout(()=>window.removeEventListener('scroll',onScroll,true),5200);
+})();</script>
+<script>
+/* Reparación de conexión: el mismo cliente Supabase que comprueba la conexión queda asignado al panel de administración. */
+(function(){
+ const button=document.getElementById('connect');
+ const status=document.getElementById('connStatus');
+ const urlField=document.getElementById('url');
+ const keyField=document.getElementById('key');
+ if(!button||!status||!urlField||!keyField)return;
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const say=t=>{status.textContent=t;};
+  const rawUrl=urlField.value.trim(),key=keyField.value.trim();
+  let parsed;
+  try{parsed=new URL(rawUrl);}catch(_){say('URL inválida. Usa la Project URL completa de Supabase.');return;}
+  if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('supabase.co')||parsed.username||parsed.password){say('La URL debe ser la Project URL HTTPS de Supabase, por ejemplo https://TU-PROYECTO.supabase.co.');return;}
+  if(!(key.startsWith('sb_publishable_')||key.startsWith('eyJ'))){say('La clave pública está incompleta o no es válida. No uses service_role.');return;}
+  button.disabled=true;
+  say('Conectando con Supabase…');
+  try{
+   if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Actualiza la página con internet.');
+   const client=cchCreateSupabaseClient(parsed.origin,key);
+   db=client;
+   localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key}));
+   const {data,error:authError}=await client.auth.getSession();
+   if(authError)throw authError;
+   const {error}=await client.from('songs').select('id',{head:true}).limit(1);
+   if(error && !/permission|policy|row.level|rls/i.test(error.message||''))throw error;
+   if(data.session?.user){say('Sesión de Supabase encontrada. Ahora pulsa Iniciar sesión para abrir el panel.');}
+   else say('¡Conexión correcta! URL y clave aceptadas. Ahora pulsa Iniciar sesión.');
+  }catch(error){db=null;say('Error de conexión: '+(error?.message||String(error)));}
+  finally{button.disabled=false;}
+ },true);
+})();
+</script>
+
+<script>
+/* Compatibilidad táctil: garantiza que las tarjetas del panel respondan al toque en móviles/PWA. */
+(function(){
+ document.addEventListener('pointerup',function(event){
+  const button=event.target&&event.target.closest?event.target.closest('[data-panel]'):null;
+  if(!button)return;
+  if(typeof window.cchShowAdminPanel==='function'){
+   event.preventDefault();
+   window.cchShowAdminPanel(button.dataset.panel);
+  }
+ },true);
+})();
+</script>
+
+<script>
+/* Navegación de emergencia: garantiza que las tarjetas del centro de control abran su sección aunque falle el listener original. */
+(function(){
+ const ids=['mobileDashboard','messenger','customerOrders','whatsappManualOrders','editor','library','lyricsStudio','mediaLibrary','systemAlerts','integrationStatus'];
+ document.addEventListener('click',function(event){
+  const button=event.target&&event.target.closest?event.target.closest('.mobile-shortcuts [data-panel]'):null;
+  if(!button)return;
+  const id=button.getAttribute('data-panel');
+  if(!ids.includes(id))return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if(typeof window.cchShowAdminPanel==='function'){
+   window.cchShowAdminPanel(id);
+  }else{
+   ids.forEach(name=>{const section=document.getElementById(name);if(section)section.classList.toggle('hidden',name!==id);});
+   const section=document.getElementById(id);
+   if(section){section.classList.remove('hidden');window.scrollTo({top:0,behavior:'smooth'});}
+   document.querySelectorAll('.mobile-shortcuts [data-panel]').forEach(item=>item.classList.toggle('active',item===button));
+  }
+ },true);
+})();
+</script>
+
+<script>
+/* Control independiente del botón de acceso: evita depender del registro de eventos del panel principal. */
+(function(){
+ const button=document.getElementById('login');
+ const status=document.getElementById('authStatus');
+ if(!button||!status)return;
+ button.addEventListener('click',async function(event){
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const email=(document.getElementById('email')?.value||'').trim();
+  const password=document.getElementById('password')?.value||'';
+  const say=t=>{status.textContent=t;};
+  if(!email||!password){say('Escribe el correo y la contraseña del administrador.');return;}
+  let saved={};
+  try{saved=JSON.parse(localStorage.getItem('cc_config')||'{}')}catch(_){}
+  if(!saved.url||!saved.key){say('Primero guarda la URL y la clave pública de Supabase.');return;}
+  if(!window.supabase||typeof window.supabase.createClient!=='function'){say('No se cargó Supabase. Actualiza la página y comprueba internet.');return;}
+  button.disabled=true;say('Verificando acceso administrativo con Supabase…');
+  try{
+   const client=cchCreateSupabaseClient(saved.url,saved.key);
+   const {data,error}=await client.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   if(!data.user)throw new Error('Supabase no devolvió un usuario autenticado.');
+   if(typeof window.cchActivateAdminSession!=='function')throw new Error('El panel principal no terminó de cargar. Actualiza la página e inténtalo otra vez.');
+   await window.cchActivateAdminSession(client,data.user);
+   say('¡Inicio de sesión correcto! Supabase sigue conectado y el panel está abierto.');
+  }catch(error){say('No se pudo iniciar sesión: '+(error?.message||String(error)));}
+  finally{button.disabled=false;}
+ },true);
+})();
+</script>
+</body></html>
