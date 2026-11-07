@@ -5,15 +5,21 @@ self.addEventListener('push',event=>{
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();
- const target=new URL(event.notification.data?.url||'/admin.html',self.location.origin).href;
- event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{
-  for(const client of list){if(new URL(client.url).origin===self.location.origin&&'focus'in client)return client.focus().then(c=>c.navigate(target));}
-  return clients.openWindow?clients.openWindow(target):undefined;
- }));
+ event.waitUntil((async()=>{
+  const requested=new URL(event.notification.data?.url||'/admin.html',self.location.origin);
+  const target=requested.origin===self.location.origin&&requested.pathname==='/admin.html'?requested.href:new URL('/admin.html',self.location.origin).href;
+  const windows=await clients.matchAll({type:'window',includeUncontrolled:true});
+  const adminWindow=windows.find(client=>{
+   try{const u=new URL(client.url);return u.origin===self.location.origin&&u.pathname==='/admin.html';}
+   catch{return false;}
+  });
+  if(adminWindow){await adminWindow.focus();return;}
+  if(clients.openWindow)await clients.openWindow(target);
+ })());
 });
 
 /* Recuperación de navegación: cache independiente para tienda y administración. */
-const CCH_SHELL_CACHE='cch-shell-v8';
+const CCH_SHELL_CACHE='cch-shell-v9';
 const CCH_NAV_PATHS=['/','/admin.html'];
 self.addEventListener('install',event=>{
  event.waitUntil((async()=>{
