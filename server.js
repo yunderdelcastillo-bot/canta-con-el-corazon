@@ -1303,7 +1303,7 @@ app.post("/api/orders/:id/activity",async(req,res)=>{
   if(saveError)return res.status(503).json({error:"Ejecuta supabase-customer-activity.sql para activar el monitoreo."});
   if(event!=="online"){
    const {data:lastEvent}=await db.from("customer_order_activity_events").select("event_type,created_at").eq("order_id",id).order("created_at",{ascending:false}).limit(1).maybeSingle();
-   const duplicate=lastEvent?.event_type===event&&Date.now()-Date.parse(lastEvent.created_at||0)<12000;
+   const duplicate=lastEvent?.event_type===event&&Date.now()-Date.parse(lastEvent.created_at||0)<120000;
    if(!duplicate){const {error:eventError}=await db.from("customer_order_activity_events").insert({order_id:id,event_type:event,playback_position:Math.floor(position),playback_duration:Math.floor(duration),created_at:now});if(eventError)console.error("Customer activity history:",eventError.message||eventError);}
   }
   res.set("Cache-Control","no-store").json({ok:true,status,lastSeenAt:now});
