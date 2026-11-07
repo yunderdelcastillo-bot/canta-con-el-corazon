@@ -146,6 +146,10 @@ body.cch-preview-open{overflow:hidden}
  </div>
  <p class="muted" style="margin:4px 3px 12px;font-size:.72rem">La prueba usa el flujo real y puede registrar un pedido. No realices pagos reales ni subas comprobantes verdaderos.</p>
  <div class="dashboard-section-head"><h3>Resumen de pedidos</h3><span>Datos de tus pedidos registrados</span></div>
+ <div id="liveCustomerForms" class="dashboard-feature" style="display:block;margin-top:12px">
+  <div><span class="feature-icon">👀</span><div><strong>Clientes en formulario</strong><small id="liveCustomerFormsStatus">Comprobando actividad…</small></div></div>
+  <div id="liveCustomerFormsList" class="muted" style="margin-top:8px;font-size:.85rem">Aún no hay clientes activos.</div>
+ </div>
  <div class="mobile-stats">
   <article class="mobile-stat stat-total"><span class="stat-icon">🛒</span><div><small>Total pedidos</small><strong id="mobileOrdersTotal">—</strong></div></article>
   <article class="mobile-stat stat-pending"><span class="stat-icon">⏳</span><div><small>Por producir</small><strong id="mobileOrdersPending">—</strong></div></article>
@@ -311,9 +315,9 @@ async function activateAdminSession(adminUser,{restored=false}={}){
  window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:true}}));
  msg('authStatus',(restored?'Sesión recuperada automáticamente: ':'Sesión iniciada: ')+user.email+' · Tu acceso se conservará en este navegador.');
  ['editor','library','mediaLibrary','lyricsStudio','customerOrders','messenger','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.remove('hidden'));
- await Promise.allSettled([load(),loadMedia(),loadCustomerOrders(),cchLoadNotifications(),cchLoadIntegrationStatus(),cchLoadAdminInbox()]);
+ await Promise.allSettled([load(),loadMedia(),loadCustomerOrders(),cchLoadNotifications(),cchLoadActiveCustomerForms(),cchLoadIntegrationStatus(),cchLoadAdminInbox()]);
  if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);
- window.cchNotificationTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadNotifications()},15000);
+ window.cchNotificationTimer=setInterval(()=>{if(document.visibilityState==='visible'){cchLoadNotifications();cchLoadActiveCustomerForms();}},15000);
  if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=setInterval(()=>{if(document.visibilityState==='visible')cchLoadAdminInbox()},15000);
  await cchRefreshPushStatus();
 }
@@ -682,7 +686,7 @@ $('form').onsubmit=async e=>{e.preventDefault();if(!db||!user){msg('saveStatus',
 $('copyOrderLink').onclick=async()=>{const link=$('orderLink').value;try{await navigator.clipboard.writeText(link);msg('copyOrderLink','¡Enlace copiado!')}catch{prompt('Copia este enlace para tu cliente:',link)}};$('sendOrderLink').onclick=()=>{const link=$('orderLink').value;const text='¡Hola! 💗 Gracias por contactar a Canta con el corazón. Para pedir tu canción personalizada, llena tus datos en este enlace y sigue las instrucciones de pago con Yape: '+link;window.open('https://wa.me/?text='+encodeURIComponent(text),'_blank','noopener')};$('refresh').onclick=load;init();
 
 let cchAlertSoundEnabled=localStorage.getItem('cch_alert_sound')==='on',cchKnownNotifications=new Set(),cchAudioUnlocked=false,cchNotificationsInitialized=false,cchAudioContext=null,cchOrderRepeatTimers=new Map();
-function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
+function cchAlertText(n){return ({new_order:'Atención. Tienes un nuevo pedido en Canta con el corazón.',form_started:'Atención. Un cliente comenzó a llenar el formulario de Canta con el corazón.',lyrics_ready:'La letra del pedido ya está generada y necesita revisión.',order_contacted:'El pedido ya fue revisado y se inició el contacto con el cliente.',preview_ready:'La muestra de la canción ya está disponible para el cliente.',preview_finished:'El cliente terminó de escuchar la muestra. Ya puede realizar el pago y enviar su comprobante.',voucher_received:'Atención. Has recibido un nuevo comprobante de pago. Requiere revisión.',payment_approved:'El pago del pedido ha sido confirmado.',production_started:'La canción del pedido entró en preparación.',audio_uploading:'Se está subiendo el audio de la canción.',song_ready:'La canción completa ya está lista para preparar la entrega.',package_delivered:'El cliente recibió su paquete. El pedido ha finalizado.',new_message:'Tienes un nuevo mensaje de un cliente.'})[n.event_type]||('Nueva actualización del pedido. '+(n.body||''))}
 async function cchSpeakAlert(message){
  if(!cchAlertSoundEnabled||!cchAudioUnlocked)return;
  try{
@@ -715,6 +719,18 @@ function cchSyncOrderRepeatAlerts(notifications){
   },30000+(index*2500));
   cchOrderRepeatTimers.set(n.id,timer);
  });
+}
+async function cchLoadActiveCustomerForms(){
+ const status=$('liveCustomerFormsStatus'),list=$('liveCustomerFormsList');if(!status||!list)return;
+ try{
+  const token=await window.cchAdminGetToken();if(!token)return;
+  const r=await fetch(API_BASE+'/api/admin/forms/active',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo consultar.');
+  status.textContent=d.count?d.count+' cliente(s) completando el formulario ahora':'Ningún cliente está llenando el formulario en este momento.';
+  list.replaceChildren();
+  if(!d.count){list.textContent='Cuando alguien escriba o seleccione una opción en el formulario, aparecerá aquí.';return;}
+  d.sessions.forEach((item,i)=>{const row=document.createElement('div');row.style.cssText='padding:8px 10px;margin-top:6px;border-radius:10px;background:#e9f8ee;color:#176b3a;font-weight:650';row.textContent='🟢 Cliente activo '+(i+1)+' · Desde '+new Date(item.started_at).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});list.appendChild(row);});
+ }catch(e){status.textContent='No se pudo consultar la actividad: '+e.message;}
 }
 async function cchLoadNotifications(){
  try{
@@ -796,7 +812,7 @@ async function cchEnablePushAlerts(){
  }catch(e){status.textContent='No se pudo activar: '+e.message;console.warn('Push setup:',e);}
 }
 $('enablePushAlerts').onclick=cchEnablePushAlerts;
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){/* No reconstruir las tarjetas al volver de Archivos de Android: podría borrar el File seleccionado. Los pedidos se actualizan con el botón manual. */cchLoadNotifications();}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&db&&user){/* No reconstruir las tarjetas al volver de Archivos de Android: podría borrar el File seleccionado. Los pedidos se actualizan con el botón manual. */cchLoadNotifications();cchLoadActiveCustomerForms();}});
 $('testPushAlerts').onclick=async()=>{const b=$('testPushAlerts'),status=$('pushAlertStatus');b.disabled=true;b.textContent='Enviando prueba…';try{const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión como administradora.');const r=await fetch(API_BASE+'/api/admin/push/test',{method:'POST',headers:{Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo enviar.');status.textContent='✅ Notificación de prueba enviada al dispositivo registrado. Bloquea la pantalla para comprobar la recepción.';}catch(e){status.textContent='No se pudo enviar la prueba: '+e.message;}finally{b.disabled=false;b.textContent='🧪 Enviar notificación de prueba';}};
 
 
