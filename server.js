@@ -459,7 +459,9 @@ app.post("/api/share-video",async(req,res)=>{
   const audioPath=String(req.query.path||"");
   const previewToken=String(req.query.previewToken||"");
   const grantToken=String(req.query.grantToken||"");
-  if(!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audioPath))return res.status(400).json({error:"Ruta de canción no válida."});
+   const audioParts=audioPath.split("/");
+   const uuidPattern=/^[0-9a-f-]{36}$/i;
+   if(audioParts.length!==2||!uuidPattern.test(audioParts[0])||!audioParts[1].toLowerCase().endsWith(".mp3")||!uuidPattern.test(audioParts[1].slice(0,-4))||!preview)return res.status(400).json({error:"No se recibió una autorización válida para sincronizar."});
   const db=admin();
   const {data:song}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
   if(!song)return res.status(404).json({error:"No se encontró la canción."});
