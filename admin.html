@@ -396,6 +396,9 @@ function cchOrderProgress(o){
 async function loadCustomerOrders(){
  const box=$('ordersList');
  const savedScroll=window.scrollY;
+ const visibleAnchor=Array.from(box.querySelectorAll('.order-card')).find(card=>card.getBoundingClientRect().bottom>0);
+ const anchorId=visibleAnchor?.id||'';
+ const anchorTop=visibleAnchor?.getBoundingClientRect().top||0;
  const savedOpen=new Set(Array.from(box.querySelectorAll('.order-card')).flatMap(card=>Array.from(card.querySelectorAll('details')).map((d,i)=>d.open?card.id+'|'+i:null).filter(Boolean)));
  if(!box.querySelector('.order-card'))box.textContent='Cargando pedidos…';
  try{
@@ -611,7 +614,7 @@ async function loadCustomerOrders(){
   const applyOrderFilters=()=>{const term=($('orderSearch')?.value||'').trim().toLowerCase(),filter=$('orderFilter')?.value||'all',source=$('orderSourceFilter')?.value||'all';let visible=0;box.querySelectorAll('.order-card').forEach(card=>{const matchesFilter=filter==='all'||card.dataset.filter===filter;const matchesText=!term||card.dataset.search.includes(term);const matchesSource=source==='all'||card.dataset.source===source;card.classList.toggle('hidden',!(matchesFilter&&matchesText&&matchesSource));if(matchesFilter&&matchesText&&matchesSource)visible++;});let empty=box.querySelector('.orders-empty');if(!visible){if(!empty){empty=document.createElement('p');empty.className='orders-empty muted';empty.textContent='No hay pedidos que coincidan con esa búsqueda o filtro.';box.appendChild(empty);}}else if(empty)empty.remove();let counter=$('ordersVisibleCount');if(counter)counter.textContent=visible+' pedido(s) visibles';};
   $('orderSearch').oninput=applyOrderFilters;$('orderFilter').onchange=applyOrderFilters;$('orderSourceFilter').onchange=applyOrderFilters;applyOrderFilters();
  box.querySelectorAll('.order-card').forEach(card=>card.querySelectorAll('details').forEach((d,i)=>{if(savedOpen.has(card.id+'|'+i))d.open=true;}));
- requestAnimationFrame(()=>window.scrollTo({top:savedScroll,behavior:'instant'}));
+ requestAnimationFrame(()=>{const anchor=anchorId?document.getElementById(anchorId):null;if(anchor){const delta=anchor.getBoundingClientRect().top-anchorTop;window.scrollTo({top:window.scrollY+delta,behavior:'instant'});}else window.scrollTo({top:savedScroll,behavior:'instant'});});
  }catch(e){box.textContent=e.message;}
 }
 let cchMessengerSelectedOrder=null,cchMessengerPoll=null;
@@ -657,7 +660,9 @@ window.cchOpenMessengerOrder=async orderId=>{window.cchShowAdminPanel?.('messeng
 window.cchOpenOrder=async orderId=>{window.cchShowAdminPanel?.('customerOrders');const search=$('orderSearch');if(search)search.value='';const filter=$('orderFilter');if(filter)filter.value='all';const source=$('orderSourceFilter');if(source)source.value='all';await loadCustomerOrders();const card=document.getElementById('order-'+orderId);if(card){card.scrollIntoView({behavior:'smooth',block:'center'});card.style.outline='3px solid #d78eaa';setTimeout(()=>card.style.outline='',3500);}else alert('No se encontró ese pedido en la lista. Actualiza los pedidos e inténtalo nuevamente.');};
 $('refreshMessenger').onclick=cchLoadAdminInbox;
 $('refreshOrders').onclick=async()=>{const b=$('refreshOrders');if(b.disabled)return;b.disabled=true;const label=b.textContent;b.textContent='Actualizando…';try{await loadCustomerOrders();}finally{b.disabled=false;b.textContent=label;}};
-window.cchOrderActivityRefresh=setInterval(()=>{const panel=$('customerOrders');if(panel&&!panel.classList.contains('hidden')&&!document.hidden)loadCustomerOrders();},15000);
+window.cchAdminLastHandsOn=Date.now();
+ ['pointerdown','touchstart','wheel','scroll','keydown','focusin','input'].forEach(type=>window.addEventListener(type,()=>{window.cchAdminLastHandsOn=Date.now();},{passive:true,capture:true}));
+ window.cchOrderActivityRefresh=setInterval(()=>{const panel=$('customerOrders');const idle=Date.now()-(window.cchAdminLastHandsOn||0)>60000;if(panel&&!panel.classList.contains('hidden')&&!document.hidden&&idle)loadCustomerOrders();},15000);
 
 async function cchManualLogout(){if(db)await db.auth.signOut();user=null;$('headerLogout')?.classList.add('hidden');$('openAdminLogin')?.classList.remove('hidden');if(window.cchNotificationTimer)clearInterval(window.cchNotificationTimer);window.cchNotificationTimer=null;if(window.cchMessengerInboxTimer)clearInterval(window.cchMessengerInboxTimer);window.cchMessengerInboxTimer=null;window.dispatchEvent(new CustomEvent('cch-admin-session',{detail:{active:false}}));['editor','library','mediaLibrary','lyricsStudio','customerOrders','messenger','systemAlerts','integrationStatus'].forEach(id=>$(id).classList.add('hidden'));msg('authStatus','Sesión cerrada manualmente.')};$('logout').onclick=cchManualLogout;$('headerLogout').onclick=cchManualLogout;
 $('giftPackage').onchange=()=>{const prices={esencial:25};$('giftPrice').value=prices[$('giftPackage').value]||20};$('file').onchange=()=>{file=$('file').files[0]||null;if(!file){msg('fileInfo','Selecciona un MP3 de tu celular.');return}if(file.size>25*1024*1024||!(file.type==='audio/mpeg'||file.name.toLowerCase().endsWith('.mp3'))){file=null;$('file').value='';msg('fileInfo','El archivo debe ser MP3 y pesar máximo 25 MB.');return}msg('fileInfo',file.name+' · '+(file.size/1048576).toFixed(2)+' MB');$('preview').src=URL.createObjectURL(file);$('previewWrap').classList.remove('hidden')};
