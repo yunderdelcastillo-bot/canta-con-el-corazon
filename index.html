@@ -1592,8 +1592,8 @@ function mountCustomerOrderChat(){
    mount(box);render(box,readState(box));
   });
  }
- const observer=new MutationObserver(scan);
- observer.observe(document.documentElement,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['style','class']});
+ /* No observar mutaciones globales: render() reconstruye los pasos y eso provocaba
+    un bucle de MutationObserver que congelaba el navegador del cliente. */
  scan();
  setInterval(scan,2500);
 })();
