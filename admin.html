@@ -423,8 +423,8 @@ async function loadCustomerOrders(){
    card.appendChild(lyricsBox);card.appendChild(infoDetails);
    if(o.payment){
     const pay=document.createElement('div');pay.className='status';
-    const labels={pending:'Pendiente de comprobante',voucher_submitted:'Voucher recibido · pendiente de revisión',approved:'Pago confirmado',rejected:'Voucher rechazado'};
-    pay.textContent='💳 Pago: '+(labels[o.payment.payment_status]||o.payment.payment_status)+' · Importe: S/'+Number(o.payment.amount||0).toFixed(2)+' · Método: '+(o.payment.provider||'manual')+(o.payment.payment_status==='approved'?' · Confirmado por administración':'');
+    const labels={pending:'Pendiente de comprobante',voucher_submitted:'Voucher recibido · pendiente de revisión',approved:'Voucher aprobado automáticamente · no verificado por banco',rejected:'Voucher rechazado'};
+    pay.textContent='💳 Pago: '+(labels[o.payment.payment_status]||o.payment.payment_status)+' · Importe: S/'+Number(o.payment.amount||0).toFixed(2)+' · Método: '+(o.payment.provider||'manual')+(o.payment.payment_status==='approved'?' · Aprobación automática técnica':'');
     card.appendChild(pay);
     if(o.payment.payment_status!=='approved'&&o.audio_ready&&o.preview_url){
      const actions=document.createElement('div');actions.className='row';
