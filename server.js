@@ -293,8 +293,13 @@ app.get("/api/audio",async(req,res)=>{
    grantAuthorized=!!g?.can_mp3;
   }
   if(!grantAuthorized){
-   const {data:packagePermission}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",song.id).maybeSingle();
-   if(packagePermission?.can_mp3)grantAuthorized=true;
+   // Los permisos MP3 antiguos solo autorizan descarga si el pedido tiene voucher y pago aprobado.
+   const orderId=path.split("/")[1].replace(/\.mp3$/i,"");
+   const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status,voucher_path").eq("order_id",orderId).maybeSingle();
+   if(paymentError)throw paymentError;
+   const {data:packagePermission,error:permissionError}=await db.from("song_package_permissions").select("can_mp3").eq("song_id",song.id).maybeSingle();
+   if(permissionError)throw permissionError;
+   if(packagePermission?.can_mp3&&payment?.payment_status==="approved"&&!!payment?.voucher_path)grantAuthorized=true;
   }
   const replaySequence=Number(req.query.replay||0);
   if(!grantAuthorized&&Number.isSafeInteger(replaySequence)&&replaySequence>0){
@@ -333,10 +338,14 @@ app.get("/api/verify-grant",async(req,res)=>{
   if(!song)return res.status(404).json({valid:false,canMp3:false,canVideo:false});
   const {data:g,error}=await db.from("song_package_permissions").select("can_mp3,can_video,package_key,package_price").eq("song_id",song.id).maybeSingle();
   if(error)throw error;
+  const orderId=path.split("/")[1].replace(/\.mp3$/i,"");
+  const {data:payment,error:paymentError}=await db.from("payment_submissions").select("payment_status,voucher_path").eq("order_id",orderId).maybeSingle();
+  if(paymentError)throw paymentError;
+  const paid=payment?.payment_status==="approved"&&!!payment?.voucher_path;
   const {data:replay,error:replayError}=await db.from("song_replay_authorizations").select("replay_count,consumed_count").eq("song_id",song.id).maybeSingle();
   if(replayError)throw replayError;
   const replayCount=Number(replay?.replay_count||0),consumedCount=Number(replay?.consumed_count||0);
-  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g,canMp3:!!g?.can_mp3,canVideo:!!g?.can_video,packageKey:g?.package_key||null,packagePrice:g?.package_price??null,replayCount,pendingReplayCount:Math.max(0,replayCount-consumedCount),nextReplaySequence:consumedCount+1});
+  res.set("Cache-Control","no-store, max-age=0").json({valid:!!g&&paid,canMp3:!!g?.can_mp3&&paid,canVideo:!!g?.can_video&&paid,packageKey:paid?(g?.package_key||null):null,packagePrice:paid?(g?.package_price??null):null,replayCount,pendingReplayCount:Math.max(0,replayCount-consumedCount),nextReplaySequence:consumedCount+1});
  }catch(e){res.status(500).json({valid:false});}
 });
 
