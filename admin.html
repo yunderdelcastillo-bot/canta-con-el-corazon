@@ -129,7 +129,7 @@ body.cch-preview-open{overflow:hidden}
 @media(max-width:480px){.cch-preview-toolbar{min-height:58px;padding:7px 9px}.cch-preview-toolbar strong{font-size:.72rem}.cch-preview-toolbar button{font-size:.78rem;padding:9px 10px}}
 
 .order-lyrics-details{padding:8px 11px!important;margin:8px 0!important;background:#fff!important}.order-lyrics-details>summary{font-size:.92rem;padding:3px 0}.order-lyrics-details>p{font-size:.9rem;line-height:1.45;max-height:360px;overflow:auto}
-</style><meta name="cch-app-version" content="2026-11-05-dashboard-navigation-fix-v7"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
+</style><meta name="cch-app-version" content="2026-11-07-client-preview-back-to-admin-v8"><link rel="manifest" href="/manifest.webmanifest"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Canta corazón"><link rel="icon" href="/app-icon.svg" type="image/svg+xml"></head><body><header class="hero"><div class="hero-inner"><div class="hero-brand"><span class="hero-mic">🎙️</span><div><h1>Canta <small>con el</small> Corazón 💗</h1><p>Canciones personalizadas para momentos especiales</p></div><span class="hero-note">♫</span></div><div class="hero-bottom"><span>⚙️ Panel administrativo</span><div class="hero-access-actions"><button type="button" id="openAdminLogin" class="hero-access-btn">👤 Ingresar</button><button type="button" id="headerLogout" class="hero-access-btn hero-access-secondary hidden">↪ Cerrar sesión</button><button type="button" id="openAdminConfig" class="hero-access-btn hero-access-secondary">⚙️ Configuración</button><a href="/">Ver tienda pública ↗</a></div></div></div></header><main class="mobile-main"><section class="mobile-dashboard" id="mobileDashboard">
  <div class="dashboard-greeting"><div><span class="eyebrow">CENTRO DE CONTROL</span><h2>¡Hola! 💜</h2><p>Administra tu negocio desde aquí.</p></div><span class="live-pill"><i></i> Panel activo</span></div>
  <div class="mobile-shortcuts" aria-label="Accesos principales">
   <button type="button" class="shortcut active" data-panel="customerOrders"><span>📥</span>Pedidos</button>
@@ -795,40 +795,50 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
 })();
 
 </script><script>
-/* Modo de prueba integrado: volver desde la muestra sin abandonar ni reiniciar el panel. */
+/* Las muestras y regalos se abren dentro del panel para conservar la sesión y permitir volver con Atrás. */
 (function(){
  const openButton=document.getElementById('cchOpenCustomerPreview');
  const returnButton=document.getElementById('cchReturnAdmin');
  const view=document.getElementById('cchCustomerPreviewView');
  const frame=document.getElementById('cchCustomerPreviewFrame');
- if(!openButton||!returnButton||!view||!frame)return;
- let loaded=false,previewOpen=false;
+ if(!returnButton||!view||!frame)return;
+ let previewOpen=false;
  function hidePreview(){
   view.hidden=true;
   view.setAttribute('aria-hidden','true');
   document.body.classList.remove('cch-preview-open');
   previewOpen=false;
-  window.scrollTo(0,0);
  }
- function openStore(){
-  if(!loaded){frame.src=location.origin+'/#order';loaded=true;}
+ function openPreview(url){
+  if(url)frame.src=url;
   if(!previewOpen){
    previewOpen=true;
-   try{history.pushState({cchCustomerPreview:true},'',location.href);}catch(error){console.warn('No se pudo preparar el regreso de la muestra:',error);}
+   try{history.pushState({...((history.state&&typeof history.state==='object')?history.state:{}),cchCustomerPreview:true},'',location.href);}
+   catch(error){console.warn('No se pudo preparar el regreso de la muestra:',error);}
   }
   document.body.classList.add('cch-preview-open');
   view.hidden=false;
   view.setAttribute('aria-hidden','false');
  }
+ function openStore(){openPreview(location.origin+'/#order');}
  function returnAdmin(){
   if(!previewOpen){hidePreview();return;}
-  previewOpen=false;
   try{history.back();}catch(error){console.warn(error);}
   hidePreview();
  }
  window.addEventListener('popstate',function(){if(previewOpen)hidePreview();});
- openButton.addEventListener('click',openStore);
+ if(openButton)openButton.addEventListener('click',openStore);
  returnButton.addEventListener('click',returnAdmin);
+ /* Intercepta los enlaces de canciones del propio sitio que antes abrían otra pestaña. */
+ document.addEventListener('click',function(event){
+  const link=event.target&&event.target.closest?event.target.closest('a[target="_blank"]'):null;
+  if(!link||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+  let url;
+  try{url=new URL(link.href,location.href);}catch{return;}
+  if(url.origin!==location.origin||url.pathname!=='/')return;
+  event.preventDefault();
+  openPreview(url.href);
+ });
 })();
 /* Comprueba si se publicó una versión nueva del panel. Actualizar este marcador en cada publicación. */
 (function(){
