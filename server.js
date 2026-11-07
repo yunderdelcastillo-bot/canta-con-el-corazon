@@ -1284,6 +1284,27 @@ app.post("/api/orders",async(req,res)=>{
   res.set("Cache-Control","no-store").status(201).json({ok:true,orderId:data.id,createdAt:data.created_at,paymentReady,paymentAccessToken});
  }catch(e){console.error("Create customer order:",e?.message||e);res.status(500).json({error:"No se pudo registrar el pedido."});}
 });
+app.post("/api/orders/:id/activity",async(req,res)=>{
+ try{
+  if(!ready())return res.status(503).json({error:"El monitoreo no está configurado."});
+  const id=String(req.params.id||""),token=String(req.body?.accessToken||""),previewToken=String(req.body?.previewToken||"");
+  if(!/^[0-9a-f-]{36}$/i.test(id)||(!/^[A-Za-z0-9_-]{40,100}$/.test(token)&&!/^[A-Za-z0-9_-]{40,100}$/.test(previewToken)))return res.status(400).json({error:"Acceso no válido."});
+  const db=admin();let authorized=false;
+  if(token){const hash=crypto.createHash("sha256").update(token).digest("hex");const {data:p,error}=await db.from("payment_submissions").select("id").eq("order_id",id).eq("access_token_hash",hash).maybeSingle();if(error)throw error;authorized=!!p;}
+  if(!authorized&&previewToken){const hash=crypto.createHash("sha256").update(previewToken).digest("hex");const {data:l,error}=await db.from("song_preview_links").select("song_id").eq("token_hash",hash).maybeSingle();if(error)throw error;if(l?.song_id){const {data:song,error:songError}=await db.from("songs").select("audio_path").eq("id",l.song_id).maybeSingle();if(songError)throw songError;authorized=!!song&&song.audio_path?.endsWith("/"+id+".mp3");}}
+  if(!authorized)return res.status(403).json({error:"No se pudo validar el pedido."});
+  const allowed=["online","listening","paused","sample_finished","payment_sent","download_started","download_completed","left"];
+  const event=String(req.body?.event||"online");if(!allowed.includes(event))return res.status(400).json({error:"Evento no permitido."});
+  const now=new Date().toISOString(),position=Math.max(0,Math.min(86400,Number(req.body?.position)||0)),duration=Math.max(0,Math.min(86400,Number(req.body?.duration)||0));
+  const status=event==="left"?"offline":event==="paused"?"paused":event==="listening"?"listening":event;
+  const row={order_id:id,status,event_type:event,playback_position:position,playback_duration:duration,last_seen_at:now,updated_at:now};
+  if(event==="download_started")row.download_started_at=now;if(event==="download_completed")row.download_completed_at=now;
+  const {error:saveError}=await db.from("customer_order_activity").upsert(row,{onConflict:"order_id"});
+  if(saveError)return res.status(503).json({error:"Ejecuta supabase-customer-activity.sql para activar el monitoreo."});
+  res.set("Cache-Control","no-store").json({ok:true,status,lastSeenAt:now});
+ }catch(e){console.error("Customer activity:",e?.message||e);res.status(500).json({error:"No se pudo registrar la actividad."});}
+});
+
 app.post("/api/orders/:id/voucher",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"El sistema de pagos no está configurado."});
@@ -1705,6 +1726,9 @@ app.get("/api/admin/orders",async(req,res)=>{
    }
    paymentByOrder.set(payment.order_id,{...payment,voucher_url:voucherUrl});
   }
+  const {data:activityRows,error:activityError}=orderIds.length?await db.from("customer_order_activity").select("*").in("order_id",orderIds):{data:[],error:null};
+  if(activityError&&!/customer_order_activity/.test(activityError.message||""))throw activityError;
+  const activityByOrder=new Map((activityRows||[]).map(row=>[row.order_id,row]));
   const orders=[];
   for(const order of data||[]){
    const audioReady=audioNames.has(order.id+".mp3");
@@ -1739,7 +1763,7 @@ app.get("/api/admin/orders",async(req,res)=>{
    const listedPayment=paymentByOrder.get(order.id)||null;
    // No inferir un regalo a partir de permisos históricos: se requiere voucher aprobado.
    const giftUnlocked=false;
-   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,payment:listedPayment,gift_unlocked:giftUnlocked});
+   orders.push({...order,audio_ready:audioReady,preview_url:previewUrl,preview_activity:previewActivity,customer_activity:activityByOrder.get(order.id)||null,payment:listedPayment,gift_unlocked:giftUnlocked});
   }
   res.set("Cache-Control","no-store").json({ok:true,orders});
  }catch(e){console.error("List customer orders:",e?.message||e);res.status(500).json({error:"No se pudieron cargar los pedidos."});}
