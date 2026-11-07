@@ -330,7 +330,7 @@ function showPaymentCta(){
    progress.style.display='block';progress.value=0;
    try{
     const fileBase64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(new Error('No se pudo leer la foto. Vuelve a seleccionarla.'));reader.onprogress=e=>{if(e.lengthComputable)status.textContent='📂 Leyendo imagen… '+Math.round(e.loaded/e.total*100)+'%';};reader.readAsDataURL(file);});
-    status.textContent='📤 Enviando voucher al servidor…';cchSendCustomerActivity('payment_sent');
+    status.textContent='📤 Enviando voucher al servidor…';
     const result=await new Promise((resolve,reject)=>{
      const xhr=new XMLHttpRequest();xhr.open('POST',API_BASE+'/api/orders/'+encodeURIComponent(ctx.orderId)+'/voucher');xhr.setRequestHeader('Content-Type','application/json');xhr.timeout=90000;
      xhr.upload.onprogress=e=>{if(e.lengthComputable){const pct=Math.round(e.loaded/e.total*100);progress.value=pct;status.textContent='📤 Enviando voucher… '+pct+'%';}};
@@ -340,7 +340,7 @@ function showPaymentCta(){
      xhr.onabort=()=>reject(new Error('La subida fue cancelada.'));
      xhr.send(JSON.stringify({accessToken:ctx.accessToken,mimeType:file.type,fileBase64}));
     });
-    progress.value=100;status.textContent='✅ Voucher recibido por el sistema. '+(result.message||'Tu pedido quedó registrado.');status.style.color='#b8ffd0';
+    progress.value=100;cchSendCustomerActivity('payment_sent');status.textContent='✅ Voucher recibido por el sistema. '+(result.message||'Tu pedido quedó registrado.');status.style.color='#b8ffd0';
     button.textContent='Voucher enviado';button.disabled=true;
      try{if(window.parent&&window.parent!==window)window.parent.postMessage({type:'cch-payment-updated',orderId:ctx.orderId},location.origin);}catch(e){}
      return;
