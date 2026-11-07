@@ -430,7 +430,17 @@ async function loadCustomerOrders(){
      paymentActivity.textContent='💚 Voucher recibido y pago aprobado automáticamente · Beneficios MP3 habilitados'+(o.audio_ready?' · Canción lista para descargar · Paquete entregado':' · Pendiente de terminar la canción');
      activityBox.appendChild(paymentActivity);
     }
-   activityBox.appendChild(activityLine);card.appendChild(activityBox);
+   activityBox.appendChild(activityLine);
+   const live=o.customer_activity||{};
+   const liveLine=document.createElement('p');liveLine.style.cssText='margin:8px 0 0;line-height:1.55;font-weight:700';
+   const seen=live.last_seen_at?new Date(live.last_seen_at):null;
+   const age=seen?Date.now()-seen.getTime():Infinity;
+   const online=age<75000&&live.event_type!=='left';
+   const labels={listening:'🎧 Está escuchando la canción',paused:'⏸️ Tiene la canción en pausa',online:'Continúa en la página',sample_finished:'✅ Terminó de escuchar la muestra',payment_sent:'💳 Envió su voucher',download_started:'⬇️ Inició la descarga del MP3',download_completed:'🎉 Descarga confirmada por el sistema',left:'Salió de la página'};
+   liveLine.textContent=(online?'🟢 EN LÍNEA · ':'⚪ SIN CONEXIÓN · ')+(labels[live.event_type]||'Todavía no hay actividad en tiempo real')+(seen?' · Última actividad: '+seen.toLocaleString('es-PE'):'');
+   activityBox.appendChild(liveLine);
+   if(live.event_type==='listening'){const pos=document.createElement('small');pos.style.cssText='display:block;color:#76636d;margin-top:4px';pos.textContent='Reproducción: '+Math.floor(live.playback_position||0)+' s'+(live.playback_duration?' / '+Math.floor(live.playback_duration)+' s':'');activityBox.appendChild(pos);}
+   card.appendChild(activityBox);
    const infoDetails=document.createElement('details');infoDetails.className='order-info-details';const infoSummary=document.createElement('summary');infoSummary.textContent='Ver historia y detalles del pedido';infoDetails.appendChild(infoSummary);const story=document.createElement('p');story.textContent='Historia: '+o.story;infoDetails.appendChild(story);
    const detail=document.createElement('p');const orderTotal=Number(o.payment?.amount||0);const packageText=String(o.package_name||'').toLowerCase();const packagePrice=packageText.includes('completo')||packageText.includes('30')?30:packageText.includes('detalle')||packageText.includes('25')?25:packageText.includes('esencial')||packageText.includes('20')?20:Math.max(0,orderTotal);const urgencyText=String(o.urgency||'').toLowerCase();const isExpress=/express|expres|30 minutos|media hora/.test(urgencyText);const expressFee=isExpress?5:0;detail.textContent='Género: '+o.style+' · Voz: '+o.voice+' · Paquete: '+o.package_name+' · Plazo: '+o.urgency+(orderTotal?' · Desglose: Paquete S/'+packagePrice.toFixed(2)+(expressFee?' + Express S/'+expressFee.toFixed(2):'')+' = Total S/'+orderTotal.toFixed(2):'');infoDetails.appendChild(detail);
    const lyricsBox=document.createElement('details');lyricsBox.className='order-info-details order-lyrics-details';lyricsBox.style.marginTop='8px';
