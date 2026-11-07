@@ -973,128 +973,50 @@ app.post("/api/support/diagnose",async(req,res)=>{
 });
 
 app.post("/api/lyrics/align",async(req,res)=>{
- let uploadedFileName="";
  try{
-  const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-  if(!apiKey)return res.status(503).json({error:"La sincronización IA no está conectada en el servidor."});
+  const apiKey=String(process.env.GROQ_API_KEY||"").trim();
+  if(!apiKey)return res.status(503).json({error:"Groq Whisper no está configurado en el servidor."});
   const body=req.body||{},audioBase64=String(body.audioBase64||"");
   const lyrics=Array.isArray(body.lyrics)?body.lyrics.map(x=>String(x||"").trim()):[];
   const duration=Number(body.duration);
-  if(!audioBase64||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800){
-   return res.status(400).json({error:"El audio, la letra o la duración no son válidos. El MP3 debe pesar menos de 18 MB."});
-  }
-  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim();
-  const now=Date.now(),record=lyricAlignLimits.get(ip)||{start:now,count:0};
-  if(now-record.start>60*60*1000){record.start=now;record.count=0;}
+  if(!audioBase64||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800)return res.status(400).json({error:"El audio, la letra o la duración no son válidos. El MP3 debe pesar menos de 18 MB."});
+  const ip=String(req.headers["x-forwarded-for"]||req.socket.remoteAddress||"").split(",")[0].trim(),now=Date.now(),record=lyricAlignLimits.get(ip)||{start:now,count:0};
+  if(now-record.start>3600000){record.start=now;record.count=0;}
   if(record.count>=4)return res.status(429).json({error:"Se alcanzó el límite temporal de sincronización. Espera una hora antes de volver a intentarlo."});
   record.count++;lyricAlignLimits.set(ip,record);
   const audio=Buffer.from(audioBase64,"base64");
   if(!audio.length||audio.length>18*1024*1024)return res.status(413).json({error:"El MP3 supera el límite de 18 MB para sincronización."});
-
-  // Files API: Google recomienda subir los audios de varios segundos antes de transcribirlos.
-  const uploadStart=await fetch("https://generativelanguage.googleapis.com/upload/v1beta/files?key="+encodeURIComponent(apiKey),{
-   method:"POST",headers:{
-    "X-Goog-Upload-Protocol":"resumable","X-Goog-Upload-Command":"start",
-    "X-Goog-Upload-Header-Content-Length":String(audio.length),
-    "X-Goog-Upload-Header-Content-Type":"audio/mpeg","Content-Type":"application/json"
-   },body:JSON.stringify({file:{display_name:"cch-lyric-align-"+crypto.randomUUID()}}),
-   signal:AbortSignal.timeout(30000)
-  });
-  if(!uploadStart.ok)throw new Error("Google no aceptó el archivo de audio ("+uploadStart.status+").");
-  const uploadUrl=uploadStart.headers.get("x-goog-upload-url");
-  if(!uploadUrl)throw new Error("Google no devolvió la dirección de carga del audio.");
-  const uploaded=await fetch(uploadUrl,{
-   method:"POST",headers:{"X-Goog-Upload-Offset":"0","X-Goog-Upload-Command":"upload, finalize","Content-Length":String(audio.length),"Content-Type":"audio/mpeg"},
-   body:audio,signal:AbortSignal.timeout(90000)
-  });
-  const uploadedPayload=await uploaded.json().catch(()=>({}));
-  if(!uploaded.ok||!uploadedPayload?.file?.uri)throw new Error("No se pudo subir el MP3 al servicio de transcripción.");
-  const fileUri=uploadedPayload.file.uri;
-  uploadedFileName=String(uploadedPayload.file.name||"");
-
-  const transcriptionResponse=await fetch("https://generativelanguage.googleapis.com/v1beta/interactions",{
-   method:"POST",headers:{"x-goog-api-key":apiKey,"Content-Type":"application/json"},
-   body:JSON.stringify({
-    model:"gemini-3.5-transcribe",
-    input:[{type:"audio",uri:fileUri,mime_type:"audio/mpeg"}],
-    generation_config:{transcription_config:{language_codes:["es-419"],mode:{type:"verbatim",timestamp_granularities:["word"]}}}
-   }),signal:AbortSignal.timeout(120000)
-  });
-  const interaction=await transcriptionResponse.json().catch(()=>({}));
-  if(!transcriptionResponse.ok)throw new Error("Gemini Transcribe no pudo analizar la voz ("+transcriptionResponse.status+").");
-  const words=[];
-  for(const step of interaction.steps||[]){
-   for(const content of step.content||[]){
-    for(const annotation of content.annotations||[]){
-     if(annotation.type!=="word_info")continue;
-     const text=String(annotation.text||"").trim(),startSeconds=parseFloat(String(annotation.start_offset||"")),endSeconds=parseFloat(String(annotation.end_offset||""));
-     const normalized=normalizeAlignWord(text);
-     if(normalized&&Number.isFinite(startSeconds)&&Number.isFinite(endSeconds)&&endSeconds>startSeconds)words.push({text,normalized,start:startSeconds,end:endSeconds});
-    }
-   }
-  }
-  if(!words.length)throw new Error("Gemini no devolvió marcas de tiempo por palabra para este audio.");
-
+  const form=new FormData();
+  form.append("file",new Blob([audio],{type:"audio/mpeg"}),"canta-con-el-corazon.mp3");
+  form.append("model","whisper-large-v3-turbo");form.append("response_format","verbose_json");
+  form.append("timestamp_granularities[]","word");form.append("language","es");
+  form.append("prompt",lyrics.join("\n").slice(0,900));
+  const response=await fetch("https://api.groq.com/openai/v1/audio/transcriptions",{method:"POST",headers:{Authorization:"Bearer "+apiKey},body:form,signal:AbortSignal.timeout(120000)});
+  const transcript=await response.json().catch(()=>({}));
+  if(!response.ok)throw Object.assign(new Error(String(transcript?.error?.message||"Groq Whisper no pudo transcribir el audio.")),{status:response.status});
+  const words=(Array.isArray(transcript.words)?transcript.words:[]).map(item=>{const text=String(item.word||"").trim(),start=Number(item.start),end=Number(item.end),normalized=normalizeAlignWord(text);return normalized&&Number.isFinite(start)&&Number.isFinite(end)&&end>start?{text,normalized,start,end}:null;}).filter(Boolean);
+  if(!words.length)throw new Error("Groq Whisper no devolvió marcas de tiempo por palabra.");
   const segments=[];let cursor=0;
   for(let lineIndex=0;lineIndex<lyrics.length;lineIndex++){
    const expected=lyrics[lineIndex].split(/\s+/).map(normalizeAlignWord).filter(Boolean);
    if(!expected.length)throw new Error("Una línea de la letra está vacía.");
-   let best=null;
-   const minLength=Math.max(1,Math.floor(expected.length*.45));
-   const maxLength=Math.min(words.length-cursor,expected.length+Math.max(5,Math.ceil(expected.length*.65)));
-   for(let from=cursor;from<words.length;from++){
-    for(let size=minLength;size<=maxLength&&from+size<=words.length;size++){
-     const heard=words.slice(from,from+size).map(w=>w.normalized);
-     const score=tokenEditDistance(expected,heard)/Math.max(expected.length,heard.length);
-     if(!best||score<best.score-0.0001||(Math.abs(score-best.score)<0.0001&&from<best.from))best={from,size,score};
-     if(best&&best.score===0&&from>best.from)break;
-    }
-    if(best&&best.score===0)break;
-   }
+   let best=null;const minLength=Math.max(1,Math.floor(expected.length*.45)),maxLength=Math.min(words.length-cursor,expected.length+Math.max(5,Math.ceil(expected.length*.65)));
+   for(let from=cursor;from<words.length;from++){for(let size=minLength;size<=maxLength&&from+size<=words.length;size++){const heard=words.slice(from,from+size).map(w=>w.normalized),score=tokenEditDistance(expected,heard)/Math.max(expected.length,heard.length);if(!best||score<best.score-0.0001||(Math.abs(score-best.score)<0.0001&&from<best.from))best={from,size,score};if(best&&best.score===0&&from>best.from)break;}if(best&&best.score===0)break;}
    if(!best||best.score>0.62)throw new Error("No se pudo reconocer con suficiente precisión la frase "+(lineIndex+1)+": "+lyrics[lineIndex]);
-   const matchedWords=words.slice(best.from,best.from+best.size);
-   const first=matchedWords[0],last=matchedWords[matchedWords.length-1];
-   // Alinear palabra por palabra dentro de la frase, conservando exactamente el texto original.
-   const n=expected.length,m=matchedWords.length;
-   const dp=Array.from({length:n+1},()=>Array(m+1).fill(0));
-   for(let i=0;i<=n;i++)dp[i][0]=i;
-   for(let j=0;j<=m;j++)dp[0][j]=j;
-   for(let i=1;i<=n;i++)for(let j=1;j<=m;j++){
-    const cost=alignWordCost(expected[i-1],matchedWords[j-1].normalized);
-    dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);
-   }
+   const matched=words.slice(best.from,best.from+best.size),first=matched[0],last=matched[matched.length-1],n=expected.length,m=matched.length,dp=Array.from({length:n+1},()=>Array(m+1).fill(0));
+   for(let i=0;i<=n;i++)dp[i][0]=i;for(let j=0;j<=m;j++)dp[0][j]=j;
+   for(let i=1;i<=n;i++)for(let j=1;j<=m;j++){const cost=alignWordCost(expected[i-1],matched[j-1].normalized);dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);}
    const mapping=Array(n).fill(null);let i=n,j=m;
-   while(i>0||j>0){
-    if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+alignWordCost(expected[i-1],matchedWords[j-1].normalized)){
-     mapping[i-1]=matchedWords[j-1];i--;j--;
-    }else if(i>0&&dp[i][j]===dp[i-1][j]+1){i--;}
-    else if(j>0){j--;}else break;
-   }
-   const originalTokens=lyrics[lineIndex].split(/(\\s+)/);
-   let wordIndex=0;
-   const wordCues=[];
-   for(const token of originalTokens){
-    if(!token.trim())continue;
-    const heard=mapping[wordIndex++];
-    if(heard)wordCues.push({text:token,start:Math.max(0,heard.start),end:Math.min(duration,heard.end)});
-   }
-   segments.push({index:lineIndex,start:Math.max(0,first.start),end:Math.min(duration,last.end),words:wordCues});
-   cursor=best.from+best.size;
+   while(i>0||j>0){if(i>0&&j>0&&dp[i][j]===dp[i-1][j-1]+alignWordCost(expected[i-1],matched[j-1].normalized)){mapping[i-1]=matched[j-1];i--;j--;}else if(i>0&&dp[i][j]===dp[i-1][j]+1)i--;else if(j>0)j--;else break;}
+   const tokens=lyrics[lineIndex].split(/(\s+)/);let wi=0;const wordCues=[];
+   for(const token of tokens){if(!token.trim())continue;const heard=mapping[wi++];if(heard)wordCues.push({text:token,start:Math.max(0,heard.start),end:Math.min(duration,heard.end)});}
+   segments.push({index:lineIndex,start:Math.max(0,first.start),end:Math.min(duration,last.end),words:wordCues});cursor=best.from+best.size;
   }
-  res.set("Cache-Control","no-store").json({ok:true,segments,model:"gemini-3.5-transcribe",timing:"word-level"});
- }catch(error){
-  console.error("Lyric alignment route:",error?.message||error);
-  const message=String(error?.message||"");
-  res.status(502).json({error:message.startsWith("No se pudo reconocer")||message.startsWith("Una línea")?message:"No se pudo completar la transcripción con marcas de tiempo. No se generará un video desincronizado; inténtalo nuevamente."});
- }finally{
-  if(uploadedFileName){
-   const apiKey=String(process.env.GEMINI_API_KEY||"").trim();
-   const fileId=uploadedFileName.startsWith("files/")?uploadedFileName.slice(6):uploadedFileName;
-   fetch("https://generativelanguage.googleapis.com/v1beta/files/"+encodeURIComponent(fileId)+"?key="+encodeURIComponent(apiKey),{method:"DELETE",signal:AbortSignal.timeout(10000)}).catch(()=>{});
-  }
- }
+  const firstStart=segments[0]?.start??0,firstSungWord=words.findIndex(w=>w.start>=firstStart-0.001),introWords=firstSungWord>0?words.slice(0,firstSungWord):[];
+  const spokenIntro=introWords.length?{text:introWords.map(w=>w.text).join(" ").trim(),start:introWords[0].start,end:introWords[introWords.length-1].end,words:introWords.map(w=>({text:w.text,start:w.start,end:w.end}))}:null;
+  res.set("Cache-Control","no-store").json({ok:true,segments,spokenIntro,model:"whisper-large-v3-turbo",timing:"word-level"});
+ }catch(error){console.error("Groq Whisper lyric alignment:",error?.message||error);const message=String(error?.message||"");res.status(502).json({error:message.startsWith("No se pudo reconocer")||message.startsWith("Una línea")?message:"Groq Whisper no pudo completar la transcripción con marcas de tiempo. La canción y su letra original no se modificarán."});}
 });
-
 // Generador de letras originales mediante proveedor compatible con OpenAI.
 const lyricRateLimits=new Map();
 // Asistente Gemini para clientes y administración. Solo conversación: no ejecuta pagos ni modifica pedidos.
