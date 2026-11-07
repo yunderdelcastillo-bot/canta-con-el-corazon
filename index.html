@@ -366,8 +366,8 @@ async function cchSendCustomerActivity(event='online'){
 (function(){
  if(window.__cchActivityMonitorStarted)return;window.__cchActivityMonitorStarted=true;
  cchSendCustomerActivity('online');
- setInterval(()=>{const p=document.getElementById('audioPlayer');cchSendCustomerActivity(p&&!p.paused?'listening':'online')},20000);
- document.addEventListener('visibilitychange',()=>cchSendCustomerActivity(document.hidden?'left':'online'));
+ setInterval(()=>{if(document.hidden)return;cchSendCustomerActivity((()=>{const p=document.getElementById('audioPlayer');return p&&p.currentSrc?(p.paused?'paused':'listening'):'online'})())},20000);
+ document.addEventListener('visibilitychange',()=>{if(!document.hidden)cchSendCustomerActivity('online')});
  window.addEventListener('pagehide',()=>cchSendCustomerActivity('left'));
  const p=document.getElementById('audioPlayer');
  if(p){p.addEventListener('play',()=>cchSendCustomerActivity('listening'));p.addEventListener('pause',()=>cchSendCustomerActivity('paused'));p.addEventListener('ended',()=>cchSendCustomerActivity('sample_finished'));}
