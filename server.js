@@ -985,7 +985,9 @@ app.post("/api/lyrics/align",async(req,res)=>{
   if((!audioBase64&&!audioPath)||audioBase64.length>25*1024*1024||!lyrics.length||lyrics.length>100||lyrics.some(x=>!x||x.length>500)||!Number.isFinite(duration)||duration<5||duration>1800)return res.status(400).json({error:"El audio, la letra o la duración no son válidos."});
   let audio;
   if(audioPath){
-   if(!/^[0-9a-f-]{36}\\/[0-9a-f-]{36}\\.mp3$/i.test(audioPath)||!preview)return res.status(400).json({error:"No se recibió una autorización válida para sincronizar."});
+   const audioParts=audioPath.split("/");
+   const uuidPattern=/^[0-9a-f-]{36}$/i;
+   if(audioParts.length!==2||!uuidPattern.test(audioParts[0])||!audioParts[1].toLowerCase().endsWith(".mp3")||!uuidPattern.test(audioParts[1].slice(0,-4))||!preview)return res.status(400).json({error:"No se recibió una autorización válida para sincronizar."});
    const tokenHash=crypto.createHash("sha256").update(preview).digest("hex"),db=admin();
    const {data:song,error:songError}=await db.from("songs").select("id,audio_path").eq("audio_path",audioPath).maybeSingle();
    if(songError||!song)return res.status(404).json({error:"No se encontró la canción para sincronizar."});
