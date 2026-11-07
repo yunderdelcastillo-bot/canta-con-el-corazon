@@ -213,6 +213,19 @@ function cchPaymentLinkStore(){try{return JSON.parse(localStorage.getItem("cch_o
 function cchRememberPaymentLink(orderId,accessToken){if(!orderId||!accessToken)return;const links=cchPaymentLinkStore();links[orderId]=accessToken;localStorage.setItem("cch_order_payment_links",JSON.stringify(links));}
 function cchBuildPaymentLink(orderId,accessToken){return "https://canta-con-el-corazon.onrender.com/?pago=1&pedido="+encodeURIComponent(orderId)+"&acceso="+encodeURIComponent(accessToken)+"#pago";}const $=id=>document.getElementById(id);let db=null,user=null,file=null;window.cchAdminGetToken=async()=>{if(!db)return '';const {data:{session}}=await db.auth.getSession();return session?.access_token||''};const cfg=()=>{try{return JSON.parse(localStorage.getItem('cc_config')||'{}')}catch{return {}}};
 function msg(id,t){$(id).textContent=t}function previewTokenStore(){try{return JSON.parse(localStorage.getItem("cc_preview_tokens")||"{}")}catch{return {}}}function packageStore(){try{return JSON.parse(localStorage.getItem('cc_song_packages')||'{}')}catch{return {}}}function makeLink(s,grant=''){const data={para:s.recipient||'',mensaje:s.dedication||'',audio:s.audio_path||'',letra:(s.lyrics||'').split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean).join('|'),tema:s.theme||'romantico'};const keys={esencial:'ESENCIAL',detalle:'DETALLE ESPECIAL',completo:'REGALO COMPLETO'};const key=s.package_key||packageStore()[s.id]?.key||'esencial';data.paquete=keys[key]||'ESENCIAL';data.precio=s.package_price||packageStore()[s.id]?.price||({esencial:20,detalle:25,completo:30}[key]);if(grant)data.grant=grant;data.surprise='1';return 'https://canta-con-el-corazon.onrender.com/?'+new URLSearchParams(data).toString()}
+// Un solo cliente Supabase por proyecto y almacenamiento persistente explícito en el navegador.
+function cchCreateSupabaseClient(url,key){
+ const normalizedUrl=new URL(url).origin;
+ const existing=window.__cchSupabasePersistentClient;
+ if(existing&&existing.url===normalizedUrl&&existing.key===key){db=existing.client;return db;}
+ const projectRef=new URL(normalizedUrl).hostname.split('.')[0];
+ const client=window.supabase.createClient(normalizedUrl,key,{auth:{
+  persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,
+  storage:window.localStorage,storageKey:'sb-'+projectRef+'-auth-token'
+ }});
+ window.__cchSupabasePersistentClient={url:normalizedUrl,key,client};
+ db=client;return client;
+}
 function init(){const c=cfg();if(c.url&&c.key){$('url').value=c.url;$('key').value=c.key;msg('connStatus','Configuración guardada encontrada. Comprobando conexión con Supabase…');setTimeout(()=>{if(!$('connect').disabled)$('connect').click()},400);return;}msg('connStatus','Buscando configuración guardada…');setTimeout(()=>{const url=$('url').value.trim(),key=$('key').value.trim();if(url&&key){msg('connStatus','Se encontraron datos en los campos del navegador. Validando conexión con Supabase…');$('connect').click();}else{msg('connStatus','No se encontró una configuración guardada. Completa la URL y la clave pública de Supabase y pulsa “Guardar y comprobar conexión”.');}},1200);}
 $('connect').onclick=async()=>{
  const rawUrl=$('url').value.trim(),key=$('key').value.trim();
@@ -226,7 +239,7 @@ $('connect').onclick=async()=>{
  }
  const url=parsed.origin,btn=$('connect');btn.disabled=true;msg('connStatus','Guardando la configuración y comprobando Supabase…');
  try{
-  const client=window.supabase.createClient(url,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+  const client=cchCreateSupabaseClient(url,key);
   localStorage.setItem('cc_config',JSON.stringify({url,key}));db=client;
   const {data:{session:restoredSession},error:sessionError}=await client.auth.getSession();
   if(sessionError)console.warn('No se pudo recuperar la sesión guardada:',sessionError.message);
@@ -320,7 +333,7 @@ $('login').onclick=async()=>{
    const parsed=new URL(savedUrl);
    if(parsed.protocol!=='https:'||!parsed.hostname.endsWith('.supabase.co'))throw new Error('La URL guardada de Supabase no es válida. Revisa la Project URL.');
    if(!(savedKey.startsWith('sb_publishable_')||savedKey.startsWith('eyJ')))throw new Error('La clave guardada no parece ser una clave pública anon/publishable. No uses service_role.');
-   db=window.supabase.createClient(parsed.origin,savedKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   db=cchCreateSupabaseClient(parsed.origin,savedKey);
   }
   const email=$('email').value.trim(),password=$('password').value;
   if(!email||!password)throw new Error('Escribe el correo y la contraseña del administrador.');
@@ -894,7 +907,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   say('Conectando con Supabase…');
   try{
    if(!window.supabase||typeof window.supabase.createClient!=='function')throw new Error('No se cargó la biblioteca de Supabase. Actualiza la página con internet.');
-   const client=window.supabase.createClient(parsed.origin,key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   const client=cchCreateSupabaseClient(parsed.origin,key);
    db=client;
    localStorage.setItem('cc_config',JSON.stringify({url:parsed.origin,key}));
    const {data,error:authError}=await client.auth.getSession();
@@ -965,7 +978,7 @@ async function cchAddOrderChat(card,order,token){const panel=document.createElem
   if(!window.supabase||typeof window.supabase.createClient!=='function'){say('No se cargó Supabase. Actualiza la página y comprueba internet.');return;}
   button.disabled=true;say('Verificando acceso administrativo con Supabase…');
   try{
-   const client=window.supabase.createClient(saved.url,saved.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+   const client=cchCreateSupabaseClient(saved.url,saved.key);
    const {data,error}=await client.auth.signInWithPassword({email,password});
    if(error)throw error;
    if(!data.user)throw new Error('Supabase no devolvió un usuario autenticado.');
