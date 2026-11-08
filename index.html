@@ -828,8 +828,9 @@ function buildCustomerOrderMessage(includeLyrics){
  let sessionId=sessionStorage.getItem('cchFormSessionId');
  if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem('cchFormSessionId',sessionId);}
  let started=false,heartbeat=null;
- const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,body:JSON.stringify({sessionId,event})}).catch(()=>{});
- const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},20000);};
+ const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,cache:'no-store',body:JSON.stringify({sessionId,event})}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;}).catch(error=>{console.warn('Seguimiento del formulario:',event,error.message);});
+ const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},15000);};
+ form.addEventListener('pointerdown',begin,{once:true,capture:true});
  form.addEventListener('input',begin,{once:true,capture:true});
  form.addEventListener('change',begin,{once:true,capture:true});
  form.addEventListener('focusin',begin,{once:true});
