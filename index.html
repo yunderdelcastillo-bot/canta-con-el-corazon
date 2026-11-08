@@ -840,14 +840,15 @@ function buildCustomerOrderMessage(includeLyrics){
   form.addEventListener('change',begin,{once:true,capture:true});
   form.addEventListener('focusin',begin,{once:true});
  }
- // Asistente conversacional: también cuenta cuando el cliente empieza a escribir su respuesta.
- if(assistantInput){
-  assistantInput.addEventListener('pointerdown',begin,{once:true});
-  assistantInput.addEventListener('focus',begin,{once:true});
-  assistantInput.addEventListener('input',begin,{once:true});
- }
- const assistantSend=document.getElementById('cchAiSend');
- if(assistantSend)assistantSend.addEventListener('click',begin,{once:true});
+ // El asistente se inserta más abajo en el HTML; usar eventos delegados
+ // permite detectarlo aunque todavía no exista cuando arranca este script.
+ const isAssistantTarget=target=>target instanceof Element&&(
+  target.matches('#cchAiInput')||target.closest('#cchAiControls')?.querySelector('#cchAiInput')===target
+ );
+ document.addEventListener('pointerdown',event=>{if(isAssistantTarget(event.target))begin();},true);
+ document.addEventListener('focusin',event=>{if(isAssistantTarget(event.target))begin();},true);
+ document.addEventListener('input',event=>{if(isAssistantTarget(event.target))begin();},true);
+ document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('#cchAiSend'))begin();},true);
  window.addEventListener('pagehide',()=>{if(started){send('left');if(heartbeat)clearInterval(heartbeat);}});
  window.cchFormSubmitted=()=>{if(started)send('submitted');if(heartbeat)clearInterval(heartbeat);sessionStorage.removeItem('cchFormSessionId');};
 })();
