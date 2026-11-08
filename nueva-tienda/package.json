@@ -1,13 +1,13 @@
 {
   "name": "canta-corazon-nueva-tienda",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
     "express": "^4.21.2",
-    "multer": "^1.4.5-lts.1"
+    "express-session": "^1.18.1",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1"
   }
 }
