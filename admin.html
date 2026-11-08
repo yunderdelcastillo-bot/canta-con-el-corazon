@@ -732,9 +732,9 @@ async function cchLoadActiveCustomerForms(){
   const token=await window.cchAdminGetToken();if(!token)return;
   const r=await fetch(API_BASE+'/api/admin/forms/active',{headers:{Authorization:'Bearer '+token},cache:'no-store'});
   const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo consultar.');
-  status.textContent=d.count?d.count+' cliente(s) completando el formulario ahora':'Ningún cliente está llenando el formulario en este momento.';
+  status.textContent=d.count?d.count+' persona(s) escribiendo o completando su pedido ahora':'Nadie está escribiendo en el formulario en este momento.';
   list.replaceChildren();
-  if(!d.count){list.textContent='Cuando alguien escriba o seleccione una opción en el formulario, aparecerá aquí.';return;}
+  if(!d.count){list.textContent='Cuando una persona escriba su primera respuesta, aparecerá aquí.';return;}
   d.sessions.forEach((item,i)=>{const row=document.createElement('div');row.style.cssText='padding:8px 10px;margin-top:6px;border-radius:10px;background:#e9f8ee;color:#176b3a;font-weight:650';row.textContent='🟢 Cliente activo '+(i+1)+' · Desde '+new Date(item.started_at).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});list.appendChild(row);});
  }catch(e){status.textContent='No se pudo consultar la actividad: '+e.message;}
 }
