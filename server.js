@@ -1285,8 +1285,9 @@ app.get("/api/admin/forms/active",async(req,res)=>{
    .gte("created_at",cutoff).order("created_at",{ascending:false}).limit(100);
   if(error)throw error;
   const sessions=(data||[]).map(row=>{
-   const match=String(row.body||"").match(/\\[cch-form-session:[0-9a-f-]{36}:(\\d+)\\]/i);
-   return match?{started_at:new Date(Number(match[1])).toISOString(),last_seen_at:row.created_at,status:"completando formulario"}:null;
+   const body=String(row.body||""),markerAt=body.indexOf(FORM_SESSION_MARKER);
+   const stamp=markerAt>=0?Number(body.slice(markerAt+FORM_SESSION_MARKER.length).split("]")[0].split(":").pop()):NaN;
+   return Number.isFinite(stamp)?{started_at:new Date(stamp).toISOString(),last_seen_at:row.created_at,status:"completando formulario"}:null;
   }).filter(Boolean);
   res.set("Cache-Control","no-store").json({ok:true,count:sessions.length,sessions});
  }catch(e){console.error("Active customer forms:",e?.message||e);res.status(500).json({error:"No se pudo consultar la actividad de formularios."});}
