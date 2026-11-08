@@ -830,6 +830,7 @@ function buildCustomerOrderMessage(includeLyrics){
  let started=false,heartbeat=null;
  const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,cache:'no-store',body:JSON.stringify({sessionId,event})}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;}).catch(error=>{console.warn('Seguimiento del formulario:',event,error.message);});
  const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},15000);};
+ window.cchTrackFormActivity=begin;
  form.addEventListener('pointerdown',begin,{once:true,capture:true});
  form.addEventListener('input',begin,{once:true,capture:true});
  form.addEventListener('change',begin,{once:true,capture:true});
@@ -1298,6 +1299,7 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
  }
  async function sendMessage(){
   const content=input.value.trim();if(!content||conversationTransferred)return;
+  if(typeof window.cchTrackFormActivity==='function')window.cchTrackFormActivity();
   messages.push({role:'user',content});add('user',content);input.value='';send.disabled=true;send.textContent='Pensando…';
   try{
    if(manualMode){handleManualReply(content);return;}
