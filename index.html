@@ -1490,7 +1490,7 @@ function mountCustomerOrderChat(){
       setProgress(90,'🎵 ¡Tu canción está lista! Ya puedes escuchar la muestra. Después adjunta tu voucher para desbloquear la descarga del MP3.');
       const upload=$('orderPaymentUpload');if(upload){upload.classList.remove('hidden');const paymentStatus=$('orderPaymentStatus');if(paymentStatus)paymentStatus.textContent='Tu muestra está lista. Adjunta tu voucher de S/25 (o S/30 si elegiste express). Al adjuntar el voucher, el pedido se aprobará automáticamente y la descarga del MP3 se desbloqueará cuando la canción esté lista.';}
       let a=$('customerAutomaticPreviewLink');
-      if(!a){a=document.createElement('a');a.id='customerAutomaticPreviewLink';a.className='btn full';a.style.cssText='display:block;text-align:center;margin:14px 0';a.textContent='🎁 ABRIR MI CANCIÓN';$('customerAudioProgress').after(a);}
+      if(!a){a=document.createElement('a');a.id='customerAutomaticPreviewLink';a.className='btn full';a.style.cssText='display:block;width:100%;box-sizing:border-box;text-align:center;margin:22px 0;padding:30px 18px;min-height:112px;font-size:clamp(1.55rem,6vw,2rem);font-weight:900;line-height:1.2;letter-spacing:.02em;border:3px solid #ffe08a;border-radius:999px;background:linear-gradient(110deg,#ffdc83 0%,#f6a9c2 100%);color:#3b1730;text-decoration:none;box-shadow:0 8px 0 #b97937,0 14px 28px rgba(255,190,110,.38);';a.textContent='🎁 ABRIR MI CANCIÓN';$('customerAudioProgress').after(a);}
       const previewUrl=new URL(d.previewUrl,location.origin);
       const paymentContext=window.cchPaymentContext;
       if(paymentContext?.orderId===id&&paymentContext?.accessToken){
