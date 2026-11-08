@@ -821,11 +821,9 @@ function buildCustomerOrderMessage(includeLyrics){
  return text;
 }
 
-// Monitoreo anónimo del formulario y del asistente conversacional.
+// Monitoreo anónimo: registra al cliente al escribir la primera respuesta.
 (function(){
- const form=document.getElementById('orderForm');
- const assistantInput=document.getElementById('cchAiInput');
- if((!form&&!assistantInput)||window.__cchFormTrackerStarted)return;
+ if(window.__cchFormTrackerStarted)return;
  window.__cchFormTrackerStarted=true;
  let sessionId=sessionStorage.getItem('cchFormSessionId');
  if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem('cchFormSessionId',sessionId);}
@@ -833,22 +831,18 @@ function buildCustomerOrderMessage(includeLyrics){
  const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,cache:'no-store',body:JSON.stringify({sessionId,event})}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;}).catch(error=>{console.warn('Seguimiento del formulario:',event,error.message);});
  const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},15000);};
  window.cchTrackFormActivity=begin;
- // Formulario clásico: registra la primera interacción sin enviar el contenido escrito.
+ // Solo comienza al escribir o cambiar una respuesta; no al abrir o tocar el campo.
+ const isAssistantTarget=target=>target instanceof Element&&target.matches('#cchAiInput');
+ document.addEventListener('input',event=>{if(isAssistantTarget(event.target))begin();},true);
+ document.addEventListener('change',event=>{
+  const target=event.target;
+  if(target instanceof Element&&(target.closest('#orderForm')||target.matches('#cchAiInput')))begin();
+ },true);
+ const form=document.getElementById('orderForm');
  if(form){
-  form.addEventListener('pointerdown',begin,{once:true,capture:true});
   form.addEventListener('input',begin,{once:true,capture:true});
   form.addEventListener('change',begin,{once:true,capture:true});
-  form.addEventListener('focusin',begin,{once:true});
  }
- // El asistente se inserta más abajo en el HTML; usar eventos delegados
- // permite detectarlo aunque todavía no exista cuando arranca este script.
- const isAssistantTarget=target=>target instanceof Element&&(
-  target.matches('#cchAiInput')||target.closest('#cchAiControls')?.querySelector('#cchAiInput')===target
- );
- document.addEventListener('pointerdown',event=>{if(isAssistantTarget(event.target))begin();},true);
- document.addEventListener('focusin',event=>{if(isAssistantTarget(event.target))begin();},true);
- document.addEventListener('input',event=>{if(isAssistantTarget(event.target))begin();},true);
- document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('#cchAiSend'))begin();},true);
  window.addEventListener('pagehide',()=>{if(started){send('left');if(heartbeat)clearInterval(heartbeat);}});
  window.cchFormSubmitted=()=>{if(started)send('submitted');if(heartbeat)clearInterval(heartbeat);sessionStorage.removeItem('cchFormSessionId');};
 })();
