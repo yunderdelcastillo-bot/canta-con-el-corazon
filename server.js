@@ -1270,7 +1270,14 @@ app.post("/api/forms/activity",async(req,res)=>{
     :{event_type:event==="left"?"form_left":"form_submitted",created_at:now};
    const {data,error}=await db.from("system_notifications").update(patch).eq("audience","admin").eq("event_type","form_started").like("body","%"+marker+"%").select("id");
    if(error)throw error;
-   if(!data?.length&&event==="heartbeat")return res.status(409).json({error:"No se encontró la sesión activa. Vuelve a tocar un campo del formulario."});
+   // Si se perdió el primer evento (red intermitente o pestaña suspendida),
+   // un heartbeat vuelve a crear la sesión para que el panel pueda detectarla.
+   if(!data?.length&&event==="heartbeat"){
+    const startedAt=Date.now();
+    const body="Un cliente está completando el formulario. "+marker+startedAt+"]";
+    const {error:insertError}=await db.from("system_notifications").insert({order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body,created_at:now});
+    if(insertError)throw insertError;
+   }
   }
   res.set("Cache-Control","no-store").json({ok:true});
  }catch(e){console.error("Customer form activity:",e?.message||e);res.status(500).json({error:"No se pudo registrar la actividad del formulario."});}
