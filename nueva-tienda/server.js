@@ -1,19 +1,26 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import session from "express-session";
+import pg from "pg";
+const { Pool } = pg;
 const app=express();
 const __dirname=path.dirname(fileURLToPath(import.meta.url));
 const PORT=process.env.PORT||10000;
-app.use(express.json({limit:"2mb"}));
+app.use(express.json({limit:"3mb"}));
+app.use(session({name:"cc_admin",secret:process.env.SESSION_SECRET||"change-this-session-secret-before-production",resave:false,saveUninitialized:false,cookie:{httpOnly:true,sameSite:"strict",secure:process.env.NODE_ENV==="production",maxAge:8*60*60*1000}}));
 app.use(express.static(path.join(__dirname,"public")));
-app.get("/api/health",(_req,res)=>res.json({ok:true,service:"canta-corazon-nueva-tienda"}));
-app.get("/api/config",(_req,res)=>res.json({
- brand:"Canta con el Corazón",
- currency:"PEN",
- price:Number(process.env.SONG_PRICE||20),
- previewSeconds:Number(process.env.PREVIEW_SECONDS||30),
- yapeQrConfigured:Boolean(process.env.YAPE_QR_IMAGE_URL),
- trebloConfigured:Boolean(process.env.TREBLO_API_KEY)
-}));
-app.post("/api/orders",(_req,res)=>res.status(501).json({error:"La creación real de pedidos se habilitará al conectar Treblo y la base de datos segura."}));
-app.listen(PORT,"0.0.0.0",()=>console.log("Canta con el Corazón nueva tienda en puerto",PORT));
+const pool=process.env.DATABASE_URL?new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.DATABASE_URL.includes("render.com")?{rejectUnauthorized:false}:undefined}):null;
+async function initDb(){if(!pool)return;await pool.query(`CREATE TABLE IF NOT EXISTS orders(id BIGSERIAL PRIMARY KEY, customer_name TEXT NOT NULL, email TEXT, phone TEXT, details JSONB NOT NULL DEFAULT '{}'::jsonb, status TEXT NOT NULL DEFAULT 'nuevo', payment_status TEXT NOT NULL DEFAULT 'pendiente', voucher_data TEXT, preview_url TEXT, full_song_url TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);}
+const requireAdmin=(req,res,next)=>{if(req.session?.admin===true)return next();res.status(401).json({error:"Inicia sesión para continuar."});};
+app.get("/api/health",(_req,res)=>res.json({ok:true,service:"canta-corazon-nueva-tienda",database:Boolean(pool)}));
+app.get("/api/config",(_req,res)=>res.json({brand:"Canta con el Corazón",currency:"PEN",price:30,previewSeconds:30,yapeQrConfigured:Boolean(process.env.YAPE_QR_IMAGE_URL),trebloConfigured:Boolean(process.env.TREBLO_API_KEY),database:Boolean(pool)}));
+app.get("/admin",(req,res)=>res.sendFile(path.join(__dirname,"public","admin.html")));
+app.post("/api/admin/login",(req,res)=>{const {password}=req.body||{};if(!process.env.ADMIN_PASSWORD)return res.status(503).json({error:"Falta configurar ADMIN_PASSWORD en Render."});if(typeof password!=="string"||password!==process.env.ADMIN_PASSWORD)return res.status(401).json({error:"Contraseña incorrecta."});req.session.admin=true;res.json({ok:true});});
+app.post("/api/admin/logout",(req,res)=>req.session.destroy(()=>res.json({ok:true})));
+app.get("/api/admin/me",requireAdmin,(_req,res)=>res.json({ok:true}));
+app.get("/api/admin/orders",requireAdmin,async(_req,res)=>{if(!pool)return res.status(503).json({error:"Base de datos aún no conectada."});try{const {rows}=await pool.query("SELECT * FROM orders ORDER BY created_at DESC LIMIT 300");res.json({orders:rows});}catch(e){res.status(500).json({error:"No se pudieron cargar los pedidos."});}});
+app.patch("/api/admin/orders/:id",requireAdmin,async(req,res)=>{if(!pool)return res.status(503).json({error:"Base de datos aún no conectada."});const {status,payment_status,preview_url,full_song_url}=req.body||{};try{const {rows}=await pool.query("UPDATE orders SET status=COALESCE($1,status),payment_status=COALESCE($2,payment_status),preview_url=COALESCE($3,preview_url),full_song_url=COALESCE($4,full_song_url),updated_at=NOW() WHERE id=$5 RETURNING id,status,payment_status,preview_url,full_song_url",[status,payment_status,preview_url,full_song_url,req.params.id]);if(!rows[0])return res.status(404).json({error:"Pedido no encontrado."});res.json({order:rows[0]});}catch(e){res.status(500).json({error:"No se pudo actualizar el pedido."});}});
+app.post("/api/orders",async(req,res)=>{if(!pool)return res.status(503).json({error:"Los pedidos se habilitarán al conectar la base de datos."});const d=req.body||{};const name=String(d.sender||"").trim();if(!name)return res.status(400).json({error:"Falta el nombre del remitente."});try{const {rows}=await pool.query("INSERT INTO orders(customer_name,email,phone,details) VALUES($1,$2,$3,$4) RETURNING id,created_at,status,payment_status",[name,d.email||null,d.phone||null,d]);res.status(201).json({order:rows[0]});}catch(e){res.status(500).json({error:"No se pudo registrar el pedido."});}});
+app.get("*",(req,res,next)=>{if(req.path.startsWith("/api/"))return res.status(404).json({error:"Ruta no encontrada."});next();});
+initDb().then(()=>app.listen(PORT,"0.0.0.0",()=>console.log("Nueva tienda escuchando en",PORT))).catch(e=>{console.error("Error iniciando base de datos",e);process.exit(1);});
