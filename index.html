@@ -1100,13 +1100,26 @@ document.getElementById('sendCustomerLyricsWhatsApp').addEventListener('click',(
 (function(){
  const panel=document.getElementById('cchAiPanel'),initial='¡Hola! 💗 Bienvenido/a a Canta con el corazón. Creamos canciones personalizadas para expresar lo que sientes y sorprender a alguien especial. 🎶\n\nTe ayudaré a contarme tu historia y escoger la música y la voz. No necesitas llenar el formulario mientras conversamos: iré guardando tus respuestas. Al final podrás revisar tus datos y pulsar «Generar mi letra». 💝\n\nPara comenzar, ¿cómo te llamas y para quién será la canción?';
  const messages=[{role:'assistant',content:initial}],box=document.getElementById('cchAiMessages'),input=document.getElementById('cchAiInput'),send=document.getElementById('cchAiSend'),autoStatus=document.getElementById('cchAiAutoStatus');
- // Conexión directa con el monitor: se registra al escribir, sin esperar al botón Enviar.
- // Detectar la entrada al asistente y la primera interacción de escritura.
- const trackAssistant=()=>window.cchTrackFormActivity?.();
+ // Seguimiento independiente del formulario principal: funciona aunque ese módulo no cargue.
+ let liveSessionId='';
+ try{liveSessionId=sessionStorage.getItem('cchFormSessionId')||'';}catch(e){}
+ if(!liveSessionId){
+  liveSessionId=(crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==='x'?r:(r&3|8)).toString(16);}));
+  try{sessionStorage.setItem('cchFormSessionId',liveSessionId);}catch(e){}
+ }
+ let liveStarted=false,liveHeartbeat=null;
+ const sendLiveActivity=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:liveSessionId,event}),keepalive:true,cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r;}).catch(e=>console.warn('CCH live activity:',event,e.message));
+ const trackAssistant=()=>{
+  if(liveStarted)return;
+  liveStarted=true;
+  sendLiveActivity('started');
+  liveHeartbeat=setInterval(()=>{if(!document.hidden)sendLiveActivity('heartbeat');},15000);
+ };
+ window.cchTrackFormActivity=trackAssistant;
  document.getElementById('cchAiOpen')?.addEventListener('click',trackAssistant);
- input.addEventListener('focus',()=>{if(input.value.trim())trackAssistant();});
- input.addEventListener('input',()=>{if(input.value.trim())trackAssistant();});
- input.addEventListener('keyup',()=>{if(input.value.trim())trackAssistant();});
+ input.addEventListener('focus',trackAssistant);
+ input.addEventListener('input',trackAssistant);
+ window.addEventListener('pagehide',()=>{if(liveStarted){sendLiveActivity('left');if(liveHeartbeat)clearInterval(liveHeartbeat);}});
  const infoToggle=document.getElementById('cchAiInfoToggle'),infoText=document.getElementById('cchAiInfoText');let infoHideTimer=null;
  infoToggle.addEventListener('click',()=>{infoText.hidden=false;infoToggle.setAttribute('aria-expanded','true');infoToggle.textContent='ⓘ Ocultar información';clearTimeout(infoHideTimer);infoHideTimer=setTimeout(()=>{infoText.hidden=true;infoToggle.setAttribute('aria-expanded','false');infoToggle.textContent='ⓘ Información';},4000);});
  let finalQuestionAsked=false,conversationTransferred=false,cachedOrderData={};
