@@ -821,9 +821,11 @@ function buildCustomerOrderMessage(includeLyrics){
  return text;
 }
 
-// Monitoreo anónimo del formulario: no se transmiten los datos que el cliente escribe.
+// Monitoreo anónimo del formulario y del asistente conversacional.
 (function(){
- const form=document.getElementById('orderForm');if(!form||window.__cchFormTrackerStarted)return;
+ const form=document.getElementById('orderForm');
+ const assistantInput=document.getElementById('cchAiInput');
+ if((!form&&!assistantInput)||window.__cchFormTrackerStarted)return;
  window.__cchFormTrackerStarted=true;
  let sessionId=sessionStorage.getItem('cchFormSessionId');
  if(!sessionId){sessionId=crypto.randomUUID();sessionStorage.setItem('cchFormSessionId',sessionId);}
@@ -831,10 +833,21 @@ function buildCustomerOrderMessage(includeLyrics){
  const send=event=>fetch(API_BASE+'/api/forms/activity',{method:'POST',headers:{'Content-Type':'application/json'},keepalive:true,cache:'no-store',body:JSON.stringify({sessionId,event})}).then(async r=>{const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'HTTP '+r.status);return d;}).catch(error=>{console.warn('Seguimiento del formulario:',event,error.message);});
  const begin=()=>{if(started)return;started=true;send('started');heartbeat=setInterval(()=>{if(!document.hidden)send('heartbeat');},15000);};
  window.cchTrackFormActivity=begin;
- form.addEventListener('pointerdown',begin,{once:true,capture:true});
- form.addEventListener('input',begin,{once:true,capture:true});
- form.addEventListener('change',begin,{once:true,capture:true});
- form.addEventListener('focusin',begin,{once:true});
+ // Formulario clásico: registra la primera interacción sin enviar el contenido escrito.
+ if(form){
+  form.addEventListener('pointerdown',begin,{once:true,capture:true});
+  form.addEventListener('input',begin,{once:true,capture:true});
+  form.addEventListener('change',begin,{once:true,capture:true});
+  form.addEventListener('focusin',begin,{once:true});
+ }
+ // Asistente conversacional: también cuenta cuando el cliente empieza a escribir su respuesta.
+ if(assistantInput){
+  assistantInput.addEventListener('pointerdown',begin,{once:true});
+  assistantInput.addEventListener('focus',begin,{once:true});
+  assistantInput.addEventListener('input',begin,{once:true});
+ }
+ const assistantSend=document.getElementById('cchAiSend');
+ if(assistantSend)assistantSend.addEventListener('click',begin,{once:true});
  window.addEventListener('pagehide',()=>{if(started){send('left');if(heartbeat)clearInterval(heartbeat);}});
  window.cchFormSubmitted=()=>{if(started)send('submitted');if(heartbeat)clearInterval(heartbeat);sessionStorage.removeItem('cchFormSessionId');};
 })();
