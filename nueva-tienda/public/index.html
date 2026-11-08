@@ -1,19 +1,64 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#8b2f68"><title>Tu canción, tu historia | Canta con el Corazón</title>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#321b25">
+<title>Tu canción, tu historia | Canta con el Corazón</title>
 <style>
-:root{--pink:#b53b78;--plum:#542044;--bg:#fff8fc;--ink:#291b26}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,sans-serif}.wrap{max-width:720px;margin:auto;padding:22px 16px 50px}.hero{text-align:center;padding:28px 18px 24px;background:linear-gradient(145deg,#ffe5f1,#f3e6ff);border-radius:24px}.logo{font-size:13px;letter-spacing:3px;color:var(--pink);font-weight:800}.hero h1{font-size:clamp(30px,7vw,48px);line-height:1.05;margin:12px 0;color:var(--plum)}.hero p{margin:0;color:#6d5265}.card{background:white;border:1px solid #f0dce8;border-radius:20px;padding:20px;margin-top:16px;box-shadow:0 8px 28px #61284c0d}h2{font-size:20px;margin:0 0 14px;color:var(--plum)}label{display:block;font-weight:700;font-size:14px;margin:13px 0 6px}input,select,textarea{width:100%;border:1px solid #e5ccd9;border-radius:12px;padding:13px;font:inherit;background:#fff}textarea{min-height:100px;resize:vertical}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{display:block;width:100%;border:0;border-radius:14px;padding:15px;background:var(--pink);color:#fff;font-size:16px;font-weight:800;margin-top:18px}.muted{font-size:13px;color:#806d79;line-height:1.5}.steps{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:15px}.pill{background:#fff;border:1px solid #eacddd;border-radius:99px;padding:7px 11px;font-size:12px;color:#70415c}#status{margin-top:12px;padding:12px;border-radius:12px;background:#fff0f6;display:none}.price{font-size:34px;color:var(--pink);font-weight:900}@media(max-width:480px){.grid{grid-template-columns:1fr}.card{padding:16px}}
-</style></head><body><main class="wrap">
-<header class="hero"><div class="logo">CANTA CON EL CORAZÓN</div><h1>Tu canción,<br>tu historia ❤️</h1><p>¡Convierte tus sentimientos en una canción inolvidable!</p><div class="steps"><span class="pill">1. Personaliza</span><span class="pill">2. Escucha tu muestra</span><span class="pill">3. Paga y desbloquea</span></div></header>
-<section class="card"><h2>🎁 Cuéntanos para quién es</h2><form id="order">
-<label>Nombre de la persona homenajeada</label><input name="recipient" required maxlength="80" placeholder="Ej. Mi amor, mamá, Jorge">
-<div class="grid"><div><label>Motivo</label><select name="occasion"><option>Cumpleaños</option><option>Aniversario</option><option>Declaración de amor</option><option>Día de la Madre o del Padre</option><option>Homenaje</option><option>Otro</option></select></div><div><label>Estilo musical</label><select name="genre"><option>Balada romántica</option><option>Cumbia peruana</option><option>Salsa</option><option>Reguetón romántico</option><option>Mariachi</option><option>Pop</option><option value="Otro">Otro (escribir mi estilo)</option></select><div id="customGenreWrap" hidden><label>¿Qué género musical deseas?</label><input name="genre_custom" maxlength="80" placeholder="Escribe el género musical"></div></div></div>
-<div class="grid"><div><label>Tipo de voz</label><select name="voice"><option>Femenina</option><option>Masculina</option></select></div><div><label>Idioma</label><select name="language"><option>Español</option></select></div></div>
-<label>Cuéntanos su historia y los detalles que quieres incluir</label><textarea name="story" required maxlength="2500" placeholder="¿Qué los une? ¿Qué recuerdo especial quieres mencionar?"></textarea>
-<label>Tu nombre o firma para la dedicatoria</label><input name="sender" required maxlength="80" placeholder="¿De parte de quién?">
-<button class="btn" type="submit">CREAR MI CANCIÓN AHORA</button><p class="muted">Precio de referencia: S/20. La muestra gratuita y la compra se habilitarán cuando se conecten el generador, el QR y la verificación de pagos.</p><div id="status" role="status"></div></form></section>
-<section class="card"><h2>🎵 Escucha antes de comprar</h2><p class="muted">Después de generar tu canción, podrás escuchar una muestra de 30 segundos. Si te encanta, podrás pagar con Yape y enviar tu comprobante.</p><div class="price">S/20</div><p class="muted">El audio completo se desbloquea después de que el administrador confirme el pago.</p></section>
-<footer class="muted" style="text-align:center;padding:22px">Canta con el Corazón · Canciones personalizadas hechas con amor.</footer>
-</main><script>
-const form=document.querySelector("#order"),status=document.querySelector("#status"),genreSelect=form.elements.genre,customGenreWrap=document.querySelector("#customGenreWrap"),customGenreInput=form.elements.genre_custom;\ngenreSelect.addEventListener("change",()=>{const custom=genreSelect.value==="Otro";customGenreWrap.hidden=!custom;customGenreInput.required=custom;if(!custom)customGenreInput.value="";});
-form.addEventListener("submit",async e=>{e.preventDefault();status.style.display="block";status.textContent="La tienda está preparada visualmente. La generación real se activará al conectar tu API Treblo y la base de datos; todavía no se ha creado ningún pedido ni consumido créditos."});
-</script></body></html>
+:root{--rose:#c83e68;--coral:#ee6658;--ink:#281c22;--muted:#776b70;--paper:#fffaf8;--line:#e9dfe0}
+*{box-sizing:border-box}body{margin:0;background:#24171b;color:var(--ink);font-family:Arial,system-ui,sans-serif}
+.page{max-width:850px;margin:auto;padding:24px 16px 54px}.hero{color:white;padding:42px 12px 34px;text-align:center}.brand{font-weight:800;letter-spacing:3px;color:#ffb6aa;font-size:13px}.hero h1{font-family:Georgia,serif;font-size:clamp(42px,9vw,72px);line-height:.98;margin:18px auto;max-width:720px}.hero p{font-size:17px;line-height:1.6;color:#e8dadd;max-width:620px;margin:0 auto}.form-card{background:#fff9f7;border:1px solid #eadcda;border-radius:24px;padding:clamp(20px,5vw,42px);max-width:780px;margin:0 auto;box-shadow:0 18px 60px #0003}.eyebrow{color:#e7a195;letter-spacing:2px;font-size:13px;font-weight:800;margin:0 0 22px}.form-card h2{font-size:clamp(28px,6vw,42px);line-height:1.12;margin:0 0 28px}.field{margin:22px 0}.field label,.field-title{display:block;font-weight:800;font-size:17px;margin-bottom:10px}.hint{color:#8a7d81;font-size:14px;line-height:1.5;margin:0 0 12px}.control{width:100%;border:1px solid #ddd5d6;border-radius:15px;background:white;padding:17px 18px;font:inherit;font-size:17px;color:var(--ink);outline-color:var(--rose)}textarea.control{min-height:135px;resize:vertical}.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.tile{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;min-height:92px;padding:15px 10px;border:1px solid #ddd5d6;border-radius:20px;background:white;font-weight:800;font-size:16px;line-height:1.25;cursor:pointer}.tile input{position:absolute;opacity:0;inset:0;cursor:pointer}.tile:has(input:checked){border:2px solid var(--rose);background:#fff0f2;box-shadow:0 0 0 2px #c83e6812}.voice-list{display:grid;gap:10px}.voice{display:flex;align-items:center;gap:14px;padding:17px;border:1px solid #ddd5d6;background:white;border-radius:16px;font-size:17px;font-weight:800}.voice input{accent-color:var(--rose);width:22px;height:22px}.custom{margin-top:12px}.custom[hidden]{display:none}.submit{width:100%;border:0;border-radius:16px;padding:20px 16px;background:linear-gradient(100deg,var(--rose),var(--coral));color:white;font-size:19px;font-weight:900;margin-top:20px;cursor:pointer}.small{font-size:13px;color:var(--muted);line-height:1.55;text-align:center;margin:16px 0 0}#status{display:none;margin-top:14px;padding:14px;border-radius:12px;background:#fff0f2;color:#693343;line-height:1.5}.price{text-align:center;color:#fff;margin:24px 0 0;font-weight:700}.price strong{font-size:26px;color:#ffb6aa}.footer{text-align:center;color:#cdbfc2;font-size:13px;padding:28px 8px 0}
+@media(max-width:560px){.page{padding:12px 10px 35px}.hero{padding:30px 10px}.tiles{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.tile{min-height:82px;font-size:15px}.form-card{border-radius:20px;padding:22px 17px}.field label,.field-title{font-size:16px}}
+</style>
+</head>
+<body><main class="page">
+<header class="hero"><div class="brand">CANTA CON EL CORAZÓN PRESENTA</div><h1>Tu canción,<br>tu historia.</h1><p>Convierte sus recuerdos y sentimientos en una canción personalizada que podrá escuchar una y otra vez.</p></header>
+<section class="form-card">
+<p class="eyebrow">CREA TU VISTA PREVIA</p>
+<h2>Cuéntanos de qué trata la canción</h2>
+<form id="order">
+<div class="field"><label for="forWhom">¿Para quién es la canción?</label><select class="control" id="forWhom" name="forWhom" required><option value="">Elige una opción</option><option>Mi pareja</option><option>Mi esposo o esposa</option><option>Mi novio o novia</option><option>Mi mamá</option><option>Mi papá</option><option>Mi hijo o hija</option><option>Un familiar</option><option>Un amigo o amiga</option><option>Para mí</option><option>Otra persona</option></select></div>
+<div class="field"><label for="recipient">Su nombre</label><p class="hint">Escribe el nombre exactamente como debe cantarse.</p><input class="control" id="recipient" name="recipient" required maxlength="80" placeholder="Ejemplo: Emily"></div>
+<div class="field"><span class="field-title">Estilo de la canción</span>
+<div class="tiles">
+<label class="tile">🎸 Balada pop latina<input type="radio" name="genre" value="Balada pop latina" required></label>
+<label class="tile">💃 Bachata romántica<input type="radio" name="genre" value="Bachata romántica"></label>
+<label class="tile">🎻 Balada acústica romántica<input type="radio" name="genre" value="Balada acústica romántica"></label>
+<label class="tile">🎷 R&amp;B / urbano suave<input type="radio" name="genre" value="R&B / urbano suave"></label>
+<label class="tile">🎧 Rap / Hip-Hop latino<input type="radio" name="genre" value="Rap / Hip-Hop latino"></label>
+<label class="tile">🙏 Góspel / Alabanza<input type="radio" name="genre" value="Góspel / Alabanza"></label>
+<label class="tile">🇵🇪 Cumbia peruana<input type="radio" name="genre" value="Cumbia peruana"></label>
+<label class="tile">🎶 Salsa<input type="radio" name="genre" value="Salsa"></label>
+<label class="tile">🎤 Otro estilo<input type="radio" name="genre" value="Otro"></label>
+</div>
+<div class="custom" id="customGenreWrap" hidden><label for="customGenre">Escribe el género o estilo musical que deseas</label><input class="control" id="customGenre" name="genre_custom" maxlength="100" placeholder="Ejemplo: huayno, rock, música criolla, merengue..."></div>
+</div>
+<div class="field"><span class="field-title">Voz</span><div class="voice-list">
+<label class="voice"><input type="radio" name="voice" value="Femenina" checked> Voz femenina</label>
+<label class="voice"><input type="radio" name="voice" value="Masculina"> Voz masculina</label>
+</div></div>
+<div class="field"><label for="qualities">Cualidades que admiras de esa persona</label><textarea class="control" id="qualities" name="qualities" maxlength="1500" placeholder="Generosa, alegre, valiente, siempre está cuando la necesito..."></textarea></div>
+<div class="field"><label for="moments">Momentos especiales juntos <span class="hint" style="display:inline">(opcional)</span></label><textarea class="control" id="moments" name="moments" maxlength="1500" placeholder="Un viaje, una conversación, un recuerdo que nunca olvidarás..."></textarea></div>
+<div class="field"><label for="message">Tu mensaje especial</label><p class="hint">Cuéntanos cómo se conocieron, recuerdos favoritos, promesas, bromas o qué quieres que esa persona sienta.</p><textarea class="control" id="message" name="message" required maxlength="2500" placeholder="Quiero decirle cuánto significa para mí..."></textarea></div>
+<div class="field"><span class="field-title">Ocasión</span><div class="tiles">
+<label class="tile">🎂 Cumpleaños<input type="radio" name="occasion" value="Cumpleaños" required></label>
+<label class="tile">💕 Declaración de amor<input type="radio" name="occasion" value="Declaración de amor"></label>
+<label class="tile">💍 Boda / aniversario<input type="radio" name="occasion" value="Boda o aniversario"></label>
+<label class="tile">🎁 Solo un regalo<input type="radio" name="occasion" value="Solo un regalo"></label>
+<label class="tile">🎵 Otro momento<input type="radio" name="occasion" value="Otro momento"></label>
+</div></div>
+<div class="field"><label for="sender">¿De parte de quién es la canción?</label><input class="control" id="sender" name="sender" required maxlength="80" placeholder="Tu nombre o firma"></div>
+<button class="submit" type="submit">CREAR VISTA PREVIA GRATIS&nbsp; →</button>
+<p class="small">Precio de referencia: S/20. La generación de la vista previa, el pago con Yape y la descarga se activarán al conectar los servicios correspondientes.</p>
+<div id="status" role="status"></div>
+</form></section>
+<p class="price">Tu historia merece una canción. <strong>S/20</strong></p>
+<footer class="footer">Canta con el Corazón · Canciones personalizadas hechas con amor.</footer>
+</main>
+<script>
+const form=document.querySelector("#order"),status=document.querySelector("#status"),customWrap=document.querySelector("#customGenreWrap"),customInput=document.querySelector("#customGenre");
+form.querySelectorAll('input[name="genre"]').forEach(r=>r.addEventListener("change",()=>{const show=r.checked&&r.value==="Otro";if(show){customWrap.hidden=false;customInput.required=true;}else if(r.checked){customWrap.hidden=true;customInput.required=false;customInput.value="";}}));
+form.addEventListener("change",()=>{const selected=form.querySelector('input[name="genre"]:checked');const show=selected&&selected.value==="Otro";customWrap.hidden=!show;customInput.required=!!show;});
+form.addEventListener("submit",e=>{e.preventDefault();status.style.display="block";status.textContent="¡Gracias! El formulario visual está listo. La creación real de la vista previa se habilitará cuando conectemos Treblo y la base de datos. Por ahora no se ha enviado ni generado ningún pedido.";});
+</script>
+</body></html>
