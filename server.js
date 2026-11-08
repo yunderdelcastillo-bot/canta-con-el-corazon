@@ -1248,19 +1248,30 @@ app.post("/api/assistant/chat",async(req,res)=>{
 const orderFields=["buyer","contact","recipient","relationship","occasion","story","style","customGenre","voice","specialPhrase","lyricDuration","lyricTone","package","urgency","lyrics"];
 function cleanOrderText(v,max=1500){return String(v??"").trim().slice(0,max);}
 const orderAudioStatus=new Map();
-const activeCustomerForms=new Map();
+// Actividad de formularios persistida en system_notifications para que funcione
+// aunque Render atienda la tienda y el panel desde instancias distintas.
+const FORM_SESSION_MARKER="[cch-form-session:";
 app.post("/api/forms/activity",async(req,res)=>{
  try{
+  if(!ready())return res.status(503).json({error:"La base de datos no está disponible."});
   const sessionId=String(req.body?.sessionId||"");
   const event=String(req.body?.event||"heartbeat");
   if(!/^[0-9a-f-]{36}$/i.test(sessionId)||!["started","heartbeat","left","submitted"].includes(event))return res.status(400).json({error:"Sesión de formulario no válida."});
-  const now=Date.now(),previous=activeCustomerForms.get(sessionId);
-  if(event==="started"&&!previous){
-   activeCustomerForms.set(sessionId,{sessionId,startedAt:now,lastSeenAt:now,status:"completando formulario"});
-   await createSystemNotification(admin(),{order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body:"Hay una persona completando el formulario de Canta con el corazón. Aún no ha enviado el pedido."});
-  }else if(event==="heartbeat"&&previous){previous.lastSeenAt=now;previous.status="completando formulario";activeCustomerForms.set(sessionId,previous);}
-  else if(event==="left"&&previous){previous.lastSeenAt=now;previous.status="salió del formulario";previous.leftAt=now;activeCustomerForms.set(sessionId,previous);}
-  else if(event==="submitted"){activeCustomerForms.delete(sessionId);}
+  const db=admin(),marker=FORM_SESSION_MARKER+sessionId+":";
+  const now=new Date().toISOString();
+  if(event==="started"){
+   const startedAt=Date.now();
+   const body="Un cliente está completando el formulario. "+marker+startedAt+"]";
+   const {error}=await db.from("system_notifications").insert({order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body,created_at:now});
+   if(error)throw error;
+  }else{
+   const patch=event==="heartbeat"
+    ?{created_at:now}
+    :{event_type:event==="left"?"form_left":"form_submitted",created_at:now};
+   const {data,error}=await db.from("system_notifications").update(patch).eq("audience","admin").eq("event_type","form_started").like("body","%"+marker+"%").select("id");
+   if(error)throw error;
+   if(!data?.length&&event==="heartbeat")return res.status(409).json({error:"No se encontró la sesión activa. Vuelve a tocar un campo del formulario."});
+  }
   res.set("Cache-Control","no-store").json({ok:true});
  }catch(e){console.error("Customer form activity:",e?.message||e);res.status(500).json({error:"No se pudo registrar la actividad del formulario."});}
 });
@@ -1268,9 +1279,15 @@ app.get("/api/admin/forms/active",async(req,res)=>{
  try{
   if(!ready())return res.status(503).json({error:"Supabase no está configurado."});
   const user=await mediaUser(req);if(!user)return res.status(401).json({error:"Inicia sesión como administradora."});
-  const now=Date.now();
-  for(const [id,item] of activeCustomerForms){if(now-item.lastSeenAt>90000)activeCustomerForms.delete(id);}
-  const sessions=[...activeCustomerForms.values()].filter(x=>!x.leftAt&&now-x.lastSeenAt<75000).map(x=>({started_at:new Date(x.startedAt).toISOString(),last_seen_at:new Date(x.lastSeenAt).toISOString(),status:x.status}));
+  const cutoff=new Date(Date.now()-75000).toISOString();
+  const {data,error}=await admin().from("system_notifications")
+   .select("body,created_at").eq("audience","admin").eq("event_type","form_started")
+   .gte("created_at",cutoff).order("created_at",{ascending:false}).limit(100);
+  if(error)throw error;
+  const sessions=(data||[]).map(row=>{
+   const match=String(row.body||"").match(/\\[cch-form-session:[0-9a-f-]{36}:(\\d+)\\]/i);
+   return match?{started_at:new Date(Number(match[1])).toISOString(),last_seen_at:row.created_at,status:"completando formulario"}:null;
+  }).filter(Boolean);
   res.set("Cache-Control","no-store").json({ok:true,count:sessions.length,sessions});
  }catch(e){console.error("Active customer forms:",e?.message||e);res.status(500).json({error:"No se pudo consultar la actividad de formularios."});}
 });
