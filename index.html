@@ -84,6 +84,15 @@ body.gift-mode #revealed:after{content:"Hecha con amor ♥ por Canta con el cora
 body.gift-mode #intro.stock-video-active{background-image:none!important;background-color:#100916}
 
 body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode .wrap{width:100%;max-width:none;min-height:100svh;margin:0;padding:0}body.video-share-mode .wrap>*{display:none!important}body.video-share-mode #sharedVideoLanding{display:flex!important;min-height:100svh;align-items:center;justify-content:center;flex-direction:column;text-align:center;padding:26px 20px;background:radial-gradient(circle at top,#6b3158,#170b1b 70%)}#sharedVideoLanding{width:100%;color:#fff0e8}#sharedVideoLanding .share-cover{width:min(100%,560px);min-height:min(72svh,760px);border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:30px 22px;background:linear-gradient(180deg,#26102b99,#0c0710d9),url('https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?auto=format&fit=crop&w=1200&q=85') center/cover;box-shadow:0 20px 60px #0008}#sharedVideoLanding .share-play{width:150px;height:150px;border:0;border-radius:50%;background:linear-gradient(135deg,#ed2459,#c10a91);color:white;font-size:4rem;display:grid;place-items:center;cursor:pointer;box-shadow:0 10px 45px #d20b7c66}#sharedVideoLanding h1{font:500 clamp(2rem,8vw,3.6rem) Georgia,serif;color:#fff0e8}#sharedVideoLanding p{font-size:1.2rem;text-shadow:0 2px 8px #000}#sharedVideoLanding video{display:block;width:min(100%,760px);max-height:88svh;background:#000;border-radius:16px}#sharedVideoLanding .share-brand{margin-top:22px;color:#f5d4e8;font-size:1rem}
+
+/* Muestra gratuita destacada para el cliente */
+.preview-hero{margin:18px 0 24px;padding:22px 16px 18px;border-radius:28px;background:#3b1028;color:#fff;text-align:center;box-shadow:0 14px 34px #3b102833;overflow:hidden}
+.preview-hero h2{margin:4px auto 18px;color:#fff;font-size:clamp(1.55rem,6vw,2.25rem);line-height:1.2;font-weight:900;letter-spacing:.01em}
+.preview-hero img{display:block;width:100%;height:clamp(190px,54vw,310px);object-fit:cover;border-radius:22px;margin:0 auto 18px}
+.preview-hero h3{margin:12px auto 20px;color:#fff;font-size:clamp(1.35rem,5vw,1.9rem);line-height:1.35}
+.preview-hero-button{display:block;width:100%;min-height:76px;padding:18px 14px;border:0;border-radius:999px;background:#20d66b;color:#fff;font-size:clamp(1.2rem,5vw,1.8rem);font-weight:900;line-height:1.2;box-shadow:0 8px 22px #13b95a55;cursor:pointer}
+.preview-hero-button:active{transform:scale(.985)}
+.preview-hero p{margin:18px 0 0;color:#fff;font-size:clamp(1.05rem,4vw,1.35rem);line-height:1.35}
 </style></head>
 <body><main class="wrap">
 <div class="brand">✦ Un regalo que se siente ✦</div><nav class="nav"><a href="#como-funciona">Cómo funciona</a><a href="#paquetes">Paquetes</a><a href="#order">Pedir canción</a><a href="#preguntas">Preguntas</a></nav>
@@ -96,6 +105,13 @@ body.video-share-mode{background:#100916;min-height:100svh}body.video-share-mode
 <p class="note">Una dedicatoria única, creada con cariño.</p>
 </div>
 <div id="revealed" class="hidden"><div id="packageInfo" class="player hidden" style="margin:18px 0;text-align:center"><strong>💗 Tu paquete</strong><p id="packageName" style="font-size:1.1rem;margin:8px 0"></p><p id="packagePrice" class="note"></p><p class="note">Paga con Yape escaneando el QR o envía desde Plin al número 977 974 730. Verifica que el titular sea Yunder Marco Del-castillo Cueva antes de confirmar.</p><img src="/yape-qr.svg" alt="Código QR de Yape para pagar Canta con el corazón" style="display:block;width:min(230px,80%);height:auto;margin:12px auto;border-radius:12px;background:white;padding:8px"><p style="color:#f6d78c;font-weight:800;font-size:1rem;margin:8px 0">Titular: Yunder Marco Del-castillo Cueva</p><p class="note">Después de pagar por Yape o Plin, adjunta aquí tu voucher. El sistema aprobará automáticamente el pedido según el importe registrado; no comprueba el ingreso real del dinero.</p><a class="btn secondary" href="https://wa.me/51977974730?text=Hola%2C%20ya%20realic%C3%A9%20el%20pago%20de%20mi%20paquete%20de%20Canta%20con%20el%20coraz%C3%B3n.%20Adjunto%20mi%20comprobante%20para%20que%20lo%20verifiquen." target="_blank" rel="noopener">📲 Ya pagué: enviar mi voucher</a></div>
+<section id="previewHero" class="preview-hero hidden" aria-live="polite">
+ <h2>💗 ¡TU MUESTRA YA ESTÁ LISTA!</h2>
+ <img src="https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=1200&q=85" alt="Estudio musical con instrumentos y luces cálidas">
+ <h3>🎵 Escucha tu canción personalizada</h3>
+ <button class="preview-hero-button hidden" id="playPreview" type="button">▶ ESCUCHAR MI MUESTRA</button>
+ <p>Una canción creada especialmente para ti ❤️</p>
+</section>
 <div class="art">♫</div>
 <h1 id="giftTitle">Una canción para ti</h1>
 <p class="subtitle" id="giftMessage">Porque tu historia merece convertirse en música.</p>
@@ -378,6 +394,7 @@ async function cchSendCustomerActivity(event='online'){
 function lockPreview(message){
  audioPlayer.pause();audioPlayer.removeAttribute('src');audioPlayer.load();audioPlayer.controls=false;audioPlayer.classList.add('hidden');
  const playButton=document.getElementById('playPreview');if(playButton)playButton.classList.add('hidden');
+ document.getElementById('previewHero')?.classList.add('hidden');
  audioNote.textContent=message||'La vista previa gratuita ya terminó. Solicita el enlace de pago para recibir tu canción completa.';
  audioNote.classList.remove('hidden');
 }
@@ -420,7 +437,9 @@ if(audio && /^[0-9a-f-]{36}\/[0-9a-f-]{36}\.mp3$/i.test(audio)){
   audioPlayer.removeAttribute('src');audioPlayer.controls=false;audioPlayer.classList.add('hidden');
   let playButton=document.getElementById('playPreview');
   if(!playButton){playButton=document.createElement('button');playButton.id='playPreview';playButton.type='button';playButton.className='btn secondary';playButton.textContent='▶ Escuchar vista previa gratis';audioNote.after(playButton)}
-  playButton.classList.remove('hidden');playButton.addEventListener('click',startPreview);
+  playButton.classList.remove('hidden');
+  if(previewLinkToken&&audio){document.getElementById('previewHero')?.classList.remove('hidden');}
+  playButton.addEventListener('click',startPreview);
   if(!previewLinkToken)lockPreview('Este enlace no contiene una muestra válida. Escríbenos por WhatsApp para recuperar tu pedido.');
  }
  audioPlayer.addEventListener('loadedmetadata',()=>{buildLyricTimeline(audioPlayer.duration);updateSyncedLyric();alignGiftLyrics()});
