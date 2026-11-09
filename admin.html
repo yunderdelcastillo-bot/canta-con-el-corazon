@@ -705,8 +705,11 @@ async function cchSpeakAlert(message){
   if(Ctx){
    if(!cchAudioContext)cchAudioContext=new Ctx();
    if(cchAudioContext.state==='suspended')await cchAudioContext.resume();
-   const playTone=(frequency,at,duration)=>{const o=cchAudioContext.createOscillator(),g=cchAudioContext.createGain();o.type='sine';o.frequency.value=frequency;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.28,at+.025);g.gain.exponentialRampToValueAtTime(.001,at+duration);o.connect(g);g.connect(cchAudioContext.destination);o.start(at);o.stop(at+duration+.02)};
-   const now=cchAudioContext.currentTime;playTone(880,now,.28);playTone(1175,now+.32,.34);playTone(1320,now+.72,.28);
+   const playTone=(frequency,at,duration)=>{const o=cchAudioContext.createOscillator(),g=cchAudioContext.createGain();o.type='sine';o.frequency.value=frequency;g.gain.setValueAtTime(.001,at);g.gain.exponentialRampToValueAtTime(.24,at+.04);g.gain.setValueAtTime(.24,at+duration-.08);g.gain.exponentialRampToValueAtTime(.001,at+duration);o.connect(g);g.connect(cchAudioContext.destination);o.start(at);o.stop(at+duration+.03)};
+   const now=cchAudioContext.currentTime;
+   /* Aviso más largo y notorio: secuencia de tonos durante casi 3 segundos. */
+   playTone(880,now,.48);playTone(1175,now+.55,.48);playTone(1320,now+1.1,.55);
+   playTone(1175,now+1.75,.48);playTone(880,now+2.3,.55);
   }
   if('speechSynthesis'in window){
    window.speechSynthesis.cancel();
