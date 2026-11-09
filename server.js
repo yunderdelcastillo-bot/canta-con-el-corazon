@@ -1260,10 +1260,17 @@ app.post("/api/forms/activity",async(req,res)=>{
   const db=admin(),marker=FORM_SESSION_MARKER+sessionId+":";
   const now=new Date().toISOString();
   if(event==="started"){
-   const startedAt=Date.now();
-   const body="Un cliente está completando el formulario. "+marker+startedAt+"]";
-   const {error}=await db.from("system_notifications").insert({order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body,created_at:now});
-   if(error)throw error;
+   const {data:existing,error:lookupError}=await db.from("system_notifications").select("id").eq("audience","admin").eq("event_type","form_started").like("body","%"+marker+"%").limit(1);
+   if(lookupError)throw lookupError;
+   if(existing?.length){
+    const {error}=await db.from("system_notifications").update({created_at:now}).eq("id",existing[0].id);
+    if(error)throw error;
+   }else{
+    const startedAt=Date.now();
+    const body="Un cliente está completando el formulario. "+marker+startedAt+"]";
+    const {error}=await db.from("system_notifications").insert({order_id:null,event_type:"form_started",audience:"admin",title:"👀 Un cliente comenzó a llenar el formulario",body,created_at:now});
+    if(error)throw error;
+   }
   }else{
    const patch=event==="heartbeat"
     ?{created_at:now}
