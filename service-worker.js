@@ -1,7 +1,7 @@
 self.addEventListener('push',event=>{
  let data={title:'Canta con el corazón',body:'Tienes una nueva notificación.',url:'/admin.html',tag:'cch-admin'};
  try{if(event.data)data={...data,...event.data.json()};}catch(e){}
- event.waitUntil(self.registration.showNotification(data.title,{body:data.body,icon:'/favicon.ico',badge:'/favicon.ico',tag:data.tag||'cch-admin',renotify:true,vibrate:[250,120,250],data:{url:data.url||'/admin.html'}}));
+ event.waitUntil(self.registration.showNotification(data.title,{body:data.body,icon:'/favicon.ico',badge:'/favicon.ico',tag:data.tag||'cch-admin',renotify:true,requireInteraction:true,silent:false,vibrate:[350,180,350,180,700],timestamp:Date.now(),data:{url:data.url||'/admin.html'}}));
 });
 self.addEventListener('notificationclick',event=>{
  event.notification.close();
