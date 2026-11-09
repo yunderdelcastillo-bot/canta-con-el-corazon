@@ -853,6 +853,13 @@ function buildCustomerOrderMessage(includeLyrics){
  window.cchTrackFormActivity=begin;
  // Solo comienza al escribir o cambiar una respuesta; no al abrir o tocar el campo.
  const isAssistantTarget=target=>target instanceof Element&&target.matches('#cchAiInput');
+ document.addEventListener('focusin',event=>{
+  const target=event.target;
+  if(target instanceof Element&&(target.closest('#orderForm')||target.matches('#cchAiInput')))begin();
+ },true);
+ document.addEventListener('click',event=>{
+  if(event.target instanceof Element&&event.target.closest('#cchAiOpen'))begin();
+ },true);
  document.addEventListener('input',event=>{if(isAssistantTarget(event.target))begin();},true);
  document.addEventListener('change',event=>{
   const target=event.target;
@@ -860,6 +867,7 @@ function buildCustomerOrderMessage(includeLyrics){
  },true);
  const form=document.getElementById('orderForm');
  if(form){
+  form.addEventListener('focusin',begin,{once:true,capture:true});
   form.addEventListener('input',begin,{once:true,capture:true});
   form.addEventListener('change',begin,{once:true,capture:true});
  }
