@@ -1419,10 +1419,15 @@ app.post("/api/orders/:id/voucher",async(req,res)=>{
   const now=new Date().toISOString();
   // Regla automática limitada: voucher único + pedido/token válidos + importe registrado.
   // No equivale a confirmación bancaria: no se consulta Yape ni se verifica el abono real.
-  const {error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id);
+  const {data:savedPayment,error:updateError}=await db.from("payment_submissions").update({voucher_path:path,payment_status:"approved",provider_payment_id:operationKey,updated_at:now,reviewed_at:now}).eq("id",payment.id).select("id,order_id,voucher_path,payment_status").maybeSingle();
   if(updateError)throw updateError;
-  const {error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id);
+  if(!savedPayment||savedPayment.order_id!==id||savedPayment.voucher_path!==path||savedPayment.payment_status!=="approved"){
+   await db.storage.from("payment-vouchers").remove([path]);
+   return res.status(409).json({error:"El comprobante se recibió, pero no se pudo confirmar su vínculo con este pedido. No se aprobó el pago; vuelve a intentarlo."});
+  }
+  const {data:savedOrder,error:orderError}=await db.from("customer_orders").update({status:"pago_verificado",updated_at:now}).eq("id",id).select("id").maybeSingle();
   if(orderError)throw orderError;
+  if(!savedOrder?.id)throw new Error("El comprobante se guardó, pero no se pudo actualizar el estado del pedido.");
   let downloadUnlocked=false;
   // Buscar la canción por el UUID del pedido, sin depender de ADMIN_OWNER_ID.
   // Los archivos se guardan como owner_id/order_id.mp3 y cada cuenta puede tener un owner_id distinto.
