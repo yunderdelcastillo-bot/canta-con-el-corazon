@@ -421,10 +421,28 @@ document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',a
 });
 document.getElementById('createWhatsAppOrder').addEventListener('click',async()=>{
  const button=document.getElementById('createWhatsAppOrder'),status=document.getElementById('waOrderStatus');
- const payload={buyer:$('waOrderBuyer').value.trim(),contact:$('waOrderContact').value.trim(),recipient:$('waOrderRecipient').value.trim(),occasion:$('waOrderOccasion').value.trim(),package:$('waOrderPackage').value,style:$('waOrderStyle').value.trim(),voice:$('waOrderVoice').value,lyricDuration:$('waOrderDuration').value,story:$('waOrderStory').value.trim(),specialPhrase:$('waOrderPhrase').value.trim()};
+ const payload={buyer:$('waOrderBuyer').value.trim(),contact:$('waOrderContact').value.trim(),recipient:$('waOrderRecipient').value.trim(),occasion:$('waOrderOccasion').value,package:$('waOrderPackage').value,style:$('waOrderStyle').value.trim()||'Balada romántica',voice:$('waOrderVoice').value,lyricDuration:$('waOrderDuration').value,story:$('waOrderStory').value.trim(),specialPhrase:$('waOrderPhrase').value.trim(),lyricTone:'Según la historia'};
  if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story){status.textContent='Completa los datos obligatorios del pedido.';return;}
  button.disabled=true;status.textContent='Registrando pedido…';
- try{const token=await window.cchAdminGetToken();const r=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo registrar');if(d.paymentReady&&d.paymentAccessToken)cchRememberPaymentLink(d.orderId,d.paymentAccessToken);status.textContent=d.paymentReady?'✓ Pedido de WhatsApp registrado. En su tarjeta encontrarás el enlace seguro para enviar al cliente.':'✓ Pedido registrado, pero falta habilitar la configuración de pagos para crear el enlace seguro.';['waOrderBuyer','waOrderContact','waOrderRecipient','waOrderOccasion','waOrderStyle','waOrderStory','waOrderPhrase'].forEach(id=>$(id).value='');await loadCustomerOrders();}catch(e){status.textContent='Error: '+e.message;}finally{button.disabled=false;}
+ try{
+  const token=await window.cchAdminGetToken();if(!token)throw new Error('Inicia sesión nuevamente como administradora.');
+  const r=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});
+  const d=await r.json();if(!r.ok)throw new Error(d.error||'No se pudo registrar');
+  if(d.paymentReady&&d.paymentAccessToken)cchRememberPaymentLink(d.orderId,d.paymentAccessToken);
+  status.textContent='✓ Tarjeta creada. Ahora estoy generando la letra y preparando el prompt musical…';
+  let lyricReady=false,lyricMessage='';
+  try{
+   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({buyer:payload.buyer,recipient:payload.recipient,occasion:payload.occasion,story:payload.story,style:payload.style,voice:payload.voice,phrase:payload.specialPhrase,duration:payload.lyricDuration,tone:payload.lyricTone})});
+   const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo generar la letra.');
+   const saveResponse=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(d.orderId),{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({lyrics:lyricData.lyrics,status:'en_proceso'})});
+   const saveData=await saveResponse.json();if(!saveResponse.ok)throw new Error(saveData.error||'La letra se generó, pero no se pudo guardar.');
+   lyricReady=true;
+  }catch(lyricError){lyricMessage='La tarjeta quedó creada, pero no se pudo generar/guardar la letra: '+lyricError.message+'. Puedes reintentarlo desde Crear con IA.';}
+  ['waOrderBuyer','waOrderContact','waOrderRecipient','waOrderOccasion','waOrderStyle','waOrderStory','waOrderPhrase'].forEach(id=>$(id).value='');
+  await loadCustomerOrders();
+  status.textContent='✓ Pedido y tarjeta creados. '+(lyricReady?'✓ Letra guardada. ✓ Prompt musical personalizado disponible en la tarjeta.':'⚠️ '+lyricMessage)+' '+(d.paymentReady?'El enlace seguro de pago quedó asociado.':'Revisa la configuración de pagos si necesitas generar el enlace.');
+ }catch(e){status.textContent='Error: '+e.message;}
+ finally{button.disabled=false;}
 });
 function cchOrderProgress(o){
  const paymentApproved=o.payment?.payment_status==='approved'||o.status==='pago_verificado';
