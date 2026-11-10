@@ -356,34 +356,34 @@ document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',a
   if(!navigator.clipboard?.readText)throw new Error('Este navegador no permite leer el portapapeles. Abre el panel en Chrome y vuelve a intentarlo.');
   const raw=(await navigator.clipboard.readText()).trim();
   if(!raw)throw new Error('Primero copia el mensaje completo del cliente en WhatsApp.');
-  const clean=s=>String(s||'').replace(/[\\u200e\\u200f]/g,' ').replace(/\\s+/g,' ').trim();
-  const norm=s=>clean(s).toLocaleLowerCase('es').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
-  const lines=raw.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const clean=s=>String(s||'').replace(/[\u200e\u200f]/g,' ').replace(/\s+/g,' ').trim();
+  const norm=s=>clean(s).toLocaleLowerCase('es').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   const find=(patterns)=>{for(const p of patterns){const m=raw.match(p);if(m&&m[1])return clean(m[1]);}return '';};
-  const phone=(raw.match(/(?:\\+?51\\s*)?9\\d{2}[\\s.-]?\\d{3}[\\s.-]?\\d{3}|\\b9\\d{8}\\b/)||[])[0]||'';
+  const phone=(raw.match(/(?:\+?51\s*)?9\d{2}[\s.-]?\d{3}[\s.-]?\d{3}|\b9\d{8}\b/)||[])[0]||'';
   const labelled=(labels)=>{
    const re=new RegExp('(?:^|[\\n•])\\s*(?:' + labels + ')\\s*[:：-]\\s*([^\\n]+)','i');
    const m=raw.match(re);return m?clean(m[1]):'';
   };
   const buyer=labelled('tu nombre|mi nombre|nombre del cliente|cliente')||
-   find([/\\b(?:soy|me llamo|mi nombre es)\\s+([A-ZÁÉÍÓÚÑ][\\p{L}]+(?:\\s+[A-ZÁÉÍÓÚÑ][\\p{L}]+){0,2})/iu])||'Cliente de WhatsApp';
+   find([/\b(?:soy|me llamo|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][\p{L}]+(?:\s+[A-ZÁÉÍÓÚÑ][\p{L}]+){0,2})/iu])||'Cliente de WhatsApp';
   const recipient=labelled('destinatario|para quién|para quien|para quién es la canción|para quien es la cancion')||
-   find([/\\bpara\\s+(?:mi\\s+)?(?:esposa|esposo|mam[aá]|pap[aá]|hijo|hija|novia|novio|pareja|hermana|hermano|amiga|amigo)\\s+([\\p{L}][\\p{L}'’-]*(?:\\s+[\\p{L}][\\p{L}'’-]*)?)/iu,/\\bpara\\s+([A-ZÁÉÍÓÚÑ][\\p{L}]+)\\b/u])||'Destinatario por confirmar';
+   find([/\bpara\s+(?:mi\s+)?(?:esposa|esposo|mam[aá]|pap[aá]|hijo|hija|novia|novio|pareja|hermana|hermano|amiga|amigo)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*)?)/iu,/\bpara\s+([A-ZÁÉÍÓÚÑ][\p{L}]+)\b/u])||'Destinatario por confirmar';
   const occasion=labelled('ocasi[oó]n(?: especial)?|motivo')||
    (/(aniversario|cumplea[nñ]os|boda|matrimonio|declaraci[oó]n de amor|d[ií]a de la madre|d[ií]a del padre|graduaci[oó]n|quincea[nñ]ero|navidad|san valent[ií]n|reconciliaci[oó]n)/i.exec(raw)||[])[1]||'Ocasión por confirmar';
   const style=labelled('estilo musical|g[eé]nero musical|estilo|g[eé]nero')||
    (/(cumbia(?: peruana)?|balada(?: rom[aá]ntica)?| salsa|bachata| huayno|rock|pop|vallenato| bolero|marinera)/i.exec(raw)||[])[1]?.trim()||'Balada romántica';
-  const voice=labelled('voz|tipo de voz')||(/voz\\s+(masculina|femenina)|(?:masculina|femenina)\\s*$/i.exec(raw)||[])[1]||'Según la historia';
+  const voice=labelled('voz|tipo de voz')||(/voz\s+(masculina|femenina)|(?:masculina|femenina)\s*$/i.exec(raw)||[])[1]||'Según la historia';
   const specialPhrase=labelled('dedicatoria|frase especial|mensaje especial')||'';
-  const packageName=labelled('paquete|producto')||(/expr[eé]s|30\\s*min/i.test(raw)?'Exprés — S/30':'Normal — S/25');
+  const packageName=labelled('paquete|producto')||(/expr[eé]s|30\s*min/i.test(raw)?'Exprés — S/30':'Normal — S/25');
   const storyLabel=labelled('historia|cu[eé]ntame su historia|cu[eé]ntame brevemente su historia');
   const story=storyLabel||clean(raw).slice(0,3500);
   const payload={
-   buyer,contact:phone.replace(/[^\\d+]/g,'')||'No indicado',
+   buyer,contact:phone.replace(/[^\d+]/g,'')||'No indicado',
    recipient,occasion,story,style,customGenre:'',
    voice, specialPhrase,lyricDuration:labelled('duraci[oó]n')||'3 minutos',
    lyricTone:labelled('emoci[oó]n|tono')||'Según la historia',
-   package:packageName,urgency:/expr[eé]s|30\\s*min/i.test(raw)?'Entrega EXPRESS (30 minutos)':'Entrega normal (24–48 horas)'
+   package:packageName,urgency:/expr[eé]s|30\s*min/i.test(raw)?'Entrega EXPRESS (30 minutos)':'Entrega normal (24–48 horas)'
   };
   const token=await window.cchAdminGetToken();
   if(!token)throw new Error('Tu sesión de administradora no está activa. Inicia sesión y vuelve a intentarlo.');
