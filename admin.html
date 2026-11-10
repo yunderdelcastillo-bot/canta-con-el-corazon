@@ -351,29 +351,72 @@ $('login').onclick=async()=>{
 
 document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',async()=>{
  const button=document.getElementById('pasteRegisterWhatsAppOrder'),status=$('waOrderStatus');
- button.disabled=true;status.textContent='Leyendo el pedido copiado…';
+ button.disabled=true;status.textContent='Leyendo las respuestas copiadas…';
  try{
-  if(!navigator.clipboard?.readText)throw new Error('Tu navegador no permite leer el portapapeles. Usa el formulario manual de abajo.');
+  if(!navigator.clipboard?.readText)throw new Error('Este navegador no permite leer el portapapeles. Abre el panel en Chrome y vuelve a intentarlo.');
   const raw=await navigator.clipboard.readText();
-  if(!raw.trim())throw new Error('Primero copia el mensaje completo del pedido en WhatsApp.');
-  const fields={};
-  const labels={'Mi nombre':'buyer','Mi WhatsApp':'contact','Para':'recipient','Ocasión':'occasion','Historia/dedicatoria':'story','Género elegido':'style','Género o estilo adicional':'customGenre','Tipo de voz':'voice','Frase especial':'specialPhrase','Duración':'lyricDuration','Emoción':'lyricTone','Paquete elegido':'package','Plazo solicitado':'urgency'};
-  const lines=raw.split(/\r?\n/);
-  let current='';
-  for(const line of lines){
-   const m=line.match(/^([^:]+):\s*(.*)$/);
-   if(m&&labels[m[1].trim()]){current=labels[m[1].trim()];fields[current]=m[2].trim();}
-   else if(current&&(/Historia\/dedicatoria|story/.test(current))&&line.trim())fields[current]+='\n'+line.trim();
+  if(!raw.trim())throw new Error('Primero copia el formulario completo de respuestas de WhatsApp.');
+  const aliases=[
+   ['buyer',['mi nombre','tu nombre','nombre del cliente','cliente']],
+   ['contact',['mi whatsapp','tu whatsapp','whatsapp','número de contacto','numero de contacto','teléfono','telefono','contacto']],
+   ['recipient',['para','para quién','para quien','para quién es la canción','para quien es la cancion','destinatario']],
+   ['occasion',['ocasión','ocasion','ocasión especial','ocasion especial']],
+   ['story',['historia/dedicatoria','historia','cuéntame su historia','cuentame su historia','cuéntame brevemente su historia','cuentame brevemente su historia']],
+   ['style',['género elegido','genero elegido','estilo musical','género musical','genero musical']],
+   ['customGenre',['género o estilo adicional','genero o estilo adicional','estilo adicional']],
+   ['voice',['tipo de voz','voz']],
+   ['specialPhrase',['frase especial','dedicatoria o frase especial','dedicatoria']],
+   ['lyricDuration',['duración','duracion']],
+   ['lyricTone',['emoción','emocion','tono']],
+   ['package',['paquete elegido','paquete','producto']]
+  ];
+  const normalize=s=>String(s||'').toLocaleLowerCase('es').replace(/[¿?¡!🎵❤️🎁🎉💌🎶📱👤]/gu,'').replace(/^\d+[\).]\s*/,'').trim();
+  const fields={};let current='';
+  for(const line of raw.split(/\r?\n/)){
+   const m=line.match(/^\s*([^:：]+)\s*[:：]\s*(.*)$/);
+   if(m){
+    const label=normalize(m[1]);
+    const found=aliases.find(([,names])=>names.some(n=>normalize(n)===label));
+    if(found){current=found[0];fields[current]=m[2].trim();continue;}
+   }
+   if(current&&line.trim())fields[current]=(fields[current]+'\n'+line.trim()).trim();
   }
-  const payload={buyer:fields.buyer||'',contact:fields.contact||'',recipient:fields.recipient||'',occasion:fields.occasion||'',story:fields.story||'',style:fields.style||'',customGenre:fields.customGenre||'',voice:fields.voice||'Según la historia',specialPhrase:fields.specialPhrase==='No indicó'?'':(fields.specialPhrase||''),lyricDuration:fields.lyricDuration||'3 minutos',lyricTone:fields.lyricTone||'Según la historia',package:fields.package||'',urgency:fields.urgency||'Entrega normal (24–48 horas), por confirmar'};
-  if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story||!payload.package)throw new Error('El texto copiado no contiene todos los datos obligatorios. Copia el pedido completo que empieza con “Hola, quiero pedir una canción personalizada…”.');
+  const payload={
+   buyer:fields.buyer||'',contact:(fields.contact||'').replace(/[^\d+]/g,''),
+   recipient:fields.recipient||'',occasion:fields.occasion||'',story:fields.story||'',
+   style:fields.style||'Balada romántica',customGenre:fields.customGenre||'',
+   voice:fields.voice||'Según la historia',specialPhrase:fields.specialPhrase||'',
+   lyricDuration:fields.lyricDuration||'3 minutos',lyricTone:fields.lyricTone||'Según la historia',
+   package:fields.package||'ESENCIAL — Solo audio — S/25',
+   urgency:/express|30\s*min/i.test(raw)?'Entrega EXPRESS (30 minutos)':'Entrega normal (24–48 horas)'
+  };
+  if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story){
+   throw new Error('Faltan respuestas obligatorias. Verifica nombre, WhatsApp, destinatario, ocasión e historia antes de copiar.');
+  }
   const token=await window.cchAdminGetToken();
+  if(!token)throw new Error('Tu sesión de administradora no está activa. Inicia sesión y vuelve a intentarlo.');
   const response=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});
   const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
   if(result.paymentReady&&result.paymentAccessToken)cchRememberPaymentLink(result.orderId,result.paymentAccessToken);
-  status.textContent=result.paymentReady?'✓ Pedido registrado. Ya puedes compartir el enlace seguro de pago desde su tarjeta.':'✓ Pedido registrado, pero falta habilitar la configuración de pagos para crear el enlace seguro.';
+  status.textContent='✓ Tarjeta creada. Ahora estoy generando y guardando la letra…';
+  try{
+   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({
+    buyer:payload.buyer,recipient:payload.recipient,occasion:payload.occasion,story:payload.story,
+    style:payload.style,voice:payload.voice,customGenre:payload.customGenre,phrase:payload.specialPhrase,
+    duration:payload.lyricDuration,tone:payload.lyricTone
+   })});
+   const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo generar la letra.');
+   const saveResponse=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(result.orderId),{
+    method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+    body:JSON.stringify({lyrics:lyricData.lyrics,status:'en_proceso'})
+   });
+   const saveData=await saveResponse.json();if(!saveResponse.ok)throw new Error(saveData.error||'La letra se generó, pero no se pudo guardar.');
+   status.textContent='✓ Pedido registrado. ✓ Tarjeta creada. ✓ Letra generada y guardada. Ya puedes preparar la canción.';
+  }catch(lyricError){
+   status.textContent='✓ Pedido y tarjeta creados, pero la letra no se pudo generar: '+lyricError.message+'. Puedes reintentarlo desde Crear con IA.';
+  }
   await loadCustomerOrders();
- }catch(error){status.textContent='No se pudo pegar el pedido: '+error.message;}
+ }catch(error){status.textContent='No se pudo procesar el pedido: '+error.message;}
  finally{button.disabled=false;}
 });
 document.getElementById('createWhatsAppOrder').addEventListener('click',async()=>{
