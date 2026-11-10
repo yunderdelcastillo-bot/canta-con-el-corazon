@@ -473,6 +473,13 @@ async function loadCustomerOrders(){
    const h=document.createElement('h3');h.textContent=o.recipient+' · '+o.occasion;card.appendChild(h);
    const geminiButton=document.createElement('button');geminiButton.type='button';geminiButton.className='btn alt';geminiButton.textContent='✨ Crear canción con Gemini';geminiButton.addEventListener('click',()=>{const url=new URL('./gemini.html',window.location.href);url.searchParams.set('order',String(o.id));window.open(url.toString(),'_blank');});card.appendChild(geminiButton);
    const p=document.createElement('p');p.textContent='Cliente: '+o.buyer+' · WhatsApp: '+o.contact+' · '+new Date(o.created_at).toLocaleString('es-PE');card.appendChild(p);
+   const waDigits=String(o.contact||'').replace(/\\D/g,'');
+   const waPhone=waDigits.length===9&&waDigits.startsWith('9')?'51'+waDigits:waDigits;
+   const waButton=document.createElement('button');waButton.type='button';waButton.className='btn';waButton.textContent='💬 Enviar WhatsApp al cliente';
+   waButton.disabled=!(waPhone.length>=11&&waPhone.length<=15);
+   if(!waButton.disabled)waButton.addEventListener('click',()=>{const message='Hola, '+(o.buyer||'')+'. 💗 Te escribo de Canta con el corazón por tu pedido de canción personalizada.';window.open('https://wa.me/'+waPhone+'?text='+encodeURIComponent(message),'_blank','noopener');});
+   else waButton.title='Este pedido no tiene un número de WhatsApp válido.';
+   card.appendChild(waButton);
    const progress=cchOrderProgress(o);
    const progressBox=document.createElement('div');progressBox.className='status';progressBox.style.cssText='margin:12px 0;padding:13px;border:1px solid #ead8e1;border-radius:14px;background:#fff;';
    const progressHeading=document.createElement('div');progressHeading.style.cssText='display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;font-weight:800;color:#681b43;';
