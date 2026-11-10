@@ -351,72 +351,58 @@ $('login').onclick=async()=>{
 
 document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',async()=>{
  const button=document.getElementById('pasteRegisterWhatsAppOrder'),status=$('waOrderStatus');
- button.disabled=true;status.textContent='Leyendo las respuestas copiadas…';
+ button.disabled=true;status.textContent='Leyendo e interpretando el mensaje de WhatsApp…';
  try{
   if(!navigator.clipboard?.readText)throw new Error('Este navegador no permite leer el portapapeles. Abre el panel en Chrome y vuelve a intentarlo.');
-  const raw=await navigator.clipboard.readText();
-  if(!raw.trim())throw new Error('Primero copia el formulario completo de respuestas de WhatsApp.');
-  const aliases=[
-   ['buyer',['mi nombre','tu nombre','nombre del cliente','cliente']],
-   ['contact',['mi whatsapp','tu whatsapp','whatsapp','número de contacto','numero de contacto','teléfono','telefono','contacto']],
-   ['recipient',['para','para quién','para quien','para quién es la canción','para quien es la cancion','destinatario']],
-   ['occasion',['ocasión','ocasion','ocasión especial','ocasion especial']],
-   ['story',['historia/dedicatoria','historia','cuéntame su historia','cuentame su historia','cuéntame brevemente su historia','cuentame brevemente su historia']],
-   ['style',['género elegido','genero elegido','estilo musical','género musical','genero musical']],
-   ['customGenre',['género o estilo adicional','genero o estilo adicional','estilo adicional']],
-   ['voice',['tipo de voz','voz']],
-   ['specialPhrase',['frase especial','dedicatoria o frase especial','dedicatoria']],
-   ['lyricDuration',['duración','duracion']],
-   ['lyricTone',['emoción','emocion','tono']],
-   ['package',['paquete elegido','paquete','producto']]
-  ];
-  const normalize=s=>String(s||'').toLocaleLowerCase('es').replace(/[¿?¡!🎵❤️🎁🎉💌🎶📱👤]/gu,'').replace(/^\d+[\).]\s*/,'').trim();
-  const fields={};let current='';
-  for(const line of raw.split(/\r?\n/)){
-   const m=line.match(/^\s*([^:：]+)\s*[:：]\s*(.*)$/);
-   if(m){
-    const label=normalize(m[1]);
-    const found=aliases.find(([,names])=>names.some(n=>normalize(n)===label));
-    if(found){current=found[0];fields[current]=m[2].trim();continue;}
-   }
-   if(current&&line.trim())fields[current]=(fields[current]+'\n'+line.trim()).trim();
-  }
-  const payload={
-   buyer:fields.buyer||'',contact:(fields.contact||'').replace(/[^\d+]/g,''),
-   recipient:fields.recipient||'',occasion:fields.occasion||'',story:fields.story||'',
-   style:fields.style||'Balada romántica',customGenre:fields.customGenre||'',
-   voice:fields.voice||'Según la historia',specialPhrase:fields.specialPhrase||'',
-   lyricDuration:fields.lyricDuration||'3 minutos',lyricTone:fields.lyricTone||'Según la historia',
-   package:fields.package||'ESENCIAL — Solo audio — S/25',
-   urgency:/express|30\s*min/i.test(raw)?'Entrega EXPRESS (30 minutos)':'Entrega normal (24–48 horas)'
+  const raw=(await navigator.clipboard.readText()).trim();
+  if(!raw)throw new Error('Primero copia el mensaje completo del cliente en WhatsApp.');
+  const clean=s=>String(s||'').replace(/[\\u200e\\u200f]/g,' ').replace(/\\s+/g,' ').trim();
+  const norm=s=>clean(s).toLocaleLowerCase('es').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+  const lines=raw.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  const find=(patterns)=>{for(const p of patterns){const m=raw.match(p);if(m&&m[1])return clean(m[1]);}return '';};
+  const phone=(raw.match(/(?:\\+?51\\s*)?9\\d{2}[\\s.-]?\\d{3}[\\s.-]?\\d{3}|\\b9\\d{8}\\b/)||[])[0]||'';
+  const labelled=(labels)=>{
+   const re=new RegExp('(?:^|[\\n•])\\s*(?:' + labels + ')\\s*[:：-]\\s*([^\\n]+)','i');
+   const m=raw.match(re);return m?clean(m[1]):'';
   };
-  if(!payload.buyer||!payload.contact||!payload.recipient||!payload.occasion||!payload.story){
-   throw new Error('Faltan respuestas obligatorias. Verifica nombre, WhatsApp, destinatario, ocasión e historia antes de copiar.');
-  }
+  const buyer=labelled('tu nombre|mi nombre|nombre del cliente|cliente')||
+   find([/\\b(?:soy|me llamo|mi nombre es)\\s+([A-ZÁÉÍÓÚÑ][\\p{L}]+(?:\\s+[A-ZÁÉÍÓÚÑ][\\p{L}]+){0,2})/iu])||'Cliente de WhatsApp';
+  const recipient=labelled('destinatario|para quién|para quien|para quién es la canción|para quien es la cancion')||
+   find([/\\bpara\\s+(?:mi\\s+)?(?:esposa|esposo|mam[aá]|pap[aá]|hijo|hija|novia|novio|pareja|hermana|hermano|amiga|amigo)\\s+([\\p{L}][\\p{L}'’-]*(?:\\s+[\\p{L}][\\p{L}'’-]*)?)/iu,/\\bpara\\s+([A-ZÁÉÍÓÚÑ][\\p{L}]+)\\b/u])||'Destinatario por confirmar';
+  const occasion=labelled('ocasi[oó]n(?: especial)?|motivo')||
+   (/(aniversario|cumplea[nñ]os|boda|matrimonio|declaraci[oó]n de amor|d[ií]a de la madre|d[ií]a del padre|graduaci[oó]n|quincea[nñ]ero|navidad|san valent[ií]n|reconciliaci[oó]n)/i.exec(raw)||[])[1]||'Ocasión por confirmar';
+  const style=labelled('estilo musical|g[eé]nero musical|estilo|g[eé]nero')||
+   (/(cumbia(?: peruana)?|balada(?: rom[aá]ntica)?| salsa|bachata| huayno|rock|pop|vallenato| bolero|marinera)/i.exec(raw)||[])[1]?.trim()||'Balada romántica';
+  const voice=labelled('voz|tipo de voz')||(/voz\\s+(masculina|femenina)|(?:masculina|femenina)\\s*$/i.exec(raw)||[])[1]||'Según la historia';
+  const specialPhrase=labelled('dedicatoria|frase especial|mensaje especial')||'';
+  const packageName=labelled('paquete|producto')||(/expr[eé]s|30\\s*min/i.test(raw)?'Exprés — S/30':'Normal — S/25');
+  const storyLabel=labelled('historia|cu[eé]ntame su historia|cu[eé]ntame brevemente su historia');
+  const story=storyLabel||clean(raw).slice(0,3500);
+  const payload={
+   buyer,contact:phone.replace(/[^\\d+]/g,'')||'No indicado',
+   recipient,occasion,story,style,customGenre:'',
+   voice, specialPhrase,lyricDuration:labelled('duraci[oó]n')||'3 minutos',
+   lyricTone:labelled('emoci[oó]n|tono')||'Según la historia',
+   package:packageName,urgency:/expr[eé]s|30\\s*min/i.test(raw)?'Entrega EXPRESS (30 minutos)':'Entrega normal (24–48 horas)'
+  };
   const token=await window.cchAdminGetToken();
   if(!token)throw new Error('Tu sesión de administradora no está activa. Inicia sesión y vuelve a intentarlo.');
+  status.textContent='Datos interpretados. Creando la tarjeta y generando la letra…';
   const response=await fetch(API_BASE+'/api/admin/orders/manual-whatsapp',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(payload)});
   const result=await response.json();if(!response.ok)throw new Error(result.error||'No se pudo registrar el pedido.');
   if(result.paymentReady&&result.paymentAccessToken)cchRememberPaymentLink(result.orderId,result.paymentAccessToken);
-  status.textContent='✓ Tarjeta creada. Ahora estoy generando y guardando la letra…';
+  let lyricReady=false,lyricMessage='';
   try{
-   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({
-    buyer:payload.buyer,recipient:payload.recipient,occasion:payload.occasion,story:payload.story,
-    style:payload.style,voice:payload.voice,customGenre:payload.customGenre,phrase:payload.specialPhrase,
-    duration:payload.lyricDuration,tone:payload.lyricTone
-   })});
+   const lyricResponse=await fetch(API_BASE+'/api/lyrics/generate',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({buyer:payload.buyer,recipient:payload.recipient,occasion:payload.occasion,story:payload.story,style:payload.style,voice:payload.voice,phrase:payload.specialPhrase,duration:payload.lyricDuration,tone:payload.lyricTone})});
    const lyricData=await lyricResponse.json();if(!lyricResponse.ok)throw new Error(lyricData.error||'No se pudo generar la letra.');
-   const saveResponse=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(result.orderId),{
-    method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-    body:JSON.stringify({lyrics:lyricData.lyrics,status:'en_proceso'})
-   });
-   const saveData=await saveResponse.json();if(!saveResponse.ok)throw new Error(saveData.error||'La letra se generó, pero no se pudo guardar.');
-   status.textContent='✓ Pedido registrado. ✓ Tarjeta creada. ✓ Letra generada y guardada. Ya puedes preparar la canción.';
-  }catch(lyricError){
-   status.textContent='✓ Pedido y tarjeta creados, pero la letra no se pudo generar: '+lyricError.message+'. Puedes reintentarlo desde Crear con IA.';
-  }
+   const saveResponse=await fetch(API_BASE+'/api/admin/orders/'+encodeURIComponent(result.orderId),{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify({lyrics:lyricData.lyrics,status:'en_proceso'})});
+   const saveData=await saveResponse.json();if(!saveResponse.ok)throw new Error(saveData.error||'No se pudo guardar la letra.');
+   lyricReady=true;
+  }catch(e){lyricMessage=e.message;}
   await loadCustomerOrders();
- }catch(error){status.textContent='No se pudo procesar el pedido: '+error.message;}
+  const missing=[];if(payload.buyer==='Cliente de WhatsApp')missing.push('nombre del cliente');if(payload.contact==='No indicado')missing.push('número de contacto');if(payload.recipient==='Destinatario por confirmar')missing.push('destinatario');if(payload.occasion==='Ocasión por confirmar')missing.push('ocasión');
+  status.textContent='✓ Tarjeta creada. '+(lyricReady?'✓ Letra generada y guardada.':'⚠️ La tarjeta se creó, pero la letra requiere reintento: '+lyricMessage+'.')+(missing.length?' Datos por confirmar: '+missing.join(', ')+'. Revisa la tarjeta antes de continuar.':'');
+ }catch(error){status.textContent='No se pudo procesar el mensaje: '+error.message;}
  finally{button.disabled=false;}
 });
 document.getElementById('createWhatsAppOrder').addEventListener('click',async()=>{
