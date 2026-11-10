@@ -365,8 +365,17 @@ document.getElementById('pasteRegisterWhatsAppOrder').addEventListener('click',a
    const re=new RegExp('(?:^|[\\n•])\\s*(?:' + labels + ')\\s*[:：-]\\s*([^\\n]+)','i');
    const m=raw.match(re);return m?clean(m[1]):'';
   };
-  const buyer=labelled('tu nombre|mi nombre|nombre del cliente|cliente')||
-   find([/\b(?:soy|me llamo|mi nombre es)\s+([A-ZÁÉÍÓÚÑ][\p{L}]+(?:\s+[A-ZÁÉÍÓÚÑ][\p{L}]+){0,2})/iu])||'Cliente de WhatsApp';
+  // El nombre del comprador puede aparecer con distintas frases o como una línea independiente.
+  const buyerLabels=labelled('nombre(?:s)?(?: y apellidos)?|nombre completo|tu nombre|mi nombre|nombre del cliente|datos del cliente|cliente|quien realiza el pedido|quien solicita');
+  const buyerIntro=find([
+   /\b(?:soy|me llamo|mi nombre es|mi nombre completo es|aqui habla|aquí habla|te escribe|les escribe|habla)\s+(?:la señora|el señor|señora|señorita|señor)?\s*([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/iu,
+   /\b(?:mi nombre:|nombre:)\s*([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*){0,3})/iu
+  ]);
+  const standaloneName=lines.slice(0,5).map(line=>clean(line.replace(/^[\s>*•-]+/,''))).find(line=>
+   line.length<=65 && /^[\p{Lu}][\p{L}'’-]*(?:\s+[\p{Lu}][\p{L}'’-]*){1,3}$/u.test(line) &&
+   !/^(hola|buenos dias|buenas tardes|buenas noches|gracias|por favor|pedido|whatsapp)$/i.test(line)
+  )||'';
+  const buyer=buyerLabels||buyerIntro||standaloneName||'Cliente de WhatsApp';
   const recipient=labelled('destinatario|para quién|para quien|para quién es la canción|para quien es la cancion')||
    find([/\bpara\s+(?:mi\s+)?(?:esposa|esposo|mam[aá]|pap[aá]|hijo|hija|novia|novio|pareja|hermana|hermano|amiga|amigo)\s+([\p{L}][\p{L}'’-]*(?:\s+[\p{L}][\p{L}'’-]*)?)/iu,/\bpara\s+([A-ZÁÉÍÓÚÑ][\p{L}]+)\b/u])||'Destinatario por confirmar';
   const occasion=labelled('ocasi[oó]n(?: especial)?|motivo')||
