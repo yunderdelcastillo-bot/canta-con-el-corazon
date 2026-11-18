@@ -75,7 +75,8 @@ async function generatePreview(){
   $("sendSong").href="https://wa.me/51977974730?text="+encodeURIComponent(songLines.join(nl));
   $("sendSong").style.display="inline-flex";
   status.textContent="💗 ¡Tu vista previa está lista! Si te gusta y deseas continuar, puedes realizar el primer abono de S/10. No tienes obligación de seguir.";
-  $("payment").classList.remove("hidden");\n  btn.textContent="🔄 GENERAR OTRA VERSIÓN";
+  $("payment").classList.remove("hidden");
+  btn.textContent="🔄 GENERAR OTRA VERSIÓN";
  }catch(error){
   status.textContent="No se pudo generar la letra: "+error.message+". Vuelve a intentarlo.";
   btn.textContent="✨ VOLVER A GENERAR MI LETRA GRATIS";
