@@ -2080,20 +2080,20 @@ app.post("/api/lyrics/generate",async(req,res)=>{
   const data={};for(const key of fields)data[key]=String(body[key]||"").trim().slice(0,key==="story"?3500:500);
   if(!data.recipient||!data.occasion||!data.story||!data.style)return res.status(400).json({error:"Completa el nombre de la persona, la ocasión, la historia y el género musical."});
   record.count++;lyricRateLimits.set(bucket,record);
-  const systemPrompt="Eres compositor/a profesional de canciones personalizadas en español latino. Escribe letras completamente originales, emotivas, cantables y coherentes. No imites ni nombres artistas, no copies letras existentes ni pidas imitar voces. Usa exclusivamente los hechos proporcionados; no inventes parentescos, fechas, lugares ni sucesos. Conserva exactamente los nombres y frases importantes. Adapta vocabulario, ritmo, métrica y rimas al género solicitado. Evita clichés y repeticiones vacías. Devuelve solamente la letra final, sin explicaciones, sin markdown y sin instrucciones técnicas. Estructura con encabezados breves entre corchetes: [Intro], [Verso 1], [Verso 2], [Coro], [Puente], [Coro final] y [Outro], según convenga. Haz un coro memorable y natural. Longitud orientativa: 2:30 a 3:30 salvo indicación distinta.";
-  const userPrompt="Crea una letra personalizada con estos datos:\n"+
-   "Quién la solicita: "+(data.buyer||"No indicado")+"\n"+
-   "Para quién: "+data.recipient+"\n"+
-   "Ocasión: "+data.occasion+"\n"+
-   "Historia y recuerdos: "+data.story+"\n"+
-   "Género musical: "+data.style+"\n"+
-   "Estilo adicional: "+(data.customGenre||"No indicado")+"\n"+
-   "Voz: "+(data.voice||"No indicada")+"\n"+
-   "Frase que debe incluirse: "+(data.phrase||"Ninguna")+"\n"+
-   "Duración aproximada: "+(data.duration||"3 minutos")+"\n"+
-   "Emoción/tono: "+(data.tone||"Según la historia")+"\n"+
-   "Indicaciones adicionales: "+(data.instruction||"Ninguna")+"\n"+
-   "Si hay contradicciones o falta información, no inventes; escribe una letra prudente y fiel a los datos.";
+  const systemPrompt="Eres compositor/a profesional especializado/a en canciones personalizadas. Tu prioridad absoluta es convertir TODOS los datos del cliente en una canción que se sienta escrita para esa persona, nunca una letra genérica. REGLAS OBLIGATORIAS: 1) El nombre exacto de la persona destinataria es un dato central e imprescindible: escríbelo correctamente, sin cambiarlo ni sustituirlo por apodos. Inclúyelo de forma natural al menos DOS veces en la letra y, siempre que sea posible, una de ellas en el coro. 2) Respeta el género musical solicitado en ritmo, vocabulario, energía y forma de cantar; no lo reemplaces por otro género. 3) Integra detalles concretos de la historia y recuerdos compartidos; no los conviertas en frases genéricas. 4) Incluye la dedicatoria o frase especial de manera textual cuando se haya proporcionado, sin alterar su sentido. 5) La ocasión debe sentirse en el mensaje y el tono de la canción. 6) Usa el tono emocional solicitado y la duración indicada. 7) No inventes parentescos, fechas, lugares, acontecimientos, cualidades ni recuerdos que el cliente no haya contado. 8) Si algún campo está vacío, simplemente no lo inventes. 9) Escribe en español latino natural, con rimas cantables y un coro memorable. Devuelve solamente la letra final, sin explicaciones, sin markdown y sin instrucciones técnicas. Usa encabezados [Intro], [Verso 1], [Pre-coro], [Coro], [Verso 2], [Puente], [Coro final] y [Outro] cuando convenga. El nombre propio debe conservar exactamente su escritura.";
+  const userPrompt="COMPÓN UNA CANCIÓN ORIGINAL Y PERSONALIZADA. Debes usar cada dato que sigue; no omitas el nombre destinatario ni el género musical.\n\n"+
+   "NOMBRE EXACTO DE LA PERSONA A QUIEN SE DEDICA (OBLIGATORIO, debe aparecer en la letra): "+data.recipient+"\n"+
+   "QUIÉN SOLICITA LA CANCIÓN: "+(data.buyer||"No indicado")+"\n"+
+   "OCASIÓN: "+data.occasion+"\n"+
+   "GÉNERO MUSICAL ELEGIDO (OBLIGATORIO): "+data.style+"\n"+
+   "HISTORIA Y RECUERDOS QUE DEBEN INSPIRAR LOS VERSOS: "+data.story+"\n"+
+   "DEDICATORIA O MENSAJE ESPECIAL QUE DEBE INCLUIRSE: "+(data.phrase||"No indicó") +"\n"+
+   "ESTILO ADICIONAL: "+(data.customGenre||"No indicado")+"\n"+
+   "TIPO DE VOZ: "+(data.voice||"No indicada")+"\n"+
+   "DURACIÓN APROXIMADA: "+(data.duration||"3 minutos")+"\n"+
+   "EMOCIÓN O TONO: "+(data.tone||"Según la historia")+"\n"+
+   "INDICACIONES ADICIONALES: "+(data.instruction||"Ninguna")+"\n\n"+
+   "INSTRUCCIÓN FINAL: Antes de terminar, verifica que escribiste el nombre exacto \""+data.recipient+"\" al menos dos veces y que la letra realmente corresponde al género \""+data.style+"\". Si falta el nombre, corrige la letra antes de responder. No agregues hechos que no estén en los datos.";
   const result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.7});
   res.set("Cache-Control","no-store").json({ok:true,lyrics:result.content,model:result.model});
  }catch(e){
