@@ -2094,7 +2094,13 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "EMOCIÓN O TONO: "+(data.tone||"Según la historia")+"\n"+
    "INDICACIONES ADICIONALES: "+(data.instruction||"Ninguna")+"\n\n"+
    "INSTRUCCIÓN FINAL: Antes de terminar, verifica que escribiste el nombre exacto \""+data.recipient+"\" al menos dos veces y que la letra realmente corresponde al género \""+data.style+"\". Si falta el nombre, corrige la letra antes de responder. No agregues hechos que no estén en los datos.";
-  const result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.7});
+  let result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.7});
+  const nameCount=lyrics=>(String(lyrics||"").toLocaleLowerCase().split(data.recipient.toLocaleLowerCase()).length-1);
+  if(nameCount(result.content)<2){
+   const correction="Reescribe la canción completa. La versión anterior omitió o usó muy poco el nombre obligatorio. Debes incluir exactamente el nombre \""+data.recipient+"\" al menos DOS veces de forma natural, una de ellas en el coro. Conserva la historia, ocasión, dedicatoria y género "+data.style+". Devuelve solo la letra completa corregida.";
+   result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt},{role:"assistant",content:result.content},{role:"user",content:correction}],{maxTokens:3000,temperature:.65});
+  }
+  if(nameCount(result.content)<2)return res.status(502).json({error:"La IA no incluyó correctamente el nombre de la persona especial. Pulsa generar otra vez; no enviaremos una letra genérica."});
   res.set("Cache-Control","no-store").json({ok:true,lyrics:result.content,model:result.model});
  }catch(e){
   console.error("Groq lyrics generation:",e?.message||e);
