@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canta con el corazÃ³n</title>
+<style>
+:root{--pink:#d94683;--deep:#8f2457;--soft:#fff1f6;--ink:#33232b;--muted:#76636c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#fff7fa,#fce7f3);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
+.wrap{max-width:760px;margin:auto;padding:24px 16px 56px}.hero{text-align:center;padding:28px 16px 20px}
+.logo{font-size:14px;letter-spacing:2px;color:var(--deep);font-weight:800}.heart{font-size:42px}.hero h1{margin:6px 0;color:var(--deep);font-size:clamp(28px,6vw,42px)}.hero p{color:var(--muted);margin:8px auto;max-width:520px}
+.card{background:white;border:1px solid #f4c9dc;border-radius:20px;padding:22px;margin:14px 0;box-shadow:0 10px 30px #8f245712}
+h2{font-size:20px;margin:0 0 8px;color:var(--deep)}.muted{color:var(--muted);font-size:14px}
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:12px}.price{border:1px solid #f1bfd4;border-radius:15px;padding:16px;background:#fff9fc}.price strong{display:block;font-size:28px;color:var(--pink)}
+label{display:block;font-weight:650;margin:14px 0 6px}input,textarea,select{width:100%;padding:13px;border:1px solid #e7cbd7;border-radius:12px;font:inherit;background:#fff}textarea{min-height:105px;resize:vertical}
+button{border:0;border-radius:13px;padding:14px 18px;background:var(--pink);color:white;font-weight:750;font-size:15px;width:100%;cursor:pointer;margin-top:14px}button.secondary{background:#8f2457}button:disabled{opacity:.45;cursor:not-allowed}
+.notice{background:#fff5d9;border:1px solid #f1d58b;padding:12px;border-radius:12px;color:#684e13;font-size:13px}
+.hidden{display:none}.pill{display:inline-block;background:#fce7f3;color:#8f2457;padding:5px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.status{padding:12px;border-radius:12px;background:#f7f1f4;margin-top:12px;font-size:14px}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
+@media(max-width:520px){.steps{grid-template-columns:1fr}.card{padding:18px}}
+</style></head>
+<body><main class="wrap">
+<header class="hero"><div class="heart">â¤ï¸</div><div class="logo">CANTA CON EL CORAZÃ“N</div><h1>Hay palabras que no te salenâ€¦ pero una canciÃ³n puede decirlas por ti.</h1><p>Sorprende a esa persona especial con una canciÃ³n creada a partir de sus recuerdos, su historia y lo que sientes por ella.</p></header>
+<section class="card"><h2>Regala una emociÃ³n que podrÃ¡ escuchar una y otra vez</h2><div class="steps">
+<div class="price"><span class="pill">PASO 1</span><strong>S/10</strong>Empieza a crear su canciÃ³n</div>
+<div class="price"><span class="pill">PASO 2</span><strong>S/10</strong>LlÃ©vate tu canciÃ³n en MP3</div></div>
+<p class="muted">Primero crea tu canciÃ³n y escucha una muestra. Cuando estÃ©s listo para conservarla y compartirla, desbloquea la descarga.</p></section>
+<section class="card" id="access"><h2>Primero, dale forma a lo que sientes</h2><p class="muted">Deja tu nÃºmero para identificar tu pedido y adjunta el comprobante de S/10 para comenzar.</p>
+<label for="phone">NÃºmero de celular</label><input id="phone" inputmode="tel" maxlength="9" placeholder="Ej. 987654321">
+<label for="voucher1">Voucher del primer pago (S/10)</label><input id="voucher1" type="file" accept="image/*">
+<div class="notice">Esta versiÃ³n es una demostraciÃ³n: adjuntar un voucher no confirma que el dinero haya llegado. La aprobaciÃ³n automÃ¡tica real requiere conexiÃ³n con una pasarela o una verificaciÃ³n segura del pago.</div>
+<button id="requestAccess">Enviar comprobante</button><div class="status hidden" id="accessStatus"></div></section>
+<section class="card hidden" id="formCard"><div class="row"><h2>CuÃ©ntanos la historia. Nosotros la convertimos en mÃºsica.</h2><span class="pill">Acceso de demostraciÃ³n</span></div>
+<label for="name">Â¿A quiÃ©n quieres dedicarle esta canciÃ³n?</label><input id="name" placeholder="Nombre de la persona">
+<label for="occasion">Â¿QuÃ© ocasiÃ³n quieres recordar?</label><select id="occasion"><option>CumpleÃ±os</option><option>Aniversario</option><option>Amor</option><option>Madre o padre</option><option>Homenaje</option><option>Amistad</option><option>Otra ocasiÃ³n</option></select>
+<label for="relation">Â¯QuiÃ©n es esa persona tan especial para ti?</label><input id="relation" placeholder="Ej. Es mi mama, esposo, hija...">
+<label for="story">Cuentanos ese recuerdo, ese momento o esa historia que merece convertirse en canciÃ³n</label><textarea id="story" placeholder="Momentos especiales, recuerdos, experiencias..."></textarea>
+<label for="dedication">Si pudiera escuchar una sola frase tuya, Â¿quÃ© te gustarÃ­a decirle?</label><textarea id="dedication" placeholder="Escribe lo que deseas expresar..."></textarea>
+<label for="genre">Â¿QuÃ© ritmo va mejor con su historia?</label><select id="genre"><option>Cumbia peruana</option><option>Salsa</option><option>Balada romÃ¡ntica</option><option>Bachata</option><option>Huayno</option><option>Merengue</option><option>ReguetÃ³n</option><option>Pop</option></select>
+<button id="generate">Crear mi canciÃ³on</button><div class="status hidden" id="generationStatus">La conexiÃ³n con el generador musical todaviÃ­a debe configurarse. Tus respuestas no se enviarÃ¡n a ningÃºn servicio en esta demostraciÃ³n.</div></section>
+<section class="card hidden" id="downloadCard"><h2>Tu canciÃ³n ya tiene una historia. Ahora llÃ©vatela contigo.</h2><p class="muted">Escucha el adelanto. Si te emociona y quieres conservarlo, adjunta el comprobante de S/10 para desbloquear tu MP3.</p>
+<label for="voucher2">Voucher del segundo pago (S/10)</label><input id="voucher2" type="file" accept="image/*">
+<button id="requestDownload" class="secondary">Enviar comprobante de descarga</button><div class="status hidden" id="downloadStatus"></div></section>
+<footer>Â¹ Canta con el corazÃ³n â· Tus historias convertidas en mÃºsica</footer>
+</main>
+<script>
+onst $=id=>document.getElementById(id);
+$("requestAccess").onclick=()=>{
+ if(!$("phone").value.trim()||!$("voucher1").files.length){alert("Ingresa tu celular y adjunta el voucher.");return;}
+ $("accessStatus").classList.remove("hidden");
+$("accessStatus").textContent="Comprobante recibido en esta demostraciÃ³n. La aprobaciÃ³n real y el desbloqueo seguro deben conectarse al sistema de pagos.";
+$("formCard").classList.remove("hidden");
+$("formCard").scrollIntoView({behavior:"smooth"});
+};
+$("generate").onclick=()=>{
+ if(!$("name").value.trim()||!$("story").value.trim()||!$("dedication").value.trim)){alert("Completa el nombre, la historia y la dedicatoria.");return;}
+$("generationStatus").classList.remove("hidden");
+$("downloadCard").classList.remove("hidden");
+$("generationStatus").scrollIntoView({behav¥½Èè‰Íµ½½Ñ ‰ô¤ì)ôì( ‰É•ÅÕ•ÍÑ½İ¹±½…ˆ¤¹½¹±¥¬ô ¤ôùì(¥˜ „ ‰Ù½Õ¡•ÈÈˆ¤¹™¥±•Ì¹±•¹Ñ ¥í…±•ÉĞ ‰‘©Õ¹Ñ„•°Í•Õ¹‘¼Ù½Õ¡•È¸ˆ¤íÉ•ÑÕÉ¸íô(€ ‰‘½İ¹±½…‘MÑ…ÑÕÌˆ¤¹±…ÍÍ1¥ÍĞ¹É•µ½Ù” ‰¡¥‘‘•¸ˆ¤ì( ‰‘½İ¹±½…‘MÑ…ÑÕÌˆ¤¹Ñ•áÑ½¹Ñ•¹Ğô‰½µÁÉ½‰…¹Ñ”É•¥‰¥‘¼•¸•ÍÑ„‘•µ½ÍÑÉ…§Í¸¸°‘•Í‰±½ÅÕ•¼É•…°É•ÅÕ¥•É”Ù…±¥‘…È•°Á…¼ä½¹•Ñ…È•°…É¡¥Ù¼5@Ì¸ˆì)ôì(ğ½ÍÉ¥ÁĞøğ½‰½‘äøğ½¡Ñµ°

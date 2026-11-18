@@ -1,16 +1,14 @@
 {
-  "name": "canta-corazon-private-storage",
-  "version": "1.0.0",
+  "name": "canta-con-el-corazon",
+  "version": "1.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "cors": "^2.8.5",
-    "@supabase/supabase-js": "^2.49.1",
-    "ffmpeg-static": "^5.2.0",
-    "web-push": "^3.6.7"
+    "express": "^4.21.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
