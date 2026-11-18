@@ -2082,7 +2082,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
   record.count++;lyricRateLimits.set(bucket,record);
   const systemPrompt="Eres director/a artístico/a y compositor/a profesional de un estudio musical especializado en canciones originales por encargo. Trabajas con estándar comercial: cada letra debe sonar humana, emotiva, memorable, cantable y lista para pasar a producción musical. No entregues textos que parezcan poemas improvisados ni plantillas genéricas.\n\n"+
    "CRITERIOS DE COMPOSICIÓN PROFESIONAL:\n"+
-   "1) PERSONALIZACIÓN OBLIGATORIA: el nombre exacto de la persona destinataria debe aparecer al menos DOS veces, escrito exactamente como fue proporcionado; procura incluirlo en el coro sin forzarlo. La historia, los recuerdos y la dedicatoria deben ser el corazón de la canción.\n"+
+   "1) PERSONALIZACIÓN OBLIGATORIA: el nombre exacto de la persona destinataria debe aparecer al menos DOS veces, escrito exactamente como fue proporcionado; procura incluirlo en el coro sin forzarlo. Si se proporciona el nombre de quien encarga la canción, inclúyelo también al menos UNA vez, escrito exactamente y de forma natural y afectuosa. Distingue claramente quién dedica y quién recibe; no inventes parentescos ni relaciones. La historia, los recuerdos y la dedicatoria deben ser el corazón de la canción.\n"+
    "2) IDENTIDAD MUSICAL: respeta el género y subgénero solicitado. La elección debe sentirse en el fraseo, energía, vocabulario, cadencia y estructura; no conviertas todos los pedidos en una misma balada ni mezcles géneros sin autorización.\n"+
    "3) ESTRUCTURA: crea una progresión musical clara y natural: [Intro] breve, [Verso 1] que presente la historia, [Pre-Coro] que eleve la emoción cuando convenga, [Coro] potente y fácil de recordar, [Verso 2] con detalles nuevos, [Puente] que aporte un giro emocional y [Coro Final]. Adapta o simplifica la estructura si el género lo requiere; evita secciones de relleno.\n"+
    "4) MÉTRICA Y CANTO: escribe líneas de longitud equilibrada, con acentos naturales y respiraciones posibles. Prioriza frases que entren bien en una melodía; usa rimas limpias y variadas, nunca sacrifiques el sentido para rimar. El coro debe tener una frase central fuerte y repetible.\n"+
@@ -2092,7 +2092,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "8) ENTREGA: español latino natural, ortografía cuidada y contenido original. Devuelve únicamente la letra completa con encabezados de secciones entre corchetes. No incluyas análisis, explicaciones, acordes, ni afirmes que existe una grabación de estudio. Conserva exactamente la escritura del nombre propio.";
   const userPrompt="TRABAJO DE ESTUDIO: escribe una canción ORIGINAL, personalizada y de calidad comercial. No omitas ningún dato relevante ni conviertas la historia en frases genéricas.\n\n"+
    "NOMBRE EXACTO DE LA PERSONA A QUIEN SE DEDICA (OBLIGATORIO; debe aparecer al menos dos veces): "+data.recipient+"\n"+
-   "QUIÉN SOLICITA LA CANCIÓN: "+(data.buyer||"No indicado")+"\n"+
+   "NOMBRE EXACTO DE QUIEN ENCARGA Y DEDICA LA CANCIÓN (si está indicado, incluir al menos una vez): "+(data.buyer||"No indicado")+"\n"+
    "OCASIÓN Y MOTIVO: "+data.occasion+"\n"+
    "GÉNERO MUSICAL PRINCIPAL (OBLIGATORIO): "+data.style+"\n"+
    "VARIANTE O REFERENCIA DE ESTILO: "+(data.customGenre||"No indicada")+"\n"+
@@ -2102,14 +2102,15 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "DURACIÓN APROXIMADA: "+(data.duration||"3 minutos")+"\n"+
    "EMOCIÓN O TONO: "+(data.tone||"Según la historia")+"\n"+
    "INDICACIONES ADICIONALES DEL CLIENTE: "+(data.instruction||"Ninguna")+"\n\n"+
-   "Antes de entregar, revisa como compositor/a: (a) el nombre exacto \""+data.recipient+"\" aparece al menos dos veces; (b) el coro tiene una frase memorable; (c) la letra respeta el género \""+data.style+"\"; (d) los recuerdos y la dedicatoria están representados fielmente; (e) las líneas son naturales para cantar y no hay relleno ni datos inventados. Corrige cualquier punto que no cumpla. Devuelve solo la letra final.";
+   "Antes de entregar, revisa como compositor/a: (a) el nombre exacto \""+data.recipient+"\" aparece al menos dos veces; (b) si se indicó quién encarga la canción, su nombre exacto \""+data.buyer+"\" aparece al menos una vez y queda claro que es quien dedica; (c) el coro tiene una frase memorable; (d) la letra respeta el género \""+data.style+"\"; (e) los recuerdos y la dedicatoria están representados fielmente; (f) las líneas son naturales para cantar y no hay relleno ni datos inventados. Corrige cualquier punto que no cumpla. Devuelve solo la letra final.";
   let result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.65});
-  const nameCount=lyrics=>(String(lyrics||"").toLocaleLowerCase().split(data.recipient.toLocaleLowerCase()).length-1);
-  if(nameCount(result.content)<2){
-   const correction="Reescribe la canción completa. La versión anterior omitió o usó muy poco el nombre obligatorio. Debes incluir exactamente el nombre \""+data.recipient+"\" al menos DOS veces de forma natural, una de ellas en el coro. Conserva la historia, ocasión, dedicatoria y género "+data.style+". Devuelve solo la letra completa corregida.";
+  const countName=(lyrics,name)=>(name?String(lyrics||"").toLocaleLowerCase().split(name.toLocaleLowerCase()).length-1:0);
+  const namesArePresent=lyrics=>countName(lyrics,data.recipient)>=2&&(!data.buyer||countName(lyrics,data.buyer)>=1);
+  if(!namesArePresent(result.content)){
+   const correction="Reescribe la canción completa. Debes incluir exactamente el nombre de la persona destinataria \""+data.recipient+"\" al menos DOS veces, una de ellas en el coro. "+(data.buyer?"También debes incluir exactamente el nombre de quien encarga y dedica la canción, \""+data.buyer+"\", al menos UNA vez de forma natural, dejando claro que esa persona es quien dedica y no quien recibe. ":"")+"Conserva la historia, ocasión, dedicatoria y género "+data.style+". No inventes parentescos ni datos. Devuelve solo la letra completa corregida.";
    result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt},{role:"assistant",content:result.content},{role:"user",content:correction}],{maxTokens:3000,temperature:.65});
   }
-  if(nameCount(result.content)<2)return res.status(502).json({error:"La IA no incluyó correctamente el nombre de la persona especial. Pulsa generar otra vez; no enviaremos una letra genérica."});
+  if(!namesArePresent(result.content))return res.status(502).json({error:"La IA no incluyó correctamente los nombres de quien dedica y de quien recibe. Pulsa generar otra vez; no enviaremos una letra incompleta."});
   res.set("Cache-Control","no-store").json({ok:true,lyrics:result.content,model:result.model});
  }catch(e){
   console.error("Groq lyrics generation:",e?.message||e);
