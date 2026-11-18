@@ -33,11 +33,13 @@ let code="";
 $("prepare").addEventListener("click",()=>{
  const buyer=$("buyer").value.trim(),phone=$("phone").value.trim(),name=$("name").value.trim(),occasion=$("occasion").value,story=$("story").value.trim(),dedication=$("dedication").value.trim(),genre=$("genre").value;
  if(!buyer||!phone||!name||!story||!dedication){alert("Completa tu nombre, WhatsApp, para quién es la canción y tu historia.");return;}
- if(!/^[0-9+\\s()-]{7,15}$/.test(phone)){alert("Revisa tu número de WhatsApp.");return;}
+ const digits=phone.replace(/[^0-9]/g,"");
+ if(digits.length<9||digits.length>12){alert("Revisa tu número de WhatsApp.");return;}
  code="CCH-"+Date.now().toString().slice(-8);
- const msg="💗 NUEVO PEDIDO — CANTA CON EL CORAZÓN\\nCódigo: "+code+"\\nCliente: "+buyer+"\\nWhatsApp: "+phone+"\\nCanción para: "+name+"\\nOcasión: "+occasion+"\\nHistoria: "+story+"\\nDedicatoria: "+dedication+"\\nRitmo: "+genre+"\\nPrecio total: S/20\\nPrimer abono: S/10 para preparar la muestra\\nSaldo: S/10 después de escuchar la muestra.\\n\\nAdjunto mi comprobante del primer abono de S/10. Por favor, confirmen mi pedido.";
+ const msg=["💗 NUEVO PEDIDO — CANTA CON EL CORAZÓN","Código: "+code,"Cliente: "+buyer,"WhatsApp: "+phone,"Canción para: "+name,"Ocasión: "+occasion,"Historia: "+story,"Dedicatoria: "+dedication,"Ritmo: "+genre,"Precio total: S/20","Primer abono: S/10 para preparar la muestra","Saldo: S/10 después de escuchar la muestra.","Adjunto mi comprobante del primer abono de S/10. Por favor, confirmen mi pedido."].join(String.fromCharCode(10));
  $("sendOrder").href="https://wa.me/51977974730?text="+encodeURIComponent(msg);
- $("sendBalance").href="https://wa.me/51977974730?text="+encodeURIComponent("Hola, ya escuché mi muestra. Estoy abonando los S/10 restantes para recibir mi canción completa en MP3. Mi código es "+code+". Adjunto el comprobante.");
+ const saldo=["Hola, ya escuché mi muestra.","Estoy abonando los S/10 restantes para recibir mi canción completa en MP3.","Mi código es "+code+". Adjunto el comprobante."].join(String.fromCharCode(10));
+ $("sendBalance").href="https://wa.me/51977974730?text="+encodeURIComponent(saldo);
  $("payment").classList.remove("hidden");
  $("payment").scrollIntoView({behavior:"smooth",block:"start"});
 });
