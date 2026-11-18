@@ -2080,21 +2080,29 @@ app.post("/api/lyrics/generate",async(req,res)=>{
   const data={};for(const key of fields)data[key]=String(body[key]||"").trim().slice(0,key==="story"?3500:500);
   if(!data.recipient||!data.occasion||!data.story||!data.style)return res.status(400).json({error:"Completa el nombre de la persona, la ocasión, la historia y el género musical."});
   record.count++;lyricRateLimits.set(bucket,record);
-  const systemPrompt="Eres compositor/a profesional especializado/a en canciones personalizadas. Tu prioridad absoluta es convertir TODOS los datos del cliente en una canción que se sienta escrita para esa persona, nunca una letra genérica. REGLAS OBLIGATORIAS: 1) El nombre exacto de la persona destinataria es un dato central e imprescindible: escríbelo correctamente, sin cambiarlo ni sustituirlo por apodos. Inclúyelo de forma natural al menos DOS veces en la letra y, siempre que sea posible, una de ellas en el coro. 2) Respeta el género musical solicitado en ritmo, vocabulario, energía y forma de cantar; no lo reemplaces por otro género. 3) Integra detalles concretos de la historia y recuerdos compartidos; no los conviertas en frases genéricas. 4) Incluye la dedicatoria o frase especial de manera textual cuando se haya proporcionado, sin alterar su sentido. 5) La ocasión debe sentirse en el mensaje y el tono de la canción. 6) Usa el tono emocional solicitado y la duración indicada. 7) No inventes parentescos, fechas, lugares, acontecimientos, cualidades ni recuerdos que el cliente no haya contado. 8) Si algún campo está vacío, simplemente no lo inventes. 9) Escribe en español latino natural, con rimas cantables y un coro memorable. Devuelve solamente la letra final, sin explicaciones, sin markdown y sin instrucciones técnicas. Usa encabezados [Intro], [Verso 1], [Pre-coro], [Coro], [Verso 2], [Puente], [Coro final] y [Outro] cuando convenga. El nombre propio debe conservar exactamente su escritura.";
-  const userPrompt="COMPÓN UNA CANCIÓN ORIGINAL Y PERSONALIZADA. Debes usar cada dato que sigue; no omitas el nombre destinatario ni el género musical.\n\n"+
-   "NOMBRE EXACTO DE LA PERSONA A QUIEN SE DEDICA (OBLIGATORIO, debe aparecer en la letra): "+data.recipient+"\n"+
+  const systemPrompt="Eres director/a artístico/a y compositor/a profesional de un estudio musical especializado en canciones originales por encargo. Trabajas con estándar comercial: cada letra debe sonar humana, emotiva, memorable, cantable y lista para pasar a producción musical. No entregues textos que parezcan poemas improvisados ni plantillas genéricas.\n\n"+
+   "CRITERIOS DE COMPOSICIÓN PROFESIONAL:\n"+
+   "1) PERSONALIZACIÓN OBLIGATORIA: el nombre exacto de la persona destinataria debe aparecer al menos DOS veces, escrito exactamente como fue proporcionado; procura incluirlo en el coro sin forzarlo. La historia, los recuerdos y la dedicatoria deben ser el corazón de la canción.\n"+
+   "2) IDENTIDAD MUSICAL: respeta el género y subgénero solicitado. La elección debe sentirse en el fraseo, energía, vocabulario, cadencia y estructura; no conviertas todos los pedidos en una misma balada ni mezcles géneros sin autorización.\n"+
+   "3) ESTRUCTURA: crea una progresión musical clara y natural: [Intro] breve, [Verso 1] que presente la historia, [Pre-Coro] que eleve la emoción cuando convenga, [Coro] potente y fácil de recordar, [Verso 2] con detalles nuevos, [Puente] que aporte un giro emocional y [Coro Final]. Adapta o simplifica la estructura si el género lo requiere; evita secciones de relleno.\n"+
+   "4) MÉTRICA Y CANTO: escribe líneas de longitud equilibrada, con acentos naturales y respiraciones posibles. Prioriza frases que entren bien en una melodía; usa rimas limpias y variadas, nunca sacrifiques el sentido para rimar. El coro debe tener una frase central fuerte y repetible.\n"+
+   "5) CALIDAD LÍRICA: usa imágenes concretas y lenguaje auténtico. Evita clichés, frases vacías, repeticiones innecesarias, rimas obvias y expresiones artificiales. No repitas el nombre en cada línea.\n"+
+   "6) FIDELIDAD: integra los datos reales del cliente y conserva el sentido de su dedicatoria. No inventes parentescos, fechas, lugares, promesas, logros ni recuerdos. Si falta un dato, no lo rellenes con suposiciones.\n"+
+   "7) INTERPRETACIÓN: considera la voz, emoción y duración solicitadas. La letra debe poder interpretarse con claridad y emoción, sin indicaciones técnicas extensas ni comentarios al usuario.\n"+
+   "8) ENTREGA: español latino natural, ortografía cuidada y contenido original. Devuelve únicamente la letra completa con encabezados de secciones entre corchetes. No incluyas análisis, explicaciones, acordes, ni afirmes que existe una grabación de estudio. Conserva exactamente la escritura del nombre propio.";
+  const userPrompt="TRABAJO DE ESTUDIO: escribe una canción ORIGINAL, personalizada y de calidad comercial. No omitas ningún dato relevante ni conviertas la historia en frases genéricas.\n\n"+
+   "NOMBRE EXACTO DE LA PERSONA A QUIEN SE DEDICA (OBLIGATORIO; debe aparecer al menos dos veces): "+data.recipient+"\n"+
    "QUIÉN SOLICITA LA CANCIÓN: "+(data.buyer||"No indicado")+"\n"+
-   "OCASIÓN: "+data.occasion+"\n"+
-   "GÉNERO MUSICAL ELEGIDO (OBLIGATORIO): "+data.style+"\n"+
-   "HISTORIA Y RECUERDOS QUE DEBEN INSPIRAR LOS VERSOS: "+data.story+"\n"+
-   "DEDICATORIA O MENSAJE ESPECIAL QUE DEBE INCLUIRSE: "+(data.phrase||"No indicó") +"\n"+
-   "ESTILO ADICIONAL: "+(data.customGenre||"No indicado")+"\n"+
+   "OCASIÓN Y MOTIVO: "+data.occasion+"\n"+
+   "GÉNERO MUSICAL PRINCIPAL (OBLIGATORIO): "+data.style+"\n"+
+   "VARIANTE O REFERENCIA DE ESTILO: "+(data.customGenre||"No indicada")+"\n"+
+   "HISTORIA, RECUERDOS Y DETALLES REALES PARA LOS VERSOS: "+data.story+"\n"+
+   "DEDICATORIA O FRASE ESPECIAL (conservar su sentido y, si encaja, sus palabras): "+(data.phrase||"No indicó")+"\n"+
    "TIPO DE VOZ: "+(data.voice||"No indicada")+"\n"+
    "DURACIÓN APROXIMADA: "+(data.duration||"3 minutos")+"\n"+
    "EMOCIÓN O TONO: "+(data.tone||"Según la historia")+"\n"+
-   "INDICACIONES ADICIONALES: "+(data.instruction||"Ninguna")+"\n\n"+
-   "INSTRUCCIÓN FINAL: Antes de terminar, verifica que escribiste el nombre exacto \""+data.recipient+"\" al menos dos veces y que la letra realmente corresponde al género \""+data.style+"\". Si falta el nombre, corrige la letra antes de responder. No agregues hechos que no estén en los datos.";
-  let result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.7});
+   "INDICACIONES ADICIONALES DEL CLIENTE: "+(data.instruction||"Ninguna")+"\n\n"+
+   "Antes de entregar, revisa como compositor/a: (a) el nombre exacto \""+data.recipient+"\" aparece al menos dos veces; (b) el coro tiene una frase memorable; (c) la letra respeta el género \""+data.style+"\"; (d) los recuerdos y la dedicatoria están representados fielmente; (e) las líneas son naturales para cantar y no hay relleno ni datos inventados. Corrige cualquier punto que no cumpla. Devuelve solo la letra final.";
   const nameCount=lyrics=>(String(lyrics||"").toLocaleLowerCase().split(data.recipient.toLocaleLowerCase()).length-1);
   if(nameCount(result.content)<2){
    const correction="Reescribe la canción completa. La versión anterior omitió o usó muy poco el nombre obligatorio. Debes incluir exactamente el nombre \""+data.recipient+"\" al menos DOS veces de forma natural, una de ellas en el coro. Conserva la historia, ocasión, dedicatoria y género "+data.style+". Devuelve solo la letra completa corregida.";
