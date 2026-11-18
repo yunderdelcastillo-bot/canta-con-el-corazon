@@ -57,8 +57,9 @@ async function generatePreview(){
   if(!response.ok)throw new Error(data.error||"No se pudo generar la letra.");
   generatedLyrics=String(data.lyrics||"").trim();
   if(!generatedLyrics)throw new Error("La IA no devolvió una letra.");
-  const previewLines=generatedLyrics.split(/\\r?\\n/).filter(line=>line.trim());\n  $("lyricsResult").value=previewLines.slice(0,8).join(nl);
   const nl=String.fromCharCode(10);
+  const previewLines=generatedLyrics.split(/\r?\n/).filter(line=>line.trim());
+  $("lyricsResult").value=previewLines.slice(0,8).join(nl);
   const dataLines=["💗 NUEVO PEDIDO — CANTA CON EL CORAZÓN","Código: "+orderCode,"DATOS DEL CLIENTE","Nombre: "+orderData.buyer,"WhatsApp: "+orderData.phone,"Canción para: "+orderData.recipient,"Ocasión: "+orderData.occasion,"Historia: "+orderData.story,"Dedicatoria: "+orderData.dedication,"Género musical elegido: "+orderData.genre,"PAGO","Precio total: S/20","Primer abono: S/10 (para iniciar producción y preparar muestra de audio)","Saldo pendiente: S/10 (si el cliente desea el MP3 completo)","El cliente revisó una vista previa gratuita de la letra. Confirmar el primer abono antes de iniciar producción."];
   $("sendOrder").href="https://wa.me/51977974730?text="+encodeURIComponent(dataLines.join(nl));
   $("sendOrder").style.display="inline-flex";
