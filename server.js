@@ -2103,6 +2103,7 @@ app.post("/api/lyrics/generate",async(req,res)=>{
    "EMOCIÓN O TONO: "+(data.tone||"Según la historia")+"\n"+
    "INDICACIONES ADICIONALES DEL CLIENTE: "+(data.instruction||"Ninguna")+"\n\n"+
    "Antes de entregar, revisa como compositor/a: (a) el nombre exacto \""+data.recipient+"\" aparece al menos dos veces; (b) el coro tiene una frase memorable; (c) la letra respeta el género \""+data.style+"\"; (d) los recuerdos y la dedicatoria están representados fielmente; (e) las líneas son naturales para cantar y no hay relleno ni datos inventados. Corrige cualquier punto que no cumpla. Devuelve solo la letra final.";
+  let result=await groqCompletion([{role:"system",content:systemPrompt},{role:"user",content:userPrompt}],{maxTokens:3000,temperature:.65});
   const nameCount=lyrics=>(String(lyrics||"").toLocaleLowerCase().split(data.recipient.toLocaleLowerCase()).length-1);
   if(nameCount(result.content)<2){
    const correction="Reescribe la canción completa. La versión anterior omitió o usó muy poco el nombre obligatorio. Debes incluir exactamente el nombre \""+data.recipient+"\" al menos DOS veces de forma natural, una de ellas en el coro. Conserva la historia, ocasión, dedicatoria y género "+data.style+". Devuelve solo la letra completa corregida.";
