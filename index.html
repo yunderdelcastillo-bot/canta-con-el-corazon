@@ -1606,4 +1606,69 @@ function mountCustomerOrderChat(){
 @media(prefers-reduced-motion:reduce){#sendCustomerLyrics.cch-send-order-primary{animation:none}}
 </style>
 
+
+<!-- Formulario simplificado: conserva los mismos campos internos para no alterar pedidos ni generación IA. -->
+<style id="cch-simple-order-form">
+/* El cliente solo ve los datos esenciales; los campos técnicos siguen disponibles para el flujo existente. */
+#orderForm .cch-optional-hidden{display:none!important}
+#orderForm .cch-single-grid{grid-template-columns:1fr!important}
+#orderForm .cch-simple-intro{font-size:.92rem;color:#f4dce6;line-height:1.5;margin:0 0 12px}
+</style>
+<script id="cch-simple-order-form-init">
+(function(){
+ function simplify(){
+  const form=document.getElementById('orderForm');
+  if(!form||form.dataset.simpleFormReady==='1')return;
+  form.dataset.simpleFormReady='1';
+  const get=id=>document.getElementById(id);
+  const hideField=id=>{
+   const el=get(id); if(!el)return;
+   const label=form.querySelector('label[for="'+id+'"]');
+   if(label)label.classList.add('cch-optional-hidden');
+   el.classList.add('cch-optional-hidden');
+   const wrap=el.closest('.grid > div');
+   if(wrap)wrap.classList.add('cch-optional-hidden');
+  };
+  const setDefault=(id,value)=>{
+   const el=get(id); if(!el)return;
+   if(!el.value)el.value=value;
+   el.required=false;
+  };
+  // Mantener visibles: nombre, WhatsApp, destinatario, dedicatoria y ritmo musical.
+  hideField('relationship');
+  hideField('occasion');
+  hideField('voice');
+  hideField('customGenre');
+  hideField('specialPhrase');
+  hideField('lyricDuration');
+  hideField('lyricTone');
+  hideField('urgency');
+  // Ocultar también las notas asociadas a opciones que ya no se muestran.
+  const urgency=get('urgency');
+  if(urgency&&urgency.nextElementSibling)urgency.nextElementSibling.classList.add('cch-optional-hidden');
+  const custom=get('customGenre');
+  if(custom&&custom.nextElementSibling)custom.nextElementSibling.classList.add('cch-optional-hidden');
+  const phrase=get('specialPhrase');
+  if(phrase&&phrase.parentElement&&phrase.parentElement.classList.contains('grid'))phrase.parentElement.classList.add('cch-optional-hidden');
+  const duration=get('lyricDuration');
+  if(duration&&duration.parentElement&&duration.parentElement.classList.contains('grid'))duration.parentElement.classList.add('cch-optional-hidden');
+  setDefault('relationship','Otro');
+  setDefault('occasion','Sorpresa sin motivo especial');
+  setDefault('voice','Me da igual');
+  setDefault('lyricDuration','3 minutos');
+  setDefault('lyricTone','Según la historia');
+  setDefault('urgency','Entrega normal (24–48 horas), por confirmar');
+  const intro=form.querySelector('p');
+  if(intro&&!form.querySelector('.cch-simple-intro')){
+   const note=document.createElement('p');
+   note.className='cch-simple-intro';
+   note.textContent='Solo necesitamos tus datos, el nombre de esa persona y unas palabras de tu dedicatoria. ¡La IA te ayudará con el resto!';
+   intro.insertAdjacentElement('afterend',note);
+  }
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',simplify,{once:true});
+ else simplify();
+})();
+</script>
+
 </body></html>
