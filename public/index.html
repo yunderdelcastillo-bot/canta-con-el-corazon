@@ -1,59 +1,16 @@
 <!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Canta con el coraz√≥n</title>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Canta con el coraz√≥n</title>
 <style>
-:root{--pink:#d94683;--deep:#8f2457;--soft:#fff1f6;--ink:#33232b;--muted:#76636c}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#fff7fa,#fce7f3);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
-.wrap{max-width:760px;margin:auto;padding:24px 16px 56px}.hero{text-align:center;padding:28px 16px 20px}
-.logo{font-size:14px;letter-spacing:2px;color:var(--deep);font-weight:800}.heart{font-size:42px}.hero h1{margin:6px 0;color:var(--deep);font-size:clamp(28px,6vw,42px)}.hero p{color:var(--muted);margin:8px auto;max-width:520px}
-.card{background:white;border:1px solid #f4c9dc;border-radius:20px;padding:22px;margin:14px 0;box-shadow:0 10px 30px #8f245712}
-h2{font-size:20px;margin:0 0 8px;color:var(--deep)}.muted{color:var(--muted);font-size:14px}
-.steps{display:grid;grid-template-columns:1fr 1fr;gap:12px}.price{border:1px solid #f1bfd4;border-radius:15px;padding:16px;background:#fff9fc}.price strong{display:block;font-size:28px;color:var(--pink)}
-label{display:block;font-weight:650;margin:14px 0 6px}input,textarea,select{width:100%;padding:13px;border:1px solid #e7cbd7;border-radius:12px;font:inherit;background:#fff}textarea{min-height:105px;resize:vertical}
-button{border:0;border-radius:13px;padding:14px 18px;background:var(--pink);color:white;font-weight:750;font-size:15px;width:100%;cursor:pointer;margin-top:14px}button.secondary{background:#8f2457}button:disabled{opacity:.45;cursor:not-allowed}
-.notice{background:#fff5d9;border:1px solid #f1d58b;padding:12px;border-radius:12px;color:#684e13;font-size:13px}
-.hidden{display:none}.pill{display:inline-block;background:#fce7f3;color:#8f2457;padding:5px 10px;border-radius:99px;font-size:12px;font-weight:700}
-.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.status{padding:12px;border-radius:12px;background:#f7f1f4;margin-top:12px;font-size:14px}
-footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
-@media(max-width:520px){.steps{grid-template-columns:1fr}.card{padding:18px}}
-</style></head>
-<body><main class="wrap">
-<header class="hero"><div class="heart">‚ù§Ô∏è</div><div class="logo">CANTA CON EL CORAZ√ìN</div><h1>Hay palabras que no te salen‚Ä¶ pero una canci√≥n puede decirlas por ti.</h1><p>Sorprende a esa persona especial con una canci√≥n creada a partir de sus recuerdos, su historia y lo que sientes por ella.</p></header>
-<section class="card"><h2>Regala una emoci√≥n que podr√° escuchar una y otra vez</h2><div class="steps">
-<div class="price"><span class="pill">PASO 1</span><strong>S/10</strong>Empieza a crear su canci√≥n</div>
-<div class="price"><span class="pill">PASO 2</span><strong>S/10</strong>Ll√©vate tu canci√≥n en MP3</div></div>
-<p class="muted">Primero crea tu canci√≥n y escucha una muestra. Cuando est√©s listo para conservarla y compartirla, desbloquea la descarga.</p></section>
-<section class="card" id="access"><h2>Primero, dale forma a lo que sientes</h2><p class="muted">Deja tu n√∫mero para identificar tu pedido y adjunta el comprobante de S/10 para comenzar.</p>
-<label for="phone">N√∫mero de celular</label><input id="phone" inputmode="tel" maxlength="9" placeholder="Ej. 987654321">
-<label for="voucher1">Voucher del primer pago (S/10)</label><input id="voucher1" type="file" accept="image/*">
-<div class="notice">Esta versi√≥n es una demostraci√≥n: adjuntar un voucher no confirma que el dinero haya llegado. La aprobaci√≥n autom√°tica real requiere conexi√≥n con una pasarela o una verificaci√≥n segura del pago.</div>
-<button id="requestAccess">Enviar comprobante</button><div class="status hidden" id="accessStatus"></div></section>
-<section class="card hidden" id="formCard"><div class="row"><h2>Cu√©ntanos la historia. Nosotros la convertimos en m√∫sica.</h2><span class="pill">Acceso de demostraci√≥n</span></div>
-<label for="name">¬øA qui√©n quieres dedicarle esta canci√≥n?</label><input id="name" placeholder="Nombre de la persona">
-<label for="occasion">¬øQu√© ocasi√≥n quieres recordar?</label><select id="occasion"><option>Cumple√±os</option><option>Aniversario</option><option>Amor</option><option>Madre o padre</option><option>Homenaje</option><option>Amistad</option><option>Otra ocasi√≥n</option></select>
-<label for="relation">¬ØQui√©n es esa persona tan especial para ti?</label><input id="relation" placeholder="Ej. Es mi mama, esposo, hija...">
-<label for="story">Cuentanos ese recuerdo, ese momento o esa historia que merece convertirse en canci√≥n</label><textarea id="story" placeholder="Momentos especiales, recuerdos, experiencias..."></textarea>
-<label for="dedication">Si pudiera escuchar una sola frase tuya, ¬øqu√© te gustar√≠a decirle?</label><textarea id="dedication" placeholder="Escribe lo que deseas expresar..."></textarea>
-<label for="genre">¬øQu√© ritmo va mejor con su historia?</label><select id="genre"><option>Cumbia peruana</option><option>Salsa</option><option>Balada rom√°ntica</option><option>Bachata</option><option>Huayno</option><option>Merengue</option><option>Reguet√≥n</option><option>Pop</option></select>
-<button id="generate">Crear mi canci√≥on</button><div class="status hidden" id="generationStatus">La conexi√≥n con el generador musical todavi√≠a debe configurarse. Tus respuestas no se enviar√°n a ning√∫n servicio en esta demostraci√≥n.</div></section>
-<section class="card hidden" id="downloadCard"><h2>Tu canci√≥n ya tiene una historia. Ahora ll√©vatela contigo.</h2><p class="muted">Escucha el adelanto. Si te emociona y quieres conservarlo, adjunta el comprobante de S/10 para desbloquear tu MP3.</p>
-<label for="voucher2">Voucher del segundo pago (S/10)</label><input id="voucher2" type="file" accept="image/*">
-<button id="requestDownload" class="secondary">Enviar comprobante de descarga</button><div class="status hidden" id="downloadStatus"></div></section>
-<footer>¬π Canta con el coraz√≥n ‚∑ Tus historias convertidas en m√∫sica</footer>
-</main>
+:root{--pink:#d94683;--deep:#8f2457;--ink:#33232b}*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#fff7fa,#fce7f3);font-family:system-ui,sans-serif;color:var(--ink)}main{max-width:720px;margin:auto;padding:24px 16px 50px}.hero{text-align:center;padding:24px 8px}.hero h1{color:var(--deep);font-size:clamp(28px,6vw,42px);margin:8px 0}.card{background:white;border:1px solid #f4c9dc;border-radius:18px;padding:20px;margin:14px 0;box-shadow:0 8px 24px #8f245715}h2{font-size:20px;color:var(--deep)}label{display:block;font-weight:650;margin:14px 0 6px}input,textarea,select{width:100%;padding:12px;border:1px solid #e7cbd7;border-radius:10px;font:inherit}textarea{min-height:90px}button{width:100%;padding:14px;border:0;border-radius:12px;background:var(--pink);color:white;font-weight:750;font-size:15px;margin-top:14px}.muted{color:#76636c;font-size:14px}.notice{background:#fff5d9;padding:12px;border-radius:10px;font-size:13px}.hidden{display:none}.price{display:inline-block;background:#fff1f6;padding:12px;border-radius:12px;margin:4px;font-weight:700;color:var(--deep)}
+</style></head><body><main>
+<header class="hero"><div>üíó CANTA CON EL CORAZ√ìN</div><h1>Hay palabras que no te salen‚Ä¶ pero una canci√≥n puede decirlas por ti.</h1><p>Sorprende a esa persona especial con una canci√≥n creada a partir de sus recuerdos, su historia y lo que sientes por ella.</p><p class="price">S/10 para empezar</p><p class="price">S/10 para descargar tu MP3</p></header>
+<section class="card"><h2>Primero, dale forma a lo que sientes</h2><p class="muted">Deja tu celular y adjunta el comprobante de S/10 para iniciar.</p><label>Numero de celular</label><input id="phone" inputmode="tel" maxlength="9" placeholder="Ej. 987654321"><label>Voucher del primer pago (S/10)</label><input id="v1" type="file" accept="image/*"><div class="notice">Demostracion: subir un voucher no confirma que el pago llego. La validacion automatica real aun debe conectarse a un proveedor de pagos.</div><button id="start">Continuar</button><p id="s1" class="muted"></p></section>
+<section class="card hidden" id="form"><h2>Cu√©ntanos su historia. Nosotros la convertimos en m√∫sica.</h2><label>¬øA qui√©n quieres dedicarle esta canci√≥n?</label><input id="name" placeholder="Nombre de esa persona"><label>¬øQu√© ocasi√≥n quieres recordar?</label><select id="occasion"><option>Cumplea√±os</option><option>Aniversario</option><option>Amor</option><option>Madre o padre</option><option>Homenaje</option><option>Amistad</option><option>Otra ocasi√≥n</option></select><label>¬øQui√©n es esa persona para ti?</label><input id="relation" placeholder="Mi mam√°, esposo, hija..."><label>Cu√©ntanos ese recuerdo o historia especial</label><textarea id="story" placeholder="Momentos, recuerdos, experiencias..."></textarea><label>Si pudiera escuchar una sola frase tuya, ¬øqu√© le dir√≠as?</label><textarea id="dedication" placeholder="Escribe lo que deseas expresarle..."></textarea><label>¬øQu√© ritmo va mejor con su historia?</label><select id="genre"><option>Cumbia peruana</option><option>Salsa</option><option>Balada rom√°ntica</option><option>Bachata</option><option>Huayno</option><option>Merengue</option><option>Reguet√≥n</option><option>Pop</option></select><button id="create">Crear mi canci√≥n</button><p id="s2" class="muted"></p></section>
+<section class="card hidden" id="download"><h2>Tu canci√≥n ya tiene una historia. Ahora ll√©vatela contigo.</h2><p>Para desbloquear el MP3, adjunta el comprobante del segundo pago de S/10.</p><label>Voucher del segundo pago</label><input type="file" id="v2" accept="image/*"><button id="finish">Enviar comprobante</button><p id="s3" class="muted"></p></section>
+<footer class="muted" style="text-align:center">Tus historias convertidas en m√∫sica ‚ù§Ô∏è</footer></main>
 <script>
-onst $=id=>document.getElementById(id);
-$("requestAccess").onclick=()=>{
- if(!$("phone").value.trim()||!$("voucher1").files.length){alert("Ingresa tu celular y adjunta el voucher.");return;}
- $("accessStatus").classList.remove("hidden");
-$("accessStatus").textContent="Comprobante recibido en esta demostraci√≥n. La aprobaci√≥n real y el desbloqueo seguro deben conectarse al sistema de pagos.";
-$("formCard").classList.remove("hidden");
-$("formCard").scrollIntoView({behavior:"smooth"});
-};
-$("generate").onclick=()=>{
- if(!$("name").value.trim()||!$("story").value.trim()||!$("dedication").value.trim)){alert("Completa el nombre, la historia y la dedicatoria.");return;}
-$("generationStatus").classList.remove("hidden");
-$("downloadCard").classList.remove("hidden");
-$("generationStatus").scrollIntoView({behav•Ω»ËâÕµΩΩ—†âÙ§Ï)ÙÏ(ê†â…ï≈’ïÕ—Ω›π±ΩÖêà§πΩπç±•ç¨Ù†§Ù˘Ï(Å•ò†Ñê†âŸΩ’ç°ï»»à§πô•±ïÃπ±ïπù—†•ÌÖ±ï…–†âë©’π—ÑÅï∞ÅÕïù’πëºÅŸΩ’ç°ï»∏à§Ì…ï—’…∏ÌÙ(Äê†âëΩ›π±ΩÖëM—Ö—’Ãà§πç±ÖÕÕ1•Õ–π…ïµΩŸî†â°•ëëï∏à§Ï(ê†âëΩ›π±ΩÖëM—Ö—’Ãà§π—ï·—Ωπ—ïπ–ÙâΩµ¡…ΩâÖπ—îÅ…ïç•â•ëºÅï∏ÅïÕ—ÑÅëïµΩÕ—…ÖçßÕ∏∏Å∞ÅëïÕâ±Ω≈’ïºÅ…ïÖ∞Å…ï≈’•ï…îÅŸÖ±•ëÖ»Åï∞Å¡ÖùºÅ‰ÅçΩπïç—Ö»Åï∞ÅÖ…ç°•ŸºÅ5@Ã∏àÏ)ÙÏ(ΩÕç…•¡–¯ΩâΩë‰¯Ω°—µ∞
+const $=id=>document.getElementById(id);
+$("start").onclick=()=>{if(!$("phone").value.trim()||!$("v1").files.length){alert("Ingresa tu celular y adjunta el voucher.");return;}$("s1").textContent="Comprobante recibido en esta demostracion. La aprobacion real requiere validar el pago."; $("form").classList.remove("hidden");$("form").scrollIntoView({behavior:"smooth"});};
+$("create").onclick=()=>{if(!$("name").value.trim()||!$("story").value.trim()||!$("dedication").value.trim()){alert("Completa el nombre, la historia y la dedicatoria.");return;}$("s2").textContent="Formulario completado. La generacion musical real se activara al conectar y probar la API musical.";$("download").classList.remove("hidden");$("download").scrollIntoView({behavior:"smooth"});};
+$("finish").onclick=()=>{if(!$("v2").files.length){alert("Adjunta el segundo voucher.");return;}$("s3").textContent="Comprobante recibido en esta demostracion. El desbloqueo real requiere validar el pago y conectar el archivo MP3.";};
+</script></body></html>
